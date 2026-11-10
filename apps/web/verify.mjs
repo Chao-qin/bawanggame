@@ -72,6 +72,8 @@ try {
 
   await evalJs(`document.querySelector('.card')?.click()`);
   await sleep(300);
+  const menu = await evalJs(`(() => { const e = document.querySelector('.game-menu'); const r = e?.getBoundingClientRect(); return { visible: !!e, bottomAligned: !!r && Math.abs(r.bottom - innerHeight) < 2, options: [...document.querySelectorAll('.game-menu-options button')].map(b => b.textContent.trim()) }; })()`);
+  console.log('Game menu:', JSON.stringify(menu));
   await evalJs(`document.querySelector('.game-menu-options .primary')?.click()`);
   await sleep(7000);
   const j2mePlayer = await evalJs(`(() => { const c = document.querySelector('#canvas'); const gear = document.querySelector('#gear'); return { runtime: !!document.querySelector('.runtime-view'), canvas: !!c, midp: !!window.MIDP, gear: !!gear, w: c?.width || 0, h: c?.height || 0, error: /Could not load|启动失败/.test(document.body.innerText), iframe: !!document.querySelector('iframe') }; })()`);

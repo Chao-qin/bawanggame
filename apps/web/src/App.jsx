@@ -237,7 +237,19 @@ function Library({ kind, onPlay }) {
   const [menuGame, setMenuGame] = useState(null)
   const [selectedGame, setSelectedGame] = useState(null)
 
-  // 云端榜单：Library 从 player 返回时会重挂载，这里自然刷新
+  useEffect(() => {
+    if (!menuGame) return undefined
+    const close = (event) => event.key === 'Escape' && setMenuGame(null)
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', close)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', close)
+    }
+  }, [menuGame])
+
+  // 本地榜单：Library 从 player 返回时会重挂载，重新读取 localStorage。
   useEffect(() => {
     fetchRecent().then(setRecent)
     fetchPopular().then(setPopular)
