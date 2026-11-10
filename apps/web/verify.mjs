@@ -74,6 +74,16 @@ try {
   await sleep(300);
   const menu = await evalJs(`(() => { const e = document.querySelector('.optionSheet'); const r = e?.getBoundingClientRect(); return { visible: !!e, bottomAligned: !!r && Math.abs(r.bottom - innerHeight) < 2, options: [...document.querySelectorAll('.optionBody button')].map(b => b.textContent.trim()) }; })()`);
   console.log('Game menu:', JSON.stringify(menu));
+  const optionStyles = await evalJs(`(() => { const s=document.querySelector('.optionSheet'), b=document.querySelector('.optionButton'); const sr=s.getBoundingClientRect(), br=b.getBoundingClientRect(); return {sheetWidth:sr.width, buttonWidth:br.width, buttonHeight:br.height, buttonBackground:getComputedStyle(b).backgroundColor, viewportWidth:innerWidth}; })()`)
+  console.log('Option visual styles:', JSON.stringify(optionStyles));
+  if (optionStyles.sheetWidth < 480 || optionStyles.buttonHeight < 44 || optionStyles.buttonBackground === 'rgb(239, 239, 239)') throw new Error('Desktop option sheet sizing/styles regression')
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+  await sleep(150)
+  const mobileOptionStyles = await evalJs(`(() => { const s=document.querySelector('.optionSheet'), b=document.querySelector('.optionButton'); const sr=s.getBoundingClientRect(), br=b.getBoundingClientRect(); return {sheetWidth:sr.width, buttonWidth:br.width, buttonHeight:br.height, bottomAligned:Math.abs(sr.bottom-innerHeight)<2, viewportWidth:innerWidth}; })()`)
+  console.log('Mobile option styles:', JSON.stringify(mobileOptionStyles))
+  if (mobileOptionStyles.sheetWidth < 388 || mobileOptionStyles.buttonWidth < 360 || mobileOptionStyles.buttonHeight < 48 || !mobileOptionStyles.bottomAligned) throw new Error('Mobile bottom sheet responsive regression')
+  await send('Emulation.clearDeviceMetricsOverride')
+  await sleep(150)
   await evalJs(`document.querySelector('.optionBody .optionPrimary')?.click()`);
   await sleep(7000);
   const j2mePlayer = await evalJs(`(() => { const c = document.querySelector('#canvas'); const gear = document.querySelector('#gear'); return { runtime: !!document.querySelector('.runtime-view'), canvas: !!c, midp: !!window.MIDP, gear: !!gear, w: c?.width || 0, h: c?.height || 0, error: /Could not load|启动失败/.test(document.body.innerText), iframe: !!document.querySelector('iframe') }; })()`);

@@ -215,7 +215,7 @@ function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
           <button className="border-0 bg-transparent text-2xl text-dim" onClick={onClose} aria-label="关闭">×</button>
         </div>
         <div className="optionBody">
-          <button onClick={() => { onSelect(game); onClose() }}>选择</button>
+          <button className="optionButton" onClick={() => { onSelect(game); onClose() }}>选择</button>
           <button className="optionButton optionPrimary" onClick={() => { onStart(game); onClose() }}>启动</button>
           {game.local && <button className="optionButton optionDanger" onClick={() => { onRemove(game); onClose() }}>卸载</button>}
         </div>
@@ -317,7 +317,7 @@ function Library({ kind, onPlay }) {
         <div className="status statusError">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>
       )}
       {!server.error && (
-        <div className="grid">
+        <div className="gameGrid">
           {games.map((g) => (
             <GameCard
               key={(g.local ? 'local:' : '') + g.kind + ':' + g.file}
@@ -375,7 +375,7 @@ function Player({ game, onBack }) {
             <strong>退出当前游戏？</strong>
             <span>当前游戏进度可能尚未保存。</span>
             <div>
-              <button onClick={() => setConfirming(false)}>继续游戏</button>
+              <button className="optionButton" onClick={() => setConfirming(false)}>继续游戏</button>
               <button className="optionButton optionDanger" onClick={exit}>退出游戏</button>
             </div>
           </div>
