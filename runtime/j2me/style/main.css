@@ -82,8 +82,9 @@ body.rotate-180 .runtime-stage { transform: rotate(180deg); }
 body.runtime-active { display: flex !important; flex-direction: column !important; }
 body.runtime-active #display-container { grid-row: auto !important; grid-column: auto !important; height: auto !important; }
 body.runtime-active #keypad { display: flex !important; }
-body.runtime-active #phone { height: 100%; max-height: 100%; }
-body.runtime-active #display-container { flex: 1 1 58%; min-height: 0; align-items: center; }
+body.runtime-active .runtime-stage { width: min(calc(100vw - 20px), 480px); height: auto; max-height: none; }
+body.runtime-active #phone { height: auto; max-height: none; }
+body.runtime-active #display-container { flex: 0 0 auto; min-height: 0; align-items: center; }
 body.runtime-active #display { flex: 0 1 auto; }
 body.runtime-active #nav,
 body.runtime-active #numpad { width: auto !important; grid-column: auto !important; grid-row: auto !important; }
@@ -91,10 +92,10 @@ body.runtime-active #keypad.keypad-1 { --u: min(30px, 6vw, 4vh); }
 body.runtime-active #keypad.keypad-2 { --u: min(38px, 7vw, 4.5vh); }
 body.runtime-active #keypad.keypad-3 { --u: min(46px, 8vw, 5vh); }
 body.runtime-active #keypad.keypad-4 { --u: min(55px, 9vw, 5.5vh); }
-body.runtime-active #keypad { flex: 1 1 42%; min-height: 0; justify-content: stretch; }
-body.runtime-active #nav { flex: 1 1 0; height: auto; min-height: 0; }
-body.runtime-active #numpad { flex: 1 1 0; grid-auto-rows: minmax(0, 1fr); }
-body.runtime-active #numpad .key { height: auto; min-height: 0; }
+body.runtime-active #keypad { flex: 0 0 auto; min-height: 0; justify-content: flex-start; }
+body.runtime-active #nav { flex: 0 0 auto; height: calc(var(--u) * 4.6); min-height: 0; }
+body.runtime-active #numpad { flex: 0 0 auto; grid-auto-rows: auto; }
+body.runtime-active #numpad .key { height: calc(var(--u) * 0.95); min-height: 0; }
 body.runtime-active #panel,
 body.runtime-active #panel .panel-box {
   touch-action: pan-y !important;
