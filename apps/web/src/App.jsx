@@ -156,29 +156,17 @@ function formatSize(n) {
   return Math.max(1, Math.round(n / 1024)) + ' KB'
 }
 
-function GameCard({ game, onPlay, onRemove }) {
+function GameCard({ game, onOpen, selected }) {
   const initial = (game.name || '?').trim().charAt(0).toUpperCase()
   return (
     <div
-      className="card"
+      className={'card' + (selected ? ' selected' : '')}
       role="button"
       tabIndex={0}
-      onClick={() => onPlay(game)}
-      onKeyDown={(e) => e.key === 'Enter' && onPlay(game)}
+      onClick={() => onOpen(game)}
+      onKeyDown={(e) => e.key === 'Enter' && onOpen(game)}
       title={game.desc || game.name}
     >
-      {onRemove && (
-        <button
-          className="card-remove"
-          title="删除该游戏"
-          onClick={(e) => {
-            e.stopPropagation()
-            if (window.confirm('删除「' + game.name + '」？')) onRemove(game.file)
-          }}
-        >
-          ✕
-        </button>
-      )}
       <div className="card-icon">
         {game.iconUrl ? <img src={game.iconUrl} alt="" /> : initial}
       </div>
@@ -190,11 +178,11 @@ function GameCard({ game, onPlay, onRemove }) {
   )
 }
 
-function MiniCard({ item, onPlay }) {
+function MiniCard({ item, onOpen }) {
   const initial = (item.name || '?').trim().charAt(0).toUpperCase()
   const meta = item.plays != null ? item.plays + ' 次游玩' : ''
   return (
-    <button className="mini-card" onClick={() => onPlay(item)} title={item.name}>
+    <button className="mini-card" onClick={() => onOpen(item)} title={item.name}>
       <div className="card-icon">{initial}</div>
       <div className="card-name">{item.name}</div>
       {meta && <div className="card-meta">{meta}</div>}
@@ -202,17 +190,37 @@ function MiniCard({ item, onPlay }) {
   )
 }
 
-function GameRow({ title, items, onPlay }) {
+function GameRow({ title, items, onOpen }) {
   if (!items || items.length === 0) return null
   return (
     <section className="row-section">
       <h2 className="row-title">{title}</h2>
       <div className="row-scroll">
         {items.map((it) => (
-          <MiniCard key={it.kind + ':' + it.file} item={it} onPlay={onPlay} />
+          <MiniCard key={it.kind + ':' + it.file} item={it} onOpen={onOpen} />
         ))}
       </div>
     </section>
+  )
+}
+
+function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
+  if (!game) return null
+  return (
+    <div className="game-menu-backdrop" role="presentation" onClick={onClose}>
+      <section className="game-menu" role="dialog" aria-modal="true" aria-label="游戏选项" onClick={(e) => e.stopPropagation()}>
+        <div className="game-menu-head">
+          <div className="game-menu-icon">{(game.name || '?').trim().charAt(0).toUpperCase()}</div>
+          <div><strong>{game.name}</strong><span>{game.vendor || (game.local ? '本机游戏' : '在线游戏')}</span></div>
+          <button className="game-menu-close" onClick={onClose} aria-label="关闭">×</button>
+        </div>
+        <div className="game-menu-options">
+          <button onClick={() => { onSelect(game); onClose() }}>选择</button>
+          <button className="primary" onClick={() => { onStart(game); onClose() }}>启动</button>
+          {game.local && <button className="danger" onClick={() => { onRemove(game); onClose() }}>卸载</button>}
+        </div>
+      </section>
+    </div>
   )
 }
 
@@ -226,6 +234,8 @@ function Library({ kind, onPlay }) {
   const [busy, setBusy] = useState(false)
   const [recent, setRecent] = useState([])
   const [popular, setPopular] = useState([])
+  const [menuGame, setMenuGame] = useState(null)
+  const [selectedGame, setSelectedGame] = useState(null)
 
   // 云端榜单：Library 从 player 返回时会重挂载，这里自然刷新
   useEffect(() => {
@@ -240,6 +250,13 @@ function Library({ kind, onPlay }) {
     }
     onPlay(g)
     recordPlay(g)
+  }
+
+  function openMenu(g) { setMenuGame(g) }
+
+  function removeFromMenu(g) {
+    if (!g.local) return
+    if (window.confirm('卸载「' + g.name + '」？')) local.remove(g.file)
   }
 
   const games = useMemo(() => {
@@ -282,8 +299,8 @@ function Library({ kind, onPlay }) {
           {server.loading ? '加载中…' : server.error ? '加载失败' : games.length + ' 款'}
         </span>
       </div>
-      <GameRow title="🔥 大家都在玩" items={popular} onPlay={handlePlay} />
-      <GameRow title="🕘 最近在玩" items={recent} onPlay={handlePlay} />
+      <GameRow title="🔥 大家都在玩" items={popular} onOpen={openMenu} />
+      <GameRow title="🕘 最近在玩" items={recent} onOpen={openMenu} />
       {server.error && (
         <div className="status error">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>
       )}
@@ -293,13 +310,20 @@ function Library({ kind, onPlay }) {
             <GameCard
               key={(g.local ? 'local:' : '') + g.kind + ':' + g.file}
               game={g}
-              onPlay={handlePlay}
-              onRemove={g.local ? local.remove : null}
+              onOpen={openMenu}
+              selected={selectedGame && selectedGame.file === g.file && selectedGame.kind === g.kind}
             />
           ))}
         </div>
       )}
       {!server.error && !server.loading && games.length === 0 && <div className="status">没有匹配的游戏</div>}
+      <GameMenu
+        game={menuGame}
+        onStart={handlePlay}
+        onSelect={setSelectedGame}
+        onRemove={removeFromMenu}
+        onClose={() => setMenuGame(null)}
+      />
     </section>
   )
 }

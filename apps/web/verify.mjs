@@ -71,6 +71,8 @@ try {
   await send('Page.captureScreenshot').then(r => fs.writeFileSync(SHOT1, Buffer.from(r.data, 'base64')));
 
   await evalJs(`document.querySelector('.card')?.click()`);
+  await sleep(300);
+  await evalJs(`document.querySelector('.game-menu-options .primary')?.click()`);
   await sleep(7000);
   const j2mePlayer = await evalJs(`(() => { const c = document.querySelector('#canvas'); const gear = document.querySelector('#gear'); return { runtime: !!document.querySelector('.runtime-view'), canvas: !!c, midp: !!window.MIDP, gear: !!gear, w: c?.width || 0, h: c?.height || 0, error: /Could not load|启动失败/.test(document.body.innerText), iframe: !!document.querySelector('iframe') }; })()`);
   console.log('J2ME runtime:', JSON.stringify(j2mePlayer));
@@ -94,6 +96,8 @@ try {
 
   // 3. open first maopao game
   await evalJs(`document.querySelector('.card').click()`);
+  await sleep(300);
+  await evalJs(`document.querySelector('.game-menu-options .primary')?.click()`);
   await sleep(12000);
   const player = await evalJs(`(() => {
     return { player: !!document.querySelector('.player'), runtime: !!document.querySelector('.runtime-view'), phone: !!document.querySelector('#phone'), iframe: !!document.querySelector('iframe') };

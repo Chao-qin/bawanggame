@@ -212,6 +212,16 @@ body.fixed-screen #display-container {
   user-select: none;
 }
 
+/* 手机壳内部：按键区始终填满可用宽度，不能被旧的桌面 max-width 限制。 */
+body.runtime-active #keypad {
+  width: 100%;
+  max-width: none;
+}
+body.runtime-active #nav,
+body.runtime-active #numpad {
+  width: 100%;
+}
+
 /* 最终防线：部分移动浏览器会忽略祖先的 user-select，按键树必须逐节点禁用。 */
 #keypad,
 #keypad *,
