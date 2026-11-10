@@ -1,0 +1,204 @@
+#fb-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 40;
+  box-sizing: border-box;
+  max-width: min(90vw, 420px);
+  padding: 9px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: #222a38;
+  color: #eef3fa;
+  font: 13px/1.45 system-ui, -apple-system, sans-serif;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: fb-in 0.18s ease-out;
+}
+
+#fb-toast[hidden] {
+  display: none;
+}
+
+#text-diag {
+  position: fixed;
+  z-index: 22;
+  box-sizing: border-box;
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(140, 190, 255, 0.5);
+  border-radius: 6px;
+  background: rgba(8, 12, 20, 0.9);
+  color: #fff;
+  font-family: system-ui, -apple-system, sans-serif;
+  pointer-events: none;
+}
+
+#fb-toast.ok {
+  border-color: #2f7d55;
+  background: #1c3a2b;
+}
+
+#fb-toast.error {
+  border-color: #8c3a3a;
+  background: #3a2020;
+}
+
+#fb-toast.out {
+  animation: fb-out 0.2s ease-in forwards;
+}
+
+@keyframes fb-in {
+  from { opacity: 0; transform: translate(-50%, 10px) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@keyframes fb-out {
+  to { opacity: 0; transform: translate(-50%, 6px); }
+}
+
+.opt.flash {
+  animation: opt-flash 0.9s ease-out;
+}
+
+@keyframes opt-flash {
+  0%, 100% { background: transparent; }
+  20% { background: rgba(80, 150, 255, 0.22); }
+}
+
+#panel:not([hidden]) .panel-box {
+  animation: panel-in 0.18s ease-out;
+}
+
+@keyframes panel-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+.key.down {
+  outline: 2px solid rgba(140, 190, 255, 0.55);
+  outline-offset: 1px;
+}
+
+.dir.down::before {
+  border-color: #dbeaff;
+  opacity: 1;
+}
+
+.preset-sec .sub {
+  margin-top: 8px;
+}
+
+/* 通用按键点按反馈：幅度刻意压低，够感知但不抢画面 */
+.key.tap {
+  animation: key-tap 0.16s ease-out;
+}
+
+@keyframes key-tap {
+  0% { transform: scale(0.965); filter: brightness(1.16); }
+  55% { transform: scale(1.012); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+/* 四个功能键是大面积象限，且靠 mask 挖出圆盘：
+   缩放会把挖孔一起拉变形，亮度 1.9 又是整片闪一下 —— 这才是"夸张"的来源。
+   这里彻底不做位移/缩放/涟漪，只留一段极短亮度脉冲，收尾与 :active 的 1.3 对齐。 */
+#choice.tap, #back.tap, #ret.tap, #clear.tap {
+  animation: fn-tap 0.13s ease-out;
+}
+
+@keyframes fn-tap {
+  0% { filter: brightness(1.34); }
+  100% { filter: brightness(1); }
+}
+
+.seg button, .chip, .fm-open, .pb-close, .menu button {
+  transition: transform 0.08s, filter 0.08s;
+}
+
+.seg button:active, .chip:active, .fm-open:active, .pb-close:active, .menu button:active {
+  transform: scale(0.95);
+  filter: brightness(1.25);
+}
+
+.opt select:active, .opt select:focus {
+  border-color: #5b8def;
+}
+
+@media (pointer: coarse) {
+  .key {
+    min-height: 44px;
+  }
+
+  .mini, .soft {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+}
+
+@media (pointer: coarse) and (orientation: portrait) {
+  .key {
+    min-height: min(40px, 6vh);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #fb-toast, #fb-toast.out, .opt.flash, #panel:not([hidden]) .panel-box, .key.tap,
+  #choice.tap, #back.tap, #ret.tap, #clear.tap {
+    animation: none;
+  }
+}
+
+#nav {
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+#choice { border-radius: 14px 0 0 0; }
+#back { border-radius: 0 14px 0 0; }
+#ret { border-radius: 0 0 0 14px; }
+#clear { border-radius: 0 0 14px 0; }
+
+#choice, #back {
+  background: linear-gradient(155deg, #43506a 0%, #333d51 100%);
+}
+
+#ret, #clear {
+  background: linear-gradient(155deg, #343d4e 0%, #272e3b 100%);
+}
+
+#choice, #back, #ret, #clear {
+  transition: filter 0.12s ease;
+}
+
+#choice:active, #back:active, #ret:active, #clear:active {
+  filter: brightness(1.3);
+}
+
+.soft::before {
+  box-shadow: 0 0 8px rgba(190, 215, 255, 0.3);
+}
+
+.mini {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+#dpad {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 0 2px rgba(8, 12, 18, 0.6),
+    0 6px 22px rgba(0, 0, 0, 0.45);
+}
+
+#numpad .key {
+  transition: filter 0.1s ease;
+}
+
+#numpad .key:active {
+  filter: brightness(1.22);
+}

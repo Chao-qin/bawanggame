@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+apps/*/node_modules/
+.pnpm-store/
+
+# Build output and deployment staging
+public/
+dist/
+site-deploy/
+coverage/
+.vite/
+.turbo/
+
+# Local game binaries and generated phone data
+games/jar/*.jar
+games/jar/*.jad
+games/jar/.cache/
+runtime/j2me/src/**/obj/
+runtime/j2me/src/**/build/
+runtime/j2me/src/**/dist/
+runtime/mrp/public/
+
+# Runtime state, databases, logs and temporary files
+.data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.pid
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS and editor files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Icon?
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+*.code-workspace
+
+# Python cache (legacy tools only)
+__pycache__/
+*.py[cod]
+
+# Local deployment/tool metadata
+.workbuddy/
+.wbapp_*.genie
+.opencode/
+
+# Keep empty asset directories in version control when needed
+!.gitkeep
