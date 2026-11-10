@@ -82,6 +82,9 @@ body.rotate-180 .runtime-stage { transform: rotate(180deg); }
 body.runtime-active { display: flex !important; flex-direction: column !important; }
 body.runtime-active #display-container { grid-row: auto !important; grid-column: auto !important; height: auto !important; }
 body.runtime-active #keypad { display: flex !important; }
+body.runtime-active #phone { height: auto; max-height: 100%; }
+body.runtime-active #display-container { flex: 0 1 auto; align-items: flex-start; }
+body.runtime-active #display { flex: 0 1 auto; }
 body.runtime-active #nav,
 body.runtime-active #numpad { width: auto !important; grid-column: auto !important; grid-row: auto !important; }
 body.runtime-active #keypad.keypad-1 { --u: min(30px, 6vw, 4vh); }
