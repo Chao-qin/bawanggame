@@ -1,7 +1,8 @@
 import React from 'react'
 
 export function PhoneMarkup({ mrp = false }) {
-  return <div id="phone" className="runtime-phone">
+  return <div className="runtime-stage">
+    <div id="phone" className="runtime-phone">
     <div id="editor-layer">
       <div id="textarea-editor" className="textEditor" contentEditable="true" />
       <input id="password-editor" className="textEditor" type="password" />
@@ -35,6 +36,7 @@ export function PhoneMarkup({ mrp = false }) {
         <button id="back" className="key soft" title="右软键" /><button id="ret" className="key mini" title="挂机键">↩</button><button id="clear" className="key mini" title="清除">C</button>
       </div>
       <div id="numpad">{[['1','.,?'],['2','abc'],['3','def'],['4','ghi'],['5','jkl'],['6','mno'],['7','pqrs'],['8','tuv'],['9','wxyz'],['*','+'],['0','␣'],['#','⇧']].map(([n, sub]) => <button key={n} id={n === '*' ? 'star' : n === '#' ? 'pound' : `num${n}`} className="key"><b>{n}</b><i>{sub}</i></button>)}</div>
+    </div>
     </div>
   </div>
 }

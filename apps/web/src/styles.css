@@ -373,7 +373,7 @@ body {
 /* Player: immersive fullscreen, no space-wasting top navigation. */
 .player { position: fixed; inset: 0; z-index: 20; background: #05070a; }
 .player-stage { position: absolute; inset: 0; background: #05070a; }
-.runtime-view { position: absolute; inset: 0; overflow: hidden; }
+.runtime-view { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .runtime-error { position: absolute; z-index: 100; inset: 20px; display: grid; place-items: center; color: #ff8b8b; white-space: pre-wrap; }
 .player-frame { display: block; width: 100%; height: 100%; border: 0; background: #05070a; }
 .player-exit { position: fixed; top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); z-index: 30; width: 38px; height: 38px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; background: rgba(10,14,20,.72); color: #fff; font-size: 26px; line-height: 1; cursor: pointer; backdrop-filter: blur(12px); }

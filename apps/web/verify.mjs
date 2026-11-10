@@ -72,7 +72,7 @@ try {
 
   await evalJs(`document.querySelector('.card')?.click()`);
   await sleep(7000);
-  const j2mePlayer = await evalJs(`(() => { const c = document.querySelector('#canvas'); return { runtime: !!document.querySelector('.runtime-view'), canvas: !!c, module: !!window.Module, w: c?.width || 0, h: c?.height || 0, iframe: !!document.querySelector('iframe') }; })()`);
+  const j2mePlayer = await evalJs(`(() => { const c = document.querySelector('#canvas'); const gear = document.querySelector('#gear'); return { runtime: !!document.querySelector('.runtime-view'), canvas: !!c, midp: !!window.MIDP, gear: !!gear, w: c?.width || 0, h: c?.height || 0, error: /Could not load|启动失败/.test(document.body.innerText), iframe: !!document.querySelector('iframe') }; })()`);
   console.log('J2ME runtime:', JSON.stringify(j2mePlayer));
   await evalJs(`document.querySelector('.player-exit')?.click()`);
   await sleep(200);

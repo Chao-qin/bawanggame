@@ -20,7 +20,7 @@
 
 ## Quick start
 
-Requires Python 3.8+ and Node.js.
+Requires Node.js and pnpm.
 
 ```bash
 pnpm install
@@ -28,9 +28,7 @@ pnpm build
 pnpm start
 ```
 
-Open http://localhost:8080. Put games into the `jar/` folder (they appear in the list for everyone) or add them with the button on the page.
-
-On Windows use `startserver.bat` (allows the proxy to reach the local network).
+Open http://localhost:8080. Put local JAR files into `games/jar/` or add them from the React lobby; browser-added games are stored locally.
 
 ## Deployment
 
@@ -80,7 +78,7 @@ URL parameters to skip the window: `?room=name&pass=password&btname=Nick` joins 
 
 ## Page parameters
 
-`React 播放器?jar=jar/game.jar` and also:
+The React lobby opens J2ME games with internal runtime state; direct HTML player URLs are no longer used.
 
 | Parameter | Value |
 |---|---|
@@ -91,22 +89,25 @@ URL parameters to skip the window: `?room=name&pass=password&btname=Nick` joins 
 
 ## Building the Java part
 
-`java/classes.jar` is prebuilt. After changing anything in `src/`:
+`runtime/j2me/java/classes.jar` is prebuilt. After changing anything in `runtime/j2me/src/`:
 
 ```bash
-src/bt/build.sh     # JSR-82
-src/m3g/build.sh    # M3G (needs clang with the wasm32 target)
+runtime/j2me/src/bt/build.sh     # JSR-82
+runtime/j2me/src/m3g/build.sh    # M3G (needs clang with the wasm32 target)
 ```
 
 ## Layout
 
 ```
-bld/        JS runtime: VM (j2me.js), MIDP (main-all.js), LCDUI, network, audio, 3D, Bluetooth
-java/       classes.jar — MIDP/CLDC class library
-src/bt/     JSR-82 sources
-src/m3g/    M3G sources
-config/     settings, local jars, URL parameters
-apps/server/ Node.js HTTP server, socket proxy, Bluetooth room server
+apps/web/             React PWA and runtime adapters
+apps/server/          Node.js HTTP server, socket proxy, Bluetooth room server
+runtime/j2me/bld/     J2ME VM, MIDP, LCDUI, network, audio, 3D, Bluetooth
+runtime/j2me/src/     JSR-82, M3G and micro3d sources
+runtime/j2me/config/  emulator settings and URL compatibility config
+runtime/j2me/style/   phone shell and LCDUI styles
+runtime/mrp/          React-loaded MRP runtime bridge
+games/jar/            local JAR games (ignored by Git)
+public/               generated React PWA output (ignored by Git)
 ```
 
 ## License and credits

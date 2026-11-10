@@ -1,73 +1,56 @@
-// 云服务客户端：WorkBuddy Cloud Service（小潮霸王 / wbapp_AcuC29CeJ61Bj442ArzTl0）
-// publicConfig 来自 workbuddy_cloud_service activate 结果；publishableKey 可入源码、不入日志。
-import { createWorkBuddyCloud } from '@tencent-ai/workbuddy-cloud-sdk'
+// 本地游玩记录：不依赖云服务、登录或 publishable key。
+// 数据只保存在当前浏览器的 localStorage 中，不会上传网络。
+const STORAGE_KEY = 'xiaochao-play-history'
+const MAX_RECORDS = 100
 
-const publicConfig = {
-  endpoint: 'https://revival-arcade.app.workbuddy.host',
-  oauthRelayBaseUrl: 'https://www.workbuddy.cn/v2/as/genie-baas/oauth',
-  publishableKey: 'wbpk_AcuC29CeJ61Bj442ArzTl0_JfZdwe1FPhxGt5mUkRaVGnjtp70Vr7Rl',
-}
-
-export const cloud = createWorkBuddyCloud({
-  endpoint: publicConfig.endpoint,
-  oauthRelayBaseUrl: publicConfig.oauthRelayBaseUrl,
-  publishableKey: publicConfig.publishableKey,
-})
-
-// 匿名设备身份：免登录游戏厅，游玩记录按设备维度隔离（随机 UUID，无个人数据）
-function getDeviceId() {
-  let id = null
-  try { id = localStorage.getItem('xiaochao-device-id') } catch (e) {}
-  if (!id) {
-    id = 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36)
-    try { localStorage.setItem('xiaochao-device-id', id) } catch (e) {}
+function readHistory() {
+  try {
+    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    return Array.isArray(value) ? value : []
+  } catch (_) {
+    return []
   }
-  return id
 }
 
-function unwrap({ data, error }) {
-  if (error) throw error
-  return data
+function writeHistory(items) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_RECORDS)))
+  } catch (_) {}
 }
 
-/** 记录一次游玩（fire-and-forget，失败静默不影响进入游戏） */
+function keyOf(game) {
+  return `${game.kind}:${game.file}`
+}
+
+/** 记录一次游玩到当前浏览器。 */
 export function recordPlay(game) {
-  return cloud.database
-    .from('play_events')
-    .insert({
-      device_id: getDeviceId(),
-      kind: game.kind,
-      file: game.file,
-      name: game.name || game.file,
-    })
-    .then(unwrap)
-    .catch((e) => console.warn('[cloud] recordPlay failed:', e && e.message))
+  const now = Date.now()
+  const item = {
+    kind: game.kind,
+    file: game.file,
+    name: game.name || game.file,
+    vendor: game.vendor || '',
+    created_at: now,
+    count: 1,
+  }
+  const history = readHistory()
+  const previous = history.find((entry) => keyOf(entry) === keyOf(item))
+  if (previous) item.count = (previous.count || 1) + 1
+  writeHistory([item, ...history.filter((entry) => keyOf(entry) !== keyOf(item))])
 }
 
-/** 本机最近在玩（按匿名设备 ID 隔离） */
+/** 当前浏览器最近打开的游戏。 */
 export function fetchRecent(limit = 12) {
-  return cloud.database
-    .from('play_events')
-    .select('kind, file, name, created_at')
-    .eq('device_id', getDeviceId())
-    .order('created_at', { ascending: false })
-    .limit(limit)
-    .then(unwrap)
-    .catch((e) => {
-      console.warn('[cloud] fetchRecent failed:', e && e.message)
-      return []
-    })
+  return Promise.resolve(
+    readHistory().sort((a, b) => b.created_at - a.created_at).slice(0, limit),
+  )
 }
 
-/** 大家都在玩（全服热门榜，RPC 聚合） */
+/** 当前浏览器打开次数最多的游戏，作为本地热门榜。 */
 export function fetchPopular(limit = 12) {
-  return cloud.database
-    .rpc('get_popular')
-    .select('*')
-    .limit(limit)
-    .then(unwrap)
-    .catch((e) => {
-      console.warn('[cloud] fetchPopular failed:', e && e.message)
-      return []
-    })
+  return Promise.resolve(
+    readHistory()
+      .sort((a, b) => (b.count || 1) - (a.count || 1) || b.created_at - a.created_at)
+      .slice(0, limit),
+  )
 }

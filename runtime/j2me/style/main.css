@@ -54,15 +54,44 @@ body {
 #phone {
   position: relative;
   display: flex;
-  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
   min-height: 0;
   flex-direction: column;
   transform-origin: center center;
-  transition: transform .2s ease;
 }
-body.rotate-90 #phone { transform: rotate(90deg); }
-body.rotate--90 #phone { transform: rotate(-90deg); }
-body.rotate-180 #phone { transform: rotate(180deg); }
+.runtime-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(calc(100vw - 20px), calc((100dvh - 20px) * .6), 480px);
+  height: min(calc(100dvh - 20px), calc((100vw - 20px) / .6), 800px);
+  min-width: 0;
+  min-height: 0;
+  transform-origin: center center;
+}
+body.rotate-90 .runtime-stage,
+body.rotate--90 .runtime-stage {
+  width: min(calc(100dvh - 20px), calc((100vw - 20px) * .6), 480px);
+  height: min(calc(100vw - 20px), calc((100dvh - 20px) / .6), 800px);
+}
+body.rotate-90 .runtime-stage { transform: rotate(90deg); }
+body.rotate--90 .runtime-stage { transform: rotate(-90deg); }
+body.rotate-180 .runtime-stage { transform: rotate(180deg); }
+body.runtime-active { display: flex !important; flex-direction: column !important; }
+body.runtime-active #display-container { grid-row: auto !important; grid-column: auto !important; height: auto !important; }
+body.runtime-active #keypad { display: flex !important; }
+body.runtime-active #nav,
+body.runtime-active #numpad { width: auto !important; grid-column: auto !important; grid-row: auto !important; }
+body.runtime-active #keypad.keypad-1 { --u: min(30px, 6vw, 4vh); }
+body.runtime-active #keypad.keypad-2 { --u: min(38px, 7vw, 4.5vh); }
+body.runtime-active #keypad.keypad-3 { --u: min(46px, 8vw, 5vh); }
+body.runtime-active #keypad.keypad-4 { --u: min(55px, 9vw, 5.5vh); }
+body.runtime-active #panel,
+body.runtime-active #panel .panel-box {
+  touch-action: pan-y !important;
+}
 body[data-layout="free"] #phone { display: block; }
 body[data-layout="free"] #display-container,
 body[data-layout="free"] #keypad { position: absolute; }

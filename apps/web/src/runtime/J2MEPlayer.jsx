@@ -8,6 +8,7 @@ const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/l
 export function J2MEPlayer({ game, onExit }) {
   const [error, setError] = useState('')
   useEffect(() => {
+    document.body.classList.add('runtime-active')
     window.__XIAOCHAO_RUNTIME__ = true
     window.__XIAOCHAO_RUNTIME_JAR = game.local ? game.file : `jar/${game.file}`
     styles.forEach(loadStyle)
@@ -20,7 +21,7 @@ export function J2MEPlayer({ game, onExit }) {
         if (typeof window.onload === 'function') window.onload(new Event('load'))
       } catch (e) { if (alive) setError(e.message || String(e)) }
     })()
-    return () => { alive = false; window.__XIAOCHAO_RUNTIME__ = false; window.__XIAOCHAO_RUNTIME_JAR = '' }
+    return () => { alive = false; document.body.classList.remove('runtime-active'); window.__XIAOCHAO_RUNTIME__ = false; window.__XIAOCHAO_RUNTIME_JAR = '' }
   }, [game, onExit])
   return <div className="runtime-view">{error ? <div className="runtime-error">{error}</div> : null}<PhoneMarkup /></div>
 }
