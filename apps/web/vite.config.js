@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import UnoCSS from 'unocss/vite'
 
 // 构建产物部署到小潮霸王项目根目录，由 Node 服务直接提供 React PWA 首页。
 // 模拟器内核资源在站点根路径，开发时代理到 8080。
@@ -33,7 +34,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
-  plugins: [react()],
+  plugins: [react(), UnoCSS()],
   server: {
     port: 5173,
     proxy: Object.fromEntries(proxyTargets.map((p) => [p, 'http://127.0.0.1:8080'])),

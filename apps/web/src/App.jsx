@@ -160,18 +160,18 @@ function GameCard({ game, onOpen, selected }) {
   const initial = (game.name || '?').trim().charAt(0).toUpperCase()
   return (
     <div
-      className={'card' + (selected ? ' selected' : '')}
+      className={'card ' + (selected ? 'cardSelected' : '')}
       role="button"
       tabIndex={0}
       onClick={() => onOpen(game)}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(game)}
       title={game.desc || game.name}
     >
-      <div className="card-icon">
-        {game.iconUrl ? <img src={game.iconUrl} alt="" /> : initial}
+      <div className="cardIcon">
+        {game.iconUrl ? <img className="h-full w-full object-contain image-render-pixel" src={game.iconUrl} alt="" /> : initial}
       </div>
-      <div className="card-name">{game.name}</div>
-      <div className="card-meta">
+      <div className="cardName">{game.name}</div>
+      <div className="cardMeta">
         {[game.vendor, formatSize(game.size), game.local ? '本机' : ''].filter(Boolean).join(' · ') || '\u00a0'}
       </div>
     </div>
@@ -182,10 +182,10 @@ function MiniCard({ item, onOpen }) {
   const initial = (item.name || '?').trim().charAt(0).toUpperCase()
   const meta = item.plays != null ? item.plays + ' 次游玩' : ''
   return (
-    <button className="mini-card" onClick={() => onOpen(item)} title={item.name}>
-      <div className="card-icon">{initial}</div>
-      <div className="card-name">{item.name}</div>
-      {meta && <div className="card-meta">{meta}</div>}
+    <button className="miniCard" onClick={() => onOpen(item)} title={item.name}>
+      <div className="cardIcon">{initial}</div>
+      <div className="cardName">{item.name}</div>
+      {meta && <div className="cardMeta">{meta}</div>}
     </button>
   )
 }
@@ -193,9 +193,9 @@ function MiniCard({ item, onOpen }) {
 function GameRow({ title, items, onOpen }) {
   if (!items || items.length === 0) return null
   return (
-    <section className="row-section">
-      <h2 className="row-title">{title}</h2>
-      <div className="row-scroll">
+    <section className="row">
+      <h2 className="rowTitle">{title}</h2>
+      <div className="rowScroll">
         {items.map((it) => (
           <MiniCard key={it.kind + ':' + it.file} item={it} onOpen={onOpen} />
         ))}
@@ -207,17 +207,17 @@ function GameRow({ title, items, onOpen }) {
 function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
   if (!game) return null
   return (
-    <div className="game-menu-backdrop" role="presentation" onClick={onClose}>
-      <section className="game-menu" role="dialog" aria-modal="true" aria-label="游戏选项" onClick={(e) => e.stopPropagation()}>
-        <div className="game-menu-head">
-          <div className="game-menu-icon">{(game.name || '?').trim().charAt(0).toUpperCase()}</div>
-          <div><strong>{game.name}</strong><span>{game.vendor || (game.local ? '本机游戏' : '在线游戏')}</span></div>
-          <button className="game-menu-close" onClick={onClose} aria-label="关闭">×</button>
+    <div className="optionBackdrop" role="presentation" onClick={onClose}>
+      <section className="optionSheet" role="dialog" aria-modal="true" aria-label="游戏选项" onClick={(e) => e.stopPropagation()}>
+        <div className="optionHead">
+          <div className="optionIcon">{(game.name || '?').trim().charAt(0).toUpperCase()}</div>
+          <div className="min-w-0 grid gap-1"><strong className="overflow-hidden text-ellipsis whitespace-nowrap">{game.name}</strong><span>{game.vendor || (game.local ? '本机游戏' : '在线游戏')}</span></div>
+          <button className="border-0 bg-transparent text-2xl text-dim" onClick={onClose} aria-label="关闭">×</button>
         </div>
-        <div className="game-menu-options">
+        <div className="optionBody">
           <button onClick={() => { onSelect(game); onClose() }}>选择</button>
-          <button className="primary" onClick={() => { onStart(game); onClose() }}>启动</button>
-          {game.local && <button className="danger" onClick={() => { onRemove(game); onClose() }}>卸载</button>}
+          <button className="optionButton optionPrimary" onClick={() => { onStart(game); onClose() }}>启动</button>
+          {game.local && <button className="optionButton optionDanger" onClick={() => { onRemove(game); onClose() }}>卸载</button>}
         </div>
       </section>
     </div>
@@ -302,7 +302,7 @@ function Library({ kind, onPlay }) {
           onChange={(e) => setQuery(e.target.value)}
         />
         {kind === 'j2me' && (
-          <label className={'upload-btn' + (busy ? ' busy' : '')}>
+          <label className={'upload' + (busy ? ' opacity-60 pointer-events-none' : '')}>
             {busy ? '导入中…' : '＋ 添加 .jar'}
             <input type="file" accept=".jar" multiple hidden onChange={handleUpload} />
           </label>
@@ -314,7 +314,7 @@ function Library({ kind, onPlay }) {
       <GameRow title="🔥 大家都在玩" items={popular} onOpen={openMenu} />
       <GameRow title="🕘 最近在玩" items={recent} onOpen={openMenu} />
       {server.error && (
-        <div className="status error">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>
+        <div className="status statusError">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>
       )}
       {!server.error && (
         <div className="grid">
@@ -359,22 +359,24 @@ function Player({ game, onBack }) {
   function requestBack() { setConfirming(true) }
   const exit = () => {
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
-    window.location.assign('/')
+    // The legacy VM patches globals and installs document/window listeners;
+    // hard-navigate after unmount to give the next game a pristine JS realm.
+    window.location.reload()
   }
   return (
     <div className="player">
-      <button className="player-exit" onClick={requestBack} aria-label="返回大厅">‹</button>
-      <div ref={stageRef} className="player-stage">
+      <button className="playerExit" onClick={requestBack} aria-label="返回大厅">‹</button>
+      <div ref={stageRef} className="playerStage">
         {game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} /> : <MrpPlayer game={game} onExit={requestBack} />}
       </div>
       {confirming && (
-        <div className="exit-confirm" role="dialog" aria-modal="true">
-          <div className="exit-confirm-box">
+        <div className="exitConfirm" role="dialog" aria-modal="true">
+          <div className="exitBox">
             <strong>退出当前游戏？</strong>
             <span>当前游戏进度可能尚未保存。</span>
             <div>
               <button onClick={() => setConfirming(false)}>继续游戏</button>
-              <button className="danger" onClick={exit}>退出游戏</button>
+              <button className="optionButton optionDanger" onClick={exit}>退出游戏</button>
             </div>
           </div>
         </div>
@@ -396,14 +398,14 @@ export default function App() {
   if (game) return <Player game={game} onBack={() => setGame(null)} />
 
   return (
-    <div className="app">
+    <div className="appShell app">
       <header className="header">
         <h1 className="logo">小潮霸王</h1>
         <nav className="tabs">
           {TABS.map((t) => (
             <button
               key={t.id}
-              className={'tab' + (tab === t.id ? ' active' : '')}
+              className={'tab' + (tab === t.id ? ' tabActive' : '')}
               onClick={() => switchTab(t.id)}
             >
               {t.label}

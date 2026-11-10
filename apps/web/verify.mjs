@@ -64,7 +64,7 @@ try {
     const tabs = [...document.querySelectorAll('.tab')].map(b => b.textContent.trim());
     const cards = document.querySelectorAll('.card').length;
     const count = document.querySelector('.count')?.textContent || '';
-    const hasUpload = !!document.querySelector('.upload-btn');
+    const hasUpload = !!document.querySelector('.upload');
     return { tabs, cards, count, hasUpload, title: document.title, url: location.href };
   })()`);
   console.log('J2ME tab:', JSON.stringify(j2me));
@@ -72,25 +72,38 @@ try {
 
   await evalJs(`document.querySelector('.card')?.click()`);
   await sleep(300);
-  const menu = await evalJs(`(() => { const e = document.querySelector('.game-menu'); const r = e?.getBoundingClientRect(); return { visible: !!e, bottomAligned: !!r && Math.abs(r.bottom - innerHeight) < 2, options: [...document.querySelectorAll('.game-menu-options button')].map(b => b.textContent.trim()) }; })()`);
+  const menu = await evalJs(`(() => { const e = document.querySelector('.optionSheet'); const r = e?.getBoundingClientRect(); return { visible: !!e, bottomAligned: !!r && Math.abs(r.bottom - innerHeight) < 2, options: [...document.querySelectorAll('.optionBody button')].map(b => b.textContent.trim()) }; })()`);
   console.log('Game menu:', JSON.stringify(menu));
-  await evalJs(`document.querySelector('.game-menu-options .primary')?.click()`);
+  await evalJs(`document.querySelector('.optionBody .optionPrimary')?.click()`);
   await sleep(7000);
   const j2mePlayer = await evalJs(`(() => { const c = document.querySelector('#canvas'); const gear = document.querySelector('#gear'); return { runtime: !!document.querySelector('.runtime-view'), canvas: !!c, midp: !!window.MIDP, gear: !!gear, w: c?.width || 0, h: c?.height || 0, error: /Could not load|启动失败/.test(document.body.innerText), iframe: !!document.querySelector('iframe') }; })()`);
   console.log('J2ME runtime:', JSON.stringify(j2mePlayer));
-  await evalJs(`document.querySelector('.player-exit')?.click()`);
+  await evalJs(`document.querySelector('.playerExit')?.click()`);
   await sleep(200);
-  await evalJs(`document.querySelector('.exit-confirm .danger')?.click()`);
-  await sleep(1000);
+  const exitDialog = await evalJs(`JSON.stringify({dialog:!!document.querySelector('.exitConfirm'),button:!!document.querySelector('.exitConfirm .optionDanger'),text:document.querySelector('.exitConfirm')?.innerText})`);
+  console.log('Exit confirm:', exitDialog);
+  await evalJs(`document.querySelector('.exitConfirm .optionDanger')?.click()`);
+  let returnedToLobby = false;
+  let returnedState = null;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    await sleep(300);
+    try {
+      returnedState = await evalJs(`JSON.stringify({url:location.href,title:document.title,root:!!document.querySelector('#root'),tabs:document.querySelectorAll('.tab').length,body:document.body.innerText.slice(0,100)})`);
+      returnedToLobby = JSON.parse(returnedState).tabs === 2;
+      if (returnedToLobby) break;
+    } catch {}
+  }
+  if (!returnedToLobby) throw new Error('返回大厅后 React 标签未恢复：' + returnedState);
 
   // 2. switch to maopao
   await evalJs(`document.querySelectorAll('.tab')[1].click()`);
   await sleep(4000);
+  console.log('Tab state after switch:', await evalJs(`JSON.stringify({ buttons: [...document.querySelectorAll('.tab')].map(b => ({text:b.textContent, className:b.className})), text:document.querySelector('.library')?.innerText.slice(0,250), errors:document.querySelectorAll('.statusError').length })`));
   const maopao = await evalJs(`(() => {
-    const active = document.querySelector('.tab.active')?.textContent.trim();
+    const active = document.querySelector('.tabActive')?.textContent.trim();
     const cards = document.querySelectorAll('.card').length;
     const count = document.querySelector('.count')?.textContent || '';
-    const names = [...document.querySelectorAll('.card-name')].slice(0, 3).map(e => e.textContent);
+    const names = [...document.querySelectorAll('.cardName')].slice(0, 3).map(e => e.textContent);
     return { active, cards, count, names };
   })()`);
   console.log('冒泡 tab:', JSON.stringify(maopao));
@@ -99,7 +112,7 @@ try {
   // 3. open first maopao game
   await evalJs(`document.querySelector('.card').click()`);
   await sleep(300);
-  await evalJs(`document.querySelector('.game-menu-options .primary')?.click()`);
+  await evalJs(`document.querySelector('.optionBody .optionPrimary')?.click()`);
   await sleep(12000);
   const player = await evalJs(`(() => {
     return { player: !!document.querySelector('.player'), runtime: !!document.querySelector('.runtime-view'), phone: !!document.querySelector('#phone'), iframe: !!document.querySelector('iframe') };
