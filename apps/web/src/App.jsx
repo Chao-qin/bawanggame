@@ -6,6 +6,7 @@ import { MrpPlayer } from './runtime/MrpPlayer.jsx'
 const TABS = [
   { id: 'j2me', label: 'J2ME' },
   { id: 'maopao', label: '冒泡社区' },
+  { id: 'store', label: '52java 商城' },
 ]
 
 function hasLocalJars() {
@@ -84,6 +85,25 @@ function useServerJars() {
     }
   }, [])
   return state
+}
+
+function useJavaStore(query, category, page) {
+  const [state, setState] = useState({ loading: true, error: null, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    let alive = true
+    setState((current) => ({ ...current, loading: true, error: null }))
+    const params = new URLSearchParams({ page: String(page) })
+    if (query) params.set('query', query)
+    if (category) params.set('category', category)
+    if (tick) params.set('refresh', '1')
+    fetch('/__52java/catalog?' + params)
+      .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json() })
+      .then((data) => { if (alive) setState({ loading: false, error: null, games: data.games || [], siteUrl: data.siteUrl || 'https://java.52emu.cn', pages: data.pages || 1, total: data.total || 0 }) })
+      .catch((e) => { if (alive) setState((current) => ({ ...current, loading: false, error: String(e.message || e) })) })
+    return () => { alive = false }
+  }, [tick, query, category, page])
+  return { ...state, refresh: () => setTick((value) => value + 1) }
 }
 
 function useLocalJars(enabled) {
@@ -340,6 +360,49 @@ function Library({ kind, onPlay }) {
   )
 }
 
+function Store({ onRefreshLibrary }) {
+  const [query, setQuery] = useState('')
+  const [appliedQuery, setAppliedQuery] = useState('')
+  const [category, setCategory] = useState('')
+  const [page, setPage] = useState(1)
+  const store = useJavaStore(appliedQuery, category, page)
+  const [busy, setBusy] = useState('')
+  const [done, setDone] = useState('')
+  async function download(game) {
+    setBusy(game.id); setDone('')
+    try {
+      const response = await fetch('/__52java/download?id=' + encodeURIComponent(game.id))
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || '下载失败')
+      setDone(game.id)
+      onRefreshLibrary()
+    } catch (error) { window.alert('下载失败：' + (error.message || error)) }
+    finally { setBusy('') }
+  }
+  return <section className="storePage">
+    <div className="storeHero">
+      <div><span className="eyebrow">REMOTE LIBRARY</span><h2 className="storeHeroTitle">52java 游戏商城</h2><p className="storeHeroText">从经典 Java 游戏目录直接加入你的本地模拟器。</p></div>
+      <div className="storeActions"><button className="ghostButton" onClick={store.refresh} disabled={store.loading}>刷新目录</button><a className="ghostButton" href={store.siteUrl} target="_blank" rel="noreferrer">打开原站 ↗</a></div>
+    </div>
+    <form className="storeFilters" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedQuery(query.trim()) }}>
+      <input className="search" type="search" placeholder="搜索 52java 游戏" value={query} onChange={(event) => setQuery(event.target.value)} />
+      <select className="categorySelect" value={category} onChange={(event) => { setPage(1); setCategory(event.target.value) }} aria-label="游戏分类">
+        <option value="">全部分类</option><option value="1">角色</option><option value="2">动作</option><option value="3">益智</option><option value="4">策略</option><option value="5">射击</option><option value="7">冒险</option><option value="8">赛车</option><option value="9">棋牌</option><option value="10">养成</option><option value="11">经营</option><option value="12">飞行</option><option value="13">格斗</option><option value="14">体育</option>
+      </select>
+      <button className="ghostButton" type="submit">搜索</button>
+    </form>
+    {store.error && <div className="status statusError">商城目录加载失败：{store.error} <button className="inlineAction" onClick={store.refresh}>重试</button></div>}
+    {store.loading && <div className="status">正在同步 52java 目录…</div>}
+    {!store.loading && !store.error && !store.games.length && <div className="emptyPanel"><strong>{appliedQuery ? '没有匹配的游戏' : '目录暂时为空'}</strong><span>可以调整筛选条件，或稍后刷新目录。</span></div>}
+    <div className="storeGrid">{store.games.map((game) => <article className="storeCard" key={game.id}>
+      <div className="storeIcon">{game.iconUrl ? <img src={game.iconUrl} alt="" /> : (game.name || '?').charAt(0)}</div>
+      <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">52java · {game.plays.toLocaleString()} 次下载</p><span className="storeInfoDesc">经典 Java 手机游戏</span></div>
+      <button className="downloadButton" onClick={() => download(game)} disabled={busy === game.id}>{busy === game.id ? '下载中…' : done === game.id ? '已加入' : '加入库'}</button>
+    </article>)}</div>
+    {!store.loading && !store.error && store.games.length > 0 && <div className="storePagination"><span>第 {page} / {store.pages} 页 · {store.total.toLocaleString()} 款</span><div><button className="ghostButton" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</button><button className="ghostButton" disabled={page >= store.pages} onClick={() => setPage(page + 1)}>下一页</button></div></div>}
+  </section>
+}
+
 function Player({ game, onBack }) {
   const [confirming, setConfirming] = useState(false)
   const stageRef = useRef(null)
@@ -367,6 +430,7 @@ function Player({ game, onBack }) {
     <div className="player">
       <button className="playerExit" onClick={requestBack} aria-label="返回大厅">‹</button>
       <div ref={stageRef} className="playerStage">
+        <div className="runtimeToolbar"><span className="runtimeLive"><i /> 正在运行</span><span className="runtimeGame">{game.name}</span><button onClick={requestBack}>退出</button></div>
         {game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} /> : <MrpPlayer game={game} onExit={requestBack} />}
       </div>
       {confirming && (
@@ -386,7 +450,10 @@ function Player({ game, onBack }) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState(() => localStorage.getItem('xiaochao-tab') || 'j2me')
+  const [tab, setTab] = useState(() => {
+    const requested = new URLSearchParams(location.search).get('tab')
+    return TABS.some((item) => item.id === requested) ? requested : localStorage.getItem('xiaochao-tab') || 'j2me'
+  })
   const [game, setGame] = useState(null)
 
   function switchTab(id) {
@@ -395,12 +462,13 @@ export default function App() {
     localStorage.setItem('xiaochao-tab', id)
   }
 
+  const [libraryTick, setLibraryTick] = useState(0)
   if (game) return <Player game={game} onBack={() => setGame(null)} />
 
   return (
     <div className="appShell app">
       <header className="header">
-        <h1 className="logo">小潮霸王</h1>
+        <div><h1 className="logo">小潮霸王</h1><span className="tagline">RETRO JAVA ARCADE</span></div>
         <nav className="tabs">
           {TABS.map((t) => (
             <button
@@ -416,7 +484,7 @@ export default function App() {
       <main className="main">
         {TABS.map((t) => (
           <div key={t.id} className="pane">
-            {tab === t.id && <Library key={t.id} kind={t.id} onPlay={setGame} />}
+            {tab === t.id && (t.id === 'store' ? <Store key={t.id} onRefreshLibrary={() => setLibraryTick((value) => value + 1)} /> : <Library key={t.id + libraryTick} kind={t.id} onPlay={setGame} />)}
           </div>
         ))}
       </main>

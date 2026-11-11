@@ -16,6 +16,7 @@
 - Platform selectable per game (default Sony Ericsson): changes `microedition.platform` and key codes (soft keys, joystick, C/Back) to match Nokia/SE/Samsung, Siemens, Motorola, LG; C (−8) and Back (−11) keys are supported; PC keyboard: arrows, Enter, Q/E as soft keys, Backspace is C, Esc is Back
 - System properties (`microedition.locale` and others) editable per game: Settings → "System properties", with reset to defaults
 - Load your own .jar files straight from the page (stored in the browser)
+- Browse the 52emu.cn Java game catalog and install JARs into the server library
 - File manager for the phone's virtual storage (memory card, saves): upload, download, folders
 
 ## Quick start
@@ -59,6 +60,8 @@ The `Dockerfile` runs `start.sh`: if UDP is available, coturn is started next to
 | `PORT` | HTTP port (default 8080) |
 | `TURN_URL` | external TURN, comma-separated: `turn:host:3478,turn:host:3478?transport=tcp` |
 | `TURN_SECRET` | shared TURN secret (`use-auth-secret` in coturn) |
+| `52JAVA_BASE_URL` | 52java origin used by the in-app store (default `https://java.52emu.cn`) |
+| `52JAVA_MAX_BYTES` | Maximum accepted game archive size (default 64 MiB) |
 | `TURN_IP` | external IP for the built-in coturn if auto-detection is wrong |
 | `TURN=0` | do not start the built-in coturn |
 | `ALLOW_PRIVATE=1` | allow the proxy to connect to the local network |

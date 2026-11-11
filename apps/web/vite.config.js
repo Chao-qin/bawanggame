@@ -6,6 +6,7 @@ import UnoCSS from 'unocss/vite'
 // 模拟器内核资源在站点根路径，开发时代理到 8080。
 const proxyTargets = [
   '/__jars',
+  '/__52java',
   '/jar',
   '/maopao',
   '/compat.html',

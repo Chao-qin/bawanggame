@@ -10,6 +10,9 @@ import yauzl from 'yauzl'
 
 const PROJECT = resolve(import.meta.dirname, '../../..')
 const PORT = Number(process.env.PORT ?? 8080)
+const JAVA_BASE = (process.env['52JAVA_BASE_URL'] ?? 'https://java.52emu.cn').replace(/\/$/, '')
+const JAVA_HOSTS = new Set([new URL(JAVA_BASE).hostname, ...(new URL(JAVA_BASE).hostname === 'java.52emu.cn' ? ['d2.52emu.cn'] : [])])
+const JAVA_MAX_BYTES = Number(process.env['52JAVA_MAX_BYTES'] ?? 64 * 1024 * 1024)
 const JARS = join(PROJECT, 'games', 'jar')
 const WEB = join(PROJECT, 'public')
 const MRP = join(PROJECT, 'maopao-revival', 'vendor', 'vmrp.github.io')
@@ -20,6 +23,124 @@ const MIME: Record<string, string> = {
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
   '.png': 'image/png', '.svg': 'image/svg+xml', '.wasm': 'application/wasm',
   '.jar': 'application/java-archive', '.mrp': 'application/octet-stream',
+}
+
+type StoreGame = { id: string; name: string; plays: number }
+type StoreCatalog = { games: StoreGame[]; page: number; pages: number; total: number }
+const storeCache = new Map<string, { expires: number; value: StoreCatalog }>()
+
+function json(res: ServerResponse, status: number, value: unknown) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' })
+  res.end(JSON.stringify(value))
+}
+
+function htmlText(value: string) {
+  return value.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).trim()
+}
+
+function parseStoreCatalog(html: string, page: number): StoreCatalog {
+  const start = html.search(/<div\s+id=["']results["'][^>]*>/i)
+  const tail = start < 0 ? '' : html.slice(start)
+  const end = tail.indexOf('</div>\n<script')
+  const results = end < 0 ? '' : tail.slice(0, end)
+  const games: StoreGame[] = []
+  for (const match of results.matchAll(/<a\s+[^>]*href=["']game\.php\?id=(\d+)["'][^>]*>([\s\S]*?)<\/a>\s*\((\d+)\)/gi)) {
+    games.push({ id: match[1], name: htmlText(match[2]), plays: Number(match[3]) })
+  }
+  const pages = Number(results.match(/共\s*(\d+)\s*页/)?.[1] ?? 1)
+  const total = Number(results.match(/共\s*\d+\s*页\s*(\d+)\s*条/)?.[1] ?? games.length)
+  return { games, page, pages: Math.max(1, pages), total }
+}
+
+async function storeCatalog(options: { page: number; query: string; category: string; force: boolean }): Promise<StoreCatalog> {
+  const key = `${options.page}:${options.query}:${options.category}`
+  const cached = storeCache.get(key)
+  if (!options.force && cached && cached.expires > Date.now()) return cached.value
+  try {
+    const url = new URL('/index.php', JAVA_BASE)
+    if (options.query) { url.searchParams.set('nkey', options.query); url.searchParams.set('qiqi', '搜索游戏') }
+    else url.searchParams.set('q', 'all')
+    if (options.category) url.searchParams.set('nsort', options.category)
+    url.searchParams.set('p', String(options.page))
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+    if (!response.ok) throw new Error(`catalog HTTP ${response.status}`)
+    const html = await response.text()
+    const value = parseStoreCatalog(html, options.page)
+    if (!html.includes('id="results"') && !html.includes("id='results'")) throw new Error('52emu catalog markup was not recognized')
+    storeCache.set(key, { expires: Date.now() + 60_000, value })
+    return value
+  } catch (error) { throw error }
+}
+
+function allowedStoreUrl(raw: string) {
+  const url = new URL(raw)
+  if (!['https:', 'http:'].includes(url.protocol) || !JAVA_HOSTS.has(url.hostname) || url.username || url.password || url.port) throw new Error('source is outside 52emu allowlist')
+  return url
+}
+
+async function storeDownload(res: ServerResponse, id: string) {
+  if (!/^\d{1,8}$/.test(id)) return json(res, 400, { error: 'invalid_game_id' })
+  try {
+    const detailUrl = new URL('/game.php', JAVA_BASE)
+    detailUrl.searchParams.set('id', id)
+    const detailResponse = await fetch(detailUrl, { signal: AbortSignal.timeout(10_000) })
+    if (!detailResponse.ok) return json(res, 502, { error: `game detail HTTP ${detailResponse.status}` })
+    const detail = await detailResponse.text()
+    const titleMarkup = detail.match(/<div\s+class=["']results["'][^>]*>\s*<h2>([\s\S]*?)<\/h2>/i)?.[1] ?? ''
+    const title = htmlText(titleMarkup.split(/\s*\[<a\b/i)[0])
+    if (!title) return json(res, 404, { error: 'game_not_found' })
+    const download = detail.match(/href=["']download\.php\?id=(\d+)&amp;xid=(\d+)["']/i)
+    if (!download || download[1] !== id) return json(res, 404, { error: 'download_not_found' })
+    const game: StoreGame = { id, name: title, plays: 0 }
+    const downloadUrl = new URL('/download.php', JAVA_BASE)
+    downloadUrl.searchParams.set('id', id)
+    downloadUrl.searchParams.set('xid', download[2])
+    const source = allowedStoreUrl(downloadUrl.toString())
+    const response = await fetch(source, { signal: AbortSignal.timeout(30_000), redirect: 'manual' })
+    if (response.status >= 300 && response.status < 400) {
+      const redirect = response.headers.get('location')
+      if (!redirect) return json(res, 502, { error: 'invalid_download_redirect' })
+      const target = allowedStoreUrl(new URL(redirect, source).toString())
+      const redirected = await fetch(target, { signal: AbortSignal.timeout(30_000), redirect: 'manual' })
+      if (redirected.status >= 300 && redirected.status < 400) return json(res, 502, { error: 'too_many_download_redirects' })
+      return await saveStoreResponse(res, game, id, redirected)
+    }
+    return await saveStoreResponse(res, game, id, response)
+  } catch (error) { return json(res, 502, { error: String(error instanceof Error ? error.message : error) }) }
+}
+
+async function saveStoreResponse(res: ServerResponse, game: StoreGame, id: string, response: Response) {
+    if (!response.ok || !response.body) return json(res, 502, { error: `download HTTP ${response.status}` })
+    const contentType = response.headers.get('content-type') || ''
+    const length = Number(response.headers.get('content-length') || 0)
+    if (length > JAVA_MAX_BYTES) return json(res, 413, { error: 'jar_too_large' })
+    const reader = response.body.getReader()
+    const chunks: Buffer[] = []
+    let total = 0
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > JAVA_MAX_BYTES) { await reader.cancel(); return json(res, 413, { error: 'jar_too_large' }) }
+      chunks.push(Buffer.from(value))
+    }
+    const buffer = Buffer.concat(chunks, total)
+    if (buffer.length < 4 || buffer.readUInt32BE(0) !== 0x504b0304) return json(res, 415, { error: `not_a_jar (${contentType})` })
+    await fs.mkdir(JARS, { recursive: true })
+    const baseName = (game.name || id).replace(/[^\w\u4e00-\u9fff.-]+/g, '_').slice(0, 80) || id
+    let name = baseName.toLowerCase().endsWith('.jar') ? baseName : `${baseName}.jar`
+    let target = join(JARS, name)
+    let n = 2
+    while (existsSync(target)) { const stem = name.replace(/\.jar$/i, ''); target = join(JARS, `${stem}-${n++}.jar`) }
+    const temporary = `${target}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
+    try {
+      await fs.writeFile(temporary, buffer, { flag: 'wx' })
+      await fs.rename(temporary, target)
+    } catch (error) {
+      await fs.rm(temporary, { force: true })
+      throw error
+    }
+    return json(res, 201, { ok: true, file: name, name: game.name, bytes: buffer.length })
 }
 
 function safePath(urlPath: string) {
@@ -142,6 +263,22 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' })
     return res.end(data)
   }
+  if (url.pathname === '/__52java/catalog') {
+    try {
+      const page = Math.min(371, Math.max(1, Number(url.searchParams.get('page')) || 1))
+      const catalog = await storeCatalog({ page, query: (url.searchParams.get('query') || '').trim().slice(0, 80), category: (url.searchParams.get('category') || '').replace(/\D/g, '').slice(0, 2), force: url.searchParams.get('refresh') === '1' })
+      return json(res, 200, { source: JAVA_BASE, siteUrl: JAVA_BASE, ...catalog })
+    } catch (error) {
+      console.error('52emu catalog error:', error)
+      return json(res, 502, { error: 'catalog_unavailable', siteUrl: JAVA_BASE })
+    }
+  }
+  if (url.pathname === '/__52java/download') {
+    const id = url.searchParams.get('id')
+    if (!id) return json(res, 400, { error: 'missing_id' })
+    return storeDownload(res, id)
+  }
+  if (url.pathname === '/__52java/open') return json(res, 200, { url: JAVA_BASE })
   const target = mappedPath(url.pathname === '/' ? '/index.html' : url.pathname)
   if (!target || !(await sendFile(res, target))) res.writeHead(404).end('Not found')
 })
