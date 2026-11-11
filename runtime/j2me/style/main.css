@@ -82,20 +82,20 @@ body.rotate-180 .runtime-stage { transform: rotate(180deg); }
 body.runtime-active { display: flex !important; flex-direction: column !important; }
 body.runtime-active #display-container { grid-row: auto !important; grid-column: auto !important; height: auto !important; }
 body.runtime-active #keypad { display: flex !important; }
-body.runtime-active .runtime-stage { width: min(calc(100vw - 20px), 480px); height: auto; max-height: 100%; }
-body.runtime-active #phone { height: auto; max-height: 100%; }
-body.runtime-active #display-container { flex: 0 0 auto; min-height: 0; align-items: center; }
+body.runtime-active .runtime-stage { width: min(calc(100vw - 20px), 480px); height: 100%; max-height: 100%; }
+body.runtime-active #phone { height: 100%; max-height: 100%; }
+body.runtime-active #display-container { flex: 1 1 0; min-height: 0; align-items: center; }
 body.runtime-active #display { flex: 0 1 auto; }
 body.runtime-active #nav,
 body.runtime-active #numpad { width: auto !important; grid-column: auto !important; grid-row: auto !important; }
-body.runtime-active #keypad.keypad-1 { --u: min(30px, 6vw, 4vh); }
-body.runtime-active #keypad.keypad-2 { --u: min(38px, 7vw, 4.5vh); }
-body.runtime-active #keypad.keypad-3 { --u: min(46px, 8vw, 5vh); }
-body.runtime-active #keypad.keypad-4 { --u: min(55px, 9vw, 5.5vh); }
-body.runtime-active #keypad { flex: 0 0 auto; min-height: 0; justify-content: flex-start; }
-body.runtime-active #nav { flex: 0 0 auto; height: calc(var(--u) * 4.6); min-height: 0; }
-body.runtime-active #numpad { flex: 0 0 auto; grid-template-rows: repeat(4, auto); grid-auto-rows: auto; min-height: 0; }
-body.runtime-active #numpad .key { height: calc(var(--u) * 0.95); min-height: 0; }
+body.runtime-active #keypad.keypad-1 { --u: min(36px, 7vw, 5vh); }
+body.runtime-active #keypad.keypad-2 { --u: min(46px, 9vw, 6vh); }
+body.runtime-active #keypad.keypad-3 { --u: min(56px, 11vw, 7vh); }
+body.runtime-active #keypad.keypad-4 { --u: min(66px, 13vw, 8vh); }
+body.runtime-active #keypad { flex: 0 0 auto; min-height: max-content; justify-content: flex-start; }
+body.runtime-active #nav { flex: 0 0 auto; height: calc(var(--u) * 4.6); min-height: calc(var(--u) * 4.6); }
+body.runtime-active #numpad { flex: 0 0 auto; grid-template-rows: repeat(4, calc(var(--u) * 0.95)); grid-auto-rows: calc(var(--u) * 0.95); min-height: 0; }
+body.runtime-active #numpad .key { height: calc(var(--u) * 0.95); min-height: calc(var(--u) * 0.95); }
 body.runtime-active #panel,
 body.runtime-active #panel .panel-box {
   touch-action: pan-y !important;
@@ -158,6 +158,59 @@ body.fixed-screen #display-container {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 40px rgba(0, 0, 0, 0.55);
   touch-action: none;
 }
+
+/* 冒泡 wasm 页面原本依赖 main.html 内联样式；在 React 手机壳中明确复刻
+   画布和对话框的定位，避免对话框参与布局并把屏幕挤乱。 */
+.mrp-stage #display {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.mrp-stage #display-container {
+  position: relative;
+}
+
+.mrp-stage #canvas {
+  flex: none;
+  position: relative;
+  border: 0;
+  padding: 0;
+  box-sizing: content-box;
+}
+
+#mrp-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(16, 19, 24, .94);
+  color: #c7cfdb;
+}
+
+#mrp-loading.hide { display: none; }
+
+#mrp-progress { width: min(60vw, 260px); height: 6px; }
+
+#mrp-dialog {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: #fff;
+  color: #111;
+}
+
+#mrp-dialog.show { display: flex; }
+#mrp-dialog h2 { flex: none; margin: 0; padding: 4px 6px; border: 1px solid #111; border-bottom: 0; font-size: 1em; text-align: center; }
+#mrp-dialog-text { flex: 1; width: 100%; box-sizing: border-box; resize: none; border: 1px solid #111; outline: none; }
+#mrp-dialog .bar { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; padding: 4px; }
 
 .screen {
   display: none;
@@ -1344,4 +1397,4 @@ body.runtime-active #numpad {
 .keymap-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .keymap-row button { flex: 1; text-align: left; }
 #keypad .key { background: var(--phone-key); color: var(--phone-text); }
-#keypad .key:active, #keypad .key.down { background: var(--phone-key-active); color: #081018; }
+#keypad .key.down { background: var(--phone-key-active); color: #081018; }

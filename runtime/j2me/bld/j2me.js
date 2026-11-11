@@ -10468,6 +10468,7 @@ var J2ME;
         };
         JVM.prototype.startIsolate0 = function (className, args) {
             var ctx = this.createIsolateCtx();
+            if (typeof window !== "undefined") window.__XIAOCHAO_J2ME_CTX = ctx;
             var sys = J2ME.CLASSES.getClass("org/mozilla/internal/Sys");
             ctx.nativeThread.pushMarkerFrame(J2ME.FrameType.ExitInterpreter);
             ctx.nativeThread.pushFrame(sys.getMethodByNameString("isolate0Entry", "(Ljava/lang/String;[Ljava/lang/String;)V"));

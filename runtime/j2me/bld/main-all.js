@@ -11770,10 +11770,12 @@ function CloseWebPage() {
 
 
 function showExitScreen() {
+  if (typeof window.__XIAOCHAO_REQUEST_EXIT === "function") {
+    window.__XIAOCHAO_REQUEST_EXIT();
+    return;
+  }
   document.getElementById("exit-screen").style.display = "block";
   myflushAll();
-  window.location.href = "index.html";
-  //CloseWebPage();
 }
 
 function backgroundCheck() {
@@ -14298,6 +14300,14 @@ window.onload = function() {
     console.error(reason);
     var title = document.querySelector("#download-screen .title");
     if (title) title.textContent = tr("Не удалось загрузить игру", "Could not load the game");
+    var detail = document.querySelector("#download-screen .download-error-detail");
+    if (!detail && title) {
+      detail = document.createElement("div");
+      detail.className = "download-error-detail";
+      detail.style.cssText = "max-width:min(88vw,420px);padding:0 12px;color:#aeb8c7;font-size:12px;text-align:center;overflow-wrap:anywhere";
+      title.parentNode.appendChild(detail);
+    }
+    if (detail) detail.textContent = reason && (reason.message || String(reason)) || "Unknown loading error";
     document.getElementById("download-bar").style.display = "none";
   });
 };

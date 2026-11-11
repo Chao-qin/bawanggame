@@ -7,9 +7,11 @@ import UnoCSS from 'unocss/vite'
 const proxyTargets = [
   '/__jars',
   '/__52java',
+  '/dasong',
   '/jar',
   '/maopao',
   '/compat.html',
+  '/java',
   '/style',
   '/config',
   '/bld',
@@ -38,6 +40,9 @@ export default defineConfig({
   plugins: [react(), UnoCSS()],
   server: {
     port: 5173,
-    proxy: Object.fromEntries(proxyTargets.map((p) => [p, 'http://127.0.0.1:8080'])),
+    proxy: {
+      ...Object.fromEntries(proxyTargets.filter((p) => p !== '/dasong').map((p) => [p, 'http://127.0.0.1:8080'])),
+      '/dasong': {target: 'http://127.0.0.1:8091', changeOrigin: true, rewrite: (path) => path.replace(/^\/dasong/, '')},
+    },
   },
 })

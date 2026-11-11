@@ -319,6 +319,12 @@
     document.addEventListener("contextmenu", function (e) {
       if (e.target.closest && e.target.closest("#keypad")) e.preventDefault();
     });
+    document.addEventListener("selectstart", function (e) {
+      if (e.target.closest && e.target.closest("#keypad")) e.preventDefault();
+    }, true);
+    document.addEventListener("dragstart", function (e) {
+      if (e.target.closest && e.target.closest("#keypad")) e.preventDefault();
+    }, true);
 
     // ---------- 防卡键 ----------
     window.addEventListener("blur", releaseAll);

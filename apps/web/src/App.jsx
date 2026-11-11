@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
 import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
 import { MrpPlayer } from './runtime/MrpPlayer.jsx'
+import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
 
 const TABS = [
   { id: 'j2me', label: 'J2ME' },
@@ -292,7 +293,8 @@ function Library({ kind, onPlay }) {
   }
 
   const games = useMemo(() => {
-    const all = server.games.concat(local.games)
+    const revival = kind === 'j2me' ? [{kind: 'local-revival', file: 'local-revival', name: '大宋豪侠 · 本地复活', vendor: '本地服务端', desc: '可移动地图、NPC 和基础战斗', size: 0, local: false}] : []
+    const all = revival.concat(server.games, local.games)
     const q = query.trim().toLowerCase()
     if (!q) return all
     return all.filter(
@@ -336,8 +338,7 @@ function Library({ kind, onPlay }) {
       {server.error && (
         <div className="status statusError">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>
       )}
-      {!server.error && (
-        <div className="gameGrid">
+      <div className="gameGrid">
           {games.map((g) => (
             <GameCard
               key={(g.local ? 'local:' : '') + g.kind + ':' + g.file}
@@ -346,8 +347,7 @@ function Library({ kind, onPlay }) {
               selected={selectedGame && selectedGame.file === g.file && selectedGame.kind === g.kind}
             />
           ))}
-        </div>
-      )}
+      </div>
       {!server.error && !server.loading && games.length === 0 && <div className="status">没有匹配的游戏</div>}
       <GameMenu
         game={menuGame}
@@ -419,8 +419,12 @@ function Player({ game, onBack }) {
       if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
     }
   }, [])
-  function requestBack() { setConfirming(true) }
+  const requestBack = useCallback(() => setConfirming(true), [])
   const exit = () => {
+    try { window.myflushAll && window.myflushAll() } catch (_) {}
+    try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
+    const stage = stageRef.current
+    if (stage) stage.style.visibility = 'hidden'
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
     // The legacy VM patches globals and installs document/window listeners;
     // hard-navigate after unmount to give the next game a pristine JS realm.
@@ -431,7 +435,7 @@ function Player({ game, onBack }) {
       <button className="playerExit" onClick={requestBack} aria-label="返回大厅">‹</button>
       <div ref={stageRef} className="playerStage">
         <div className="runtimeToolbar"><span className="runtimeLive"><i /> 正在运行</span><span className="runtimeGame">{game.name}</span><button onClick={requestBack}>退出</button></div>
-        {game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} /> : <MrpPlayer game={game} onExit={requestBack} />}
+        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} /> : <MrpPlayer game={game} onExit={requestBack} />}
       </div>
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true">

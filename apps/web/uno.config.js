@@ -46,7 +46,7 @@ export default defineConfig({
     runtimeView: 'absolute inset-0 flex items-center justify-center overflow-hidden',
     runtimeError: 'absolute inset-5 z-100 grid place-items-center whitespace-pre-wrap text-red-300',
     'runtime-view': 'absolute inset-0 flex items-center justify-center overflow-hidden',
-    'runtime-stage': 'flex min-h-0 min-w-0 items-center justify-center',
+    'runtime-stage': 'flex h-full min-h-0 min-w-0 w-full items-center justify-center overflow-hidden',
     playerExit: 'fixed left-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full border border-white/20 bg-black/50 text-2xl text-white backdrop-blur sm:left-4 sm:top-4',
     optionBackdrop: 'fixed inset-0 z-50 grid items-end justify-items-center bg-black/60',
     optionSheet: 'w-full max-w-[520px] overflow-hidden rounded-t-2xl border border-b-0 border-line bg-card shadow-2xl animate-sheet-in',

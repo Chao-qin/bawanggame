@@ -20,7 +20,14 @@ export function MrpPlayer({ game, onExit }) {
         await loadClassic('/maopao/vmrp_v1.0/vmrp.js')
       } catch (e) { if (alive) setError(e.message || String(e)) }
     })()
-    return () => { alive = false; document.body.classList.remove('runtime-active'); window.__XIAOCHAO_RUNTIME_MRP = ''; window.__XIAOCHAO_RUNTIME_MRP_URL = '' }
+    return () => {
+      alive = false
+      try { if (window.Module && window.Module._setEventEnable) window.Module._setEventEnable(false) } catch (_) {}
+      try { window.js_stopSound && window.js_stopSound() } catch (_) {}
+      document.body.classList.remove('runtime-active')
+      window.__XIAOCHAO_RUNTIME_MRP = ''
+      window.__XIAOCHAO_RUNTIME_MRP_URL = ''
+    }
   }, [game, onExit])
   return <div className="runtime-view">{error ? <div className="runtime-error">{error}</div> : null}<PhoneMarkup mrp /></div>
 }

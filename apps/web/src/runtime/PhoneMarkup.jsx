@@ -1,7 +1,8 @@
 import React from 'react'
 
 export function PhoneMarkup({ mrp = false }) {
-  return <div className="runtime-stage">
+  const blockSelection = (event) => event.preventDefault()
+  return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} onSelectStart={blockSelection} onDragStart={blockSelection}>
     <div id="phone" className="runtime-phone">
     <div className="deviceStatus"><span>小潮 OS</span><span className="deviceStatusRight"><b>●</b> 100%</span></div>
     <div id="editor-layer">

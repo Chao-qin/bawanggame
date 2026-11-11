@@ -1,5 +1,5 @@
 const loaded = new Map()
-const RUNTIME_VERSION = '20261110-6'
+const RUNTIME_VERSION = '20261111-1'
 
 function versioned(src) {
   return `${src}${src.includes('?') ? '&' : '?'}v=${RUNTIME_VERSION}`
