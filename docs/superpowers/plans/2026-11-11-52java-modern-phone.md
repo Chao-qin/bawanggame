@@ -43,4 +43,4 @@
 - [x] Start the server and production web build in the feature clone.
 - [x] Verify root page, marketplace, live catalog, download success, JAR list refresh, and simulator view in Chromium.
 - [x] Fix issues found during browser inspection.
-- [ ] Commit feature branch, merge into main, rebuild package, and report the resulting artifact.
+- [x] Commit feature branch, merge into main, rebuild the source and static deployment packages.
