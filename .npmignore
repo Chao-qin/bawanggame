@@ -1,4 +1,7 @@
 .worktrees/
+.wbapp_*.genie
+.workbuddy/
+.opencode/
 node_modules/
 **/node_modules/
 public/
