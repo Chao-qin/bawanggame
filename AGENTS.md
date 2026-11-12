@@ -61,6 +61,12 @@ git fetch --prune origin
 
 有未提交改动时不要强制删除 worktree；先提交、转移或明确处理这些改动。
 
+## GitHub Operations
+
+涉及 GitHub issue、PR、评论、分支或审查的操作必须使用 GitHub MCP。除非用户明确要求，不使用 `gh` CLI，也不绕过 MCP 直接调用 GitHub API。
+
+创建 issue 或 PR 前先通过 MCP 搜索已有内容，避免重复；创建后通过 MCP 验证标题、正文、分支和关联关系。
+
 ## Documentation Placement
 
 - `docs/superpowers/specs/`：产品或技术方案，说明目标、架构、接口、实施阶段和验收标准。
