@@ -368,6 +368,9 @@ function Store({ onRefreshLibrary }) {
   const store = useJavaStore(appliedQuery, category, page)
   const [busy, setBusy] = useState('')
   const [done, setDone] = useState('')
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [appliedQuery, category, page])
   async function download(game) {
     setBusy(game.id); setDone('')
     try {
@@ -399,7 +402,7 @@ function Store({ onRefreshLibrary }) {
       <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">52java · {game.plays.toLocaleString()} 次下载</p><span className="storeInfoDesc">经典 Java 手机游戏</span></div>
       <button className="downloadButton" onClick={() => download(game)} disabled={busy === game.id}>{busy === game.id ? '下载中…' : done === game.id ? '已加入' : '加入库'}</button>
     </article>)}</div>
-    {!store.loading && !store.error && store.games.length > 0 && <div className="storePagination"><span>第 {page} / {store.pages} 页 · {store.total.toLocaleString()} 款</span><div><button className="ghostButton" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</button><button className="ghostButton" disabled={page >= store.pages} onClick={() => setPage(page + 1)}>下一页</button></div></div>}
+    {!store.loading && !store.error && store.games.length > 0 && <div className="storePagination"><span>第 {page} / {store.pages} 页 · {store.total.toLocaleString()} 款</span><div><button type="button" className="ghostButton" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</button><button type="button" className="ghostButton" disabled={page >= store.pages} onClick={() => setPage(page + 1)}>下一页</button></div></div>}
   </section>
 }
 

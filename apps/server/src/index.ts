@@ -58,8 +58,13 @@ async function storeCatalog(options: { page: number; query: string; category: st
   if (!options.force && cached && cached.expires > Date.now()) return cached.value
   try {
     const url = new URL('/index.php', JAVA_BASE)
-    if (options.query) { url.searchParams.set('nkey', options.query); url.searchParams.set('qiqi', '搜索游戏') }
-    else url.searchParams.set('q', 'all')
+    if (options.query) {
+      url.searchParams.set('nkey', options.query)
+      url.searchParams.set('qiqi', '搜索游戏')
+    } else if (!options.category) {
+      // 52emu ignores nsort when q=all is present.
+      url.searchParams.set('q', 'all')
+    }
     if (options.category) url.searchParams.set('nsort', options.category)
     url.searchParams.set('p', String(options.page))
     const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
