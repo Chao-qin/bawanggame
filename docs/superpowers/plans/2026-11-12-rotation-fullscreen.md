@@ -51,4 +51,4 @@
 - [x] Run `git diff --check` and the web build.
 - [x] Run the existing browser verification script against a local server.
 - [x] Inspect responsive geometry at portrait and landscape viewport sizes.
-- [ ] Commit implementation, push branch, search existing GitHub PRs/issues with GitHub MCP, and create and verify one PR.
+- [x] Commit implementation, push branch, search existing GitHub PRs/issues with GitHub MCP, and create and verify one PR.
