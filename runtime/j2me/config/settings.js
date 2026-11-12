@@ -3,7 +3,7 @@ var Settings = (function () {
   var GAME = "j2me.game.";
   var phone = window.matchMedia && matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 800;
   var DEFAULTS = {
-    screen: "auto", scale: "2", keypad: "3", rotate: "0", theme: "classic", layout: "fixed", fps: "0", jit: "1", platform: "se",
+    screen: "auto", scale: "2", keypad: "3", rotate: "0", fullscreenFit: "width", theme: "classic", layout: "fixed", fps: "0", jit: "1", platform: "se",
     keyHold: "60", tapFrames: "1", dpadOk: "press", keyRepeat: "1", repeatDelay: "450", repeatInterval: "100", vibrate: phone ? "10" : "0",
     wakeLock: "0", pixelated: "0", showFps: "0"
   };
@@ -23,7 +23,11 @@ var Settings = (function () {
     },
     rotate: {
       label: tr("Поворот", "Rotation", "旋转"),
-      items: [["0", tr("Нет", "None", "不旋转")], ["90", tr("90° по часовой", "90° clockwise", "顺时针 90°")], ["-90", tr("90° против часовой", "90° counter-clockwise", "逆时针 90°")]]
+      items: [["0", tr("Нет", "None", "不旋转")], ["45", "45°"], ["90", tr("90° по часовой", "90° clockwise", "顺时针 90°")], ["135", "135°"], ["180", "180°"], ["225", "225°"], ["270", tr("270° по часовой", "270° clockwise", "顺时针 270°")], ["315", "315°"]]
+    },
+    fullscreenFit: {
+      label: tr("全屏适配", "Fullscreen fit", "全屏适配"),
+      items: [["width", tr("固定宽度", "Fixed width", "固定宽度")], ["height", tr("固定高度", "Fixed height", "固定高度")]]
     },
     theme: {
       label: tr("Тема", "Theme", "主题"),

@@ -21,7 +21,8 @@
   config.screen = config.screenMode === "manual" ? v.screen : config.screenMode === "fit" ? "" : "240x320";
   config.scale = parseFloat(v.scale) || 1;
   config.keypad = v.keypad | 0;
-  config.rotate = v.rotate | 0;
+  config.rotate = [0, 45, 90, 135, 180, 225, 270, 315].indexOf(v.rotate | 0) >= 0 ? v.rotate | 0 : 0;
+  config.fullscreenFit = v.fullscreenFit === "height" ? "height" : "width";
   config.theme = v.theme || "classic";
   config.layout = v.layout === "free" ? "free" : "fixed";
   config.jit = v.jit !== "0";
