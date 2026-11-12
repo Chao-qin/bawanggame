@@ -15,8 +15,8 @@
 **Files:**
 - Modify: `apps/web/src/App.jsx:437-444`
 
-- [ ] Remove the `.runtimeToolbar` element from `Player` while keeping `.playerExit`, the stage ref, and exit confirmation behavior.
-- [ ] Confirm no code depends on `.runtimeToolbar` for exit handling.
+- [x] Remove the `.runtimeToolbar` element from `Player` while keeping `.playerExit`, the stage ref, and exit confirmation behavior.
+- [x] Confirm no code depends on `.runtimeToolbar` for exit handling.
 
 ### Task 2: Restore full runtime viewport and isolate editor overlay
 
@@ -25,17 +25,17 @@
 - Modify: `runtime/j2me/style/main.css:80-90`
 - Modify: `runtime/j2me/style/lcdui.css:410-430`
 
-- [ ] Let `.runtime-view` fill the player stage instead of reserving a fixed top offset.
-- [ ] Keep the runtime stage centered and constrained by the legacy phone sizing rules.
-- [ ] Ensure `#editor-layer`/`.lc-editors` remain absolutely positioned overlays with no layout contribution, transparent backgrounds, and a controlled stacking order.
-- [ ] Preserve visible text editor behavior by changing only the hidden container and positioning rules.
+- [x] Let `.runtime-view` fill the player stage instead of reserving a fixed top offset.
+- [x] Keep the runtime stage centered and constrained by the legacy phone sizing rules.
+- [x] Ensure `#editor-layer`/`.lc-editors` remain absolutely positioned overlays with no layout contribution, transparent backgrounds, and a controlled stacking order.
+- [x] Preserve visible text editor behavior by changing only the hidden container and positioning rules.
 
 ### Task 3: Verify the player layout
 
 **Files:**
 - Test: `apps/web/verify.mjs`
 
-- [ ] Run the existing web verification command from `apps/web/package.json`.
-- [ ] Build the web app and confirm UnoCSS emits the updated runtime view rule.
-- [ ] Inspect the changed files and verify the toolbar is absent while the return button remains.
-- [ ] Commit the implementation with a focused message.
+- [x] Run the available production build from `apps/web/package.json` (there is no separate web test script).
+- [x] Build the web app and confirm UnoCSS emits the updated runtime view rule.
+- [x] Inspect the changed files and verify the toolbar is absent while the return button remains.
+- [x] Commit the implementation with a focused message.
