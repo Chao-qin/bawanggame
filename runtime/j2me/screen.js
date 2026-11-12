@@ -291,9 +291,20 @@ var ScreenSetup = (function () {
   }
 
   function refit() {
+    document.body.style.setProperty("--runtime-rotation", (config.rotate | 0) + "deg");
+    document.body.dataset.rotation = String(config.rotate | 0);
+    document.body.dataset.fullscreenFit = config.fullscreenFit === "height" ? "height" : "width";
     document.body.classList.toggle("fixed-screen", !!config.screen);
     MIDP.updatePhysicalScreenSize();
     MIDP.updateCanvas();
+    var stage = document.querySelector(".runtime-stage");
+    if (stage) {
+      var w = stage.offsetWidth || innerWidth, h = stage.offsetHeight || innerHeight;
+      var a = Math.abs((config.rotate | 0) % 180) * Math.PI / 180;
+      var bw = w * Math.cos(a) + h * Math.sin(a), bh = w * Math.sin(a) + h * Math.cos(a);
+      var fit = Math.min(1, innerWidth / Math.max(1, bw), innerHeight / Math.max(1, bh));
+      document.body.style.setProperty("--rotation-scale", fit.toFixed(4));
+    }
     window.dispatchEvent(new Event("resize"));
   }
 

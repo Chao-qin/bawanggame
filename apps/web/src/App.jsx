@@ -420,7 +420,24 @@ function Store({ onRefreshLibrary }) {
 
 function Player({ game, onBack }) {
   const [confirming, setConfirming] = useState(false)
+  const [fitMode, setFitMode] = useState(() => {
+    try { return localStorage.getItem('xiaochao.fullscreen-fit.' + game.kind + ':' + game.file) === 'height' ? 'height' : 'width' } catch (_) { return 'width' }
+  })
   const stageRef = useRef(null)
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+    stage.dataset.fullscreenFit = fitMode
+    document.body.dataset.fullscreenFit = fitMode
+    const syncFullscreen = () => document.body.classList.toggle('fullscreen-active', !!document.fullscreenElement)
+    syncFullscreen()
+    document.addEventListener('fullscreenchange', syncFullscreen)
+    return () => {
+      delete document.body.dataset.fullscreenFit
+      document.body.classList.remove('fullscreen-active')
+      document.removeEventListener('fullscreenchange', syncFullscreen)
+    }
+  }, [fitMode])
   useEffect(() => {
     const stage = stageRef.current
     if (!stage) return
@@ -435,6 +452,20 @@ function Player({ game, onBack }) {
     }
   }, [])
   const requestBack = useCallback(() => setConfirming(true), [])
+  const setFit = (mode) => {
+    setFitMode(mode)
+    try { localStorage.setItem('xiaochao.fullscreen-fit.' + game.kind + ':' + game.file, mode) } catch (_) {}
+    if (game.kind === 'j2me' && window.Settings && window.config?.gameId) {
+      window.config.fullscreenFit = mode
+      window.Settings.setGame(window.config.gameId, 'fullscreenFit', mode)
+    }
+  }
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else if (stageRef.current?.requestFullscreen) await stageRef.current.requestFullscreen()
+    } catch (_) {}
+  }
   const exit = () => {
     try { window.myflushAll && window.myflushAll() } catch (_) {}
     try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
@@ -450,6 +481,11 @@ function Player({ game, onBack }) {
       <button className="playerExit" onClick={requestBack} aria-label="返回大厅">‹</button>
       <div ref={stageRef} className="playerStage">
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} /> : <MrpPlayer game={game} onExit={requestBack} />}
+        <div className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-full border border-white/15 bg-black/55 p-1 text-xs text-white/80 backdrop-blur sm:right-4 sm:top-4" onClick={(event) => event.stopPropagation()}>
+          <button className={'rounded-full px-2.5 py-1 ' + (fitMode === 'width' ? 'bg-white/20 text-white' : '')} onClick={() => setFit('width')} title="固定宽度">宽</button>
+          <button className={'rounded-full px-2.5 py-1 ' + (fitMode === 'height' ? 'bg-white/20 text-white' : '')} onClick={() => setFit('height')} title="固定高度">高</button>
+          <button className="rounded-full px-2.5 py-1" onClick={toggleFullscreen} title="切换全屏">全屏</button>
+        </div>
       </div>
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true">

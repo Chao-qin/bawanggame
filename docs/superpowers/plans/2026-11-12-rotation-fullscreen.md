@@ -18,10 +18,10 @@
 - Modify: `runtime/j2me/keymap.js`
 - Modify: `runtime/j2me/panel.js`
 
-- [ ] Add eight rotation options and a persisted `fullscreenFit` option with fixed-width/fixed-height values.
-- [ ] Parse and validate the options from URL and local settings, preserving current defaults.
-- [ ] Apply arbitrary rotation as a CSS variable; keep directional key remapping only for 90/270-degree turns.
-- [ ] Add panel controls and update them without restarting the game.
+- [x] Add eight rotation options and a persisted `fullscreenFit` option with fixed-width/fixed-height values.
+- [x] Parse and validate the options from URL and local settings, preserving current defaults.
+- [x] Apply arbitrary rotation as a CSS variable; keep directional key remapping only for 90/270-degree turns.
+- [x] Add panel controls and update them without restarting the game.
 
 ## Chunk 2: Stage Geometry and Landscape Layout
 
@@ -29,9 +29,9 @@
 - Modify: `runtime/j2me/screen.js`
 - Modify: `runtime/j2me/style/main.css`
 
-- [ ] Make stage sizing account for rotation bounding boxes and fullscreen fit mode.
-- [ ] Add the landscape three-column keyboard-screen-keyboard arrangement with safe-area padding.
-- [ ] Ensure portrait and free layout modes continue to use existing geometry.
+- [x] Make stage sizing account for rotation bounding boxes and fullscreen fit mode.
+- [x] Add the landscape three-column keyboard-screen-keyboard arrangement with safe-area padding.
+- [x] Ensure portrait and free layout modes continue to use existing geometry.
 
 ## Chunk 3: Fullscreen Player Controls
 
@@ -39,16 +39,16 @@
 - Modify: `apps/web/src/App.jsx`
 - Modify: `runtime/j2me/style/main.css`
 
-- [ ] Move fullscreen behavior to the player stage and expose a compact fit-mode control overlay.
-- [ ] Persist fit mode per game and reflect fullscreen state changes.
-- [ ] Ensure exiting a game releases fullscreen and leaves no overlay behind.
+- [x] Move fullscreen behavior to the player stage and expose a compact fit-mode control overlay.
+- [x] Persist fit mode per game and reflect fullscreen state changes.
+- [x] Ensure exiting a game releases fullscreen and leaves no overlay behind.
 
 ## Chunk 4: Verification and Delivery
 
 **Files:**
 - Modify: `apps/web/verify.mjs` only if existing checks need a stable selector.
 
-- [ ] Run `git diff --check` and the web build.
-- [ ] Run the existing browser verification script against a local server.
-- [ ] Inspect responsive geometry at portrait and landscape viewport sizes.
+- [x] Run `git diff --check` and the web build.
+- [x] Run the existing browser verification script against a local server.
+- [x] Inspect responsive geometry at portrait and landscape viewport sizes.
 - [ ] Commit implementation, push branch, search existing GitHub PRs/issues with GitHub MCP, and create and verify one PR.
