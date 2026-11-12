@@ -2,6 +2,7 @@ import { createReadStream, existsSync, promises as fs } from 'node:fs'
 import { createServer, IncomingMessage, ServerResponse } from 'node:http'
 import { connect as tcpConnect } from 'node:net'
 import crypto from 'node:crypto'
+import { networkInterfaces } from 'node:os'
 import { connect as tlsConnect } from 'node:tls'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { URL } from 'node:url'
@@ -372,4 +373,10 @@ function handleSocket(path: string, req: IncomingMessage, ws: WebSocket) {
   ws.on('close', () => tcp.destroy())
 }
 
-server.listen(PORT, () => console.log(`http://localhost:${PORT}`))
+const lanAddress = Object.values(networkInterfaces())
+  .flat()
+  .find((item) => item && item.family === 'IPv4' && !item.internal)?.address
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`http://localhost:${PORT}`)
+  if (lanAddress) console.log(`http://${lanAddress}:${PORT}`)
+})
