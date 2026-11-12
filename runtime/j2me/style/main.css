@@ -61,6 +61,13 @@ body {
   flex-direction: column;
   transform-origin: center center;
 }
+
+#editor-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
 .runtime-stage {
   display: flex;
   align-items: center;
@@ -138,6 +145,7 @@ textarea,
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  background: var(--phone-bg);
 }
 
 body.fixed-screen #display-container {
@@ -165,6 +173,7 @@ body.fixed-screen #display-container {
   position: relative;
   width: 100%;
   height: 100%;
+  background: var(--phone-bg);
 }
 
 .mrp-stage #display-container {

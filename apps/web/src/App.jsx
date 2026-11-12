@@ -437,7 +437,6 @@ function Player({ game, onBack }) {
     <div className="player">
       <button className="playerExit" onClick={requestBack} aria-label="返回大厅">‹</button>
       <div ref={stageRef} className="playerStage">
-        <div className="runtimeToolbar"><span className="runtimeLive"><i /> 正在运行</span><span className="runtimeGame">{game.name}</span><button onClick={requestBack}>退出</button></div>
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} /> : <MrpPlayer game={game} onExit={requestBack} />}
       </div>
       {confirming && (
