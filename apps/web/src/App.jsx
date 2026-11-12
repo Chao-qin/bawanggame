@@ -177,6 +177,11 @@ function formatSize(n) {
   return Math.max(1, Math.round(n / 1024)) + ' KB'
 }
 
+function localJarName(name, id) {
+  const base = String(name || id || 'game').replace(/[\\/:*?"<>|]+/g, '_').trim() || id || 'game'
+  return base.toLowerCase().endsWith('.jar') ? base : base + '.jar'
+}
+
 function GameCard({ game, onOpen, selected }) {
   const initial = (game.name || '?').trim().charAt(0).toUpperCase()
   return (
@@ -374,9 +379,16 @@ function Store({ onRefreshLibrary }) {
   async function download(game) {
     setBusy(game.id); setDone('')
     try {
+      if (!hasLocalJars()) throw new Error('浏览器本机存储不可用')
       const response = await fetch('/__52java/download?id=' + encodeURIComponent(game.id))
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || '下载失败')
+      if (!response.ok) {
+        let message = '下载失败'
+        try { message = (await response.json()).error || message } catch (_) {}
+        throw new Error(message)
+      }
+      const blob = await response.blob()
+      if (!blob.size) throw new Error('下载内容为空')
+      await window.LocalJars.add(new File([blob], localJarName(game.name, game.id), { type: 'application/java-archive' }))
       setDone(game.id)
       onRefreshLibrary()
     } catch (error) { window.alert('下载失败：' + (error.message || error)) }

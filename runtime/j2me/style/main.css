@@ -171,8 +171,7 @@ body.fixed-screen #display-container {
    画布和对话框的定位，避免对话框参与布局并把屏幕挤乱。 */
 .mrp-stage #display {
   position: relative;
-  width: 100%;
-  height: 100%;
+  flex: none;
   background: var(--phone-bg);
 }
 

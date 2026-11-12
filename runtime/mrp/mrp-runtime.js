@@ -106,11 +106,21 @@
   var canvas = document.getElementById('canvas');
   function fit() {
     var box = document.getElementById('display-container');
+    var display = document.getElementById('display');
     if (!box) return;
     var s = Math.min(box.clientWidth / 240, box.clientHeight / 320);
     if (!isFinite(s) || s <= 0) s = 1;
-    canvas.style.width = Math.floor(240 * s) + 'px';
-    canvas.style.height = Math.floor(320 * s) + 'px';
+    var width = Math.floor(240 * s);
+    var height = Math.floor(320 * s);
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    // Keep the overlay host the same size as the 240x320 game surface.
+    // A full-size flex host lets hidden loading/dialog layers paint outside
+    // the canvas and produces a white block above the game screen.
+    if (display) {
+      display.style.width = width + 'px';
+      display.style.height = height + 'px';
+    }
   }
   window.addEventListener('resize', fit);
   fit();

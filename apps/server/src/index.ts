@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, promises as fs } from 'node:fs'
+import { createReadStream, promises as fs } from 'node:fs'
 import { createServer, IncomingMessage, ServerResponse } from 'node:http'
 import { connect as tcpConnect } from 'node:net'
 import crypto from 'node:crypto'
@@ -109,44 +109,55 @@ async function storeDownload(res: ServerResponse, id: string) {
       const target = allowedStoreUrl(new URL(redirect, source).toString())
       const redirected = await fetch(target, { signal: AbortSignal.timeout(30_000), redirect: 'manual' })
       if (redirected.status >= 300 && redirected.status < 400) return json(res, 502, { error: 'too_many_download_redirects' })
-      return await saveStoreResponse(res, game, id, redirected)
+      return await streamStoreResponse(res, game, redirected)
     }
-    return await saveStoreResponse(res, game, id, response)
+    return await streamStoreResponse(res, game, response)
   } catch (error) { return json(res, 502, { error: String(error instanceof Error ? error.message : error) }) }
 }
 
-async function saveStoreResponse(res: ServerResponse, game: StoreGame, id: string, response: Response) {
+async function streamStoreResponse(res: ServerResponse, game: StoreGame, response: Response) {
     if (!response.ok || !response.body) return json(res, 502, { error: `download HTTP ${response.status}` })
     const contentType = response.headers.get('content-type') || ''
     const length = Number(response.headers.get('content-length') || 0)
     if (length > JAVA_MAX_BYTES) return json(res, 413, { error: 'jar_too_large' })
     const reader = response.body.getReader()
-    const chunks: Buffer[] = []
+    const prefix: Uint8Array[] = []
+    let prefixLength = 0
+    while (prefixLength < 4) {
+      const part = await reader.read()
+      if (part.done || !part.value) return json(res, 415, { error: `not_a_jar (${contentType})` })
+      prefix.push(part.value)
+      prefixLength += part.value.byteLength
+    }
+    const firstBytes = Buffer.concat(prefix.map(part => Buffer.from(part)))
+    if (firstBytes.readUInt32BE(0) !== 0x504b0304) return json(res, 415, { error: `not_a_jar (${contentType})` })
+    const baseName = (game.name || game.id).replace(/[^\w\u4e00-\u9fff.-]+/g, '_').slice(0, 80) || game.id
+    const name = baseName.toLowerCase().endsWith('.jar') ? baseName : `${baseName}.jar`
+    const encodedName = encodeURIComponent(name)
+    res.writeHead(200, {
+      'Content-Type': 'application/java-archive',
+      ...(length ? { 'Content-Length': String(length) } : {}),
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodedName}`,
+      'Cache-Control': 'no-store',
+    })
     let total = 0
+    const writeChunk = async (chunk: Uint8Array) => {
+      total += chunk.byteLength
+      if (total > JAVA_MAX_BYTES) {
+        await reader.cancel()
+        res.destroy()
+        return false
+      }
+      if (!res.write(Buffer.from(chunk))) await new Promise<void>(resolve => res.once('drain', resolve))
+      return true
+    }
+    for (const part of prefix) if (!(await writeChunk(part))) return
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      total += value.byteLength
-      if (total > JAVA_MAX_BYTES) { await reader.cancel(); return json(res, 413, { error: 'jar_too_large' }) }
-      chunks.push(Buffer.from(value))
+      if (!(await writeChunk(value))) return
     }
-    const buffer = Buffer.concat(chunks, total)
-    if (buffer.length < 4 || buffer.readUInt32BE(0) !== 0x504b0304) return json(res, 415, { error: `not_a_jar (${contentType})` })
-    await fs.mkdir(JARS, { recursive: true })
-    const baseName = (game.name || id).replace(/[^\w\u4e00-\u9fff.-]+/g, '_').slice(0, 80) || id
-    let name = baseName.toLowerCase().endsWith('.jar') ? baseName : `${baseName}.jar`
-    let target = join(JARS, name)
-    let n = 2
-    while (existsSync(target)) { const stem = name.replace(/\.jar$/i, ''); target = join(JARS, `${stem}-${n++}.jar`) }
-    const temporary = `${target}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
-    try {
-      await fs.writeFile(temporary, buffer, { flag: 'wx' })
-      await fs.rename(temporary, target)
-    } catch (error) {
-      await fs.rm(temporary, { force: true })
-      throw error
-    }
-    return json(res, 201, { ok: true, file: name, name: game.name, bytes: buffer.length })
+    res.end()
 }
 
 function safePath(urlPath: string) {
