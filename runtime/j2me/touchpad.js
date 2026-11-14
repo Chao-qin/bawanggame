@@ -68,6 +68,15 @@
 
     function keyEl(id) { return document.getElementById(id); }
 
+    function inKeypad(target) {
+      return target && target.closest && target.closest("#keypad");
+    }
+
+    function clearSelection() {
+      var selection = window.getSelection && window.getSelection();
+      if (selection && selection.rangeCount) selection.removeAllRanges();
+    }
+
     // ---------- 边沿去重：同一键被多指按住时，只给 sink 一次 press/release ----------
     function press(code, holder) {
       var h = codeHolders[code] || (codeHolders[code] = {});
@@ -292,6 +301,7 @@
       var h = hit(e.clientX, e.clientY, contactRadius(e), prev);
       if (h.kind === null) return;
       e.preventDefault();
+      clearSelection();
       if (onActivate) onActivate(e);
       held[e.pointerId] = { ids: [], center: false, startCenter: !!h.center, okTimer: 0, okDown: false };
       move(e.pointerId, h);
@@ -317,13 +327,16 @@
     document.addEventListener("pointerup", up);
     document.addEventListener("pointercancel", up);
     document.addEventListener("contextmenu", function (e) {
-      if (e.target.closest && e.target.closest("#keypad")) e.preventDefault();
+      if (inKeypad(e.target)) e.preventDefault();
     });
     document.addEventListener("selectstart", function (e) {
-      if (e.target.closest && e.target.closest("#keypad")) e.preventDefault();
+      if (inKeypad(e.target)) {
+        clearSelection();
+        e.preventDefault();
+      }
     }, true);
     document.addEventListener("dragstart", function (e) {
-      if (e.target.closest && e.target.closest("#keypad")) e.preventDefault();
+      if (inKeypad(e.target)) e.preventDefault();
     }, true);
 
     // ---------- 防卡键 ----------
