@@ -466,6 +466,11 @@ function Player({ game, onBack }) {
       else if (stageRef.current?.requestFullscreen) await stageRef.current.requestFullscreen()
     } catch (_) {}
   }
+  const blockRuntimeGesture = (event) => {
+    const target = event.target
+    if (target.closest?.('input, textarea, [contenteditable="true"]')) return
+    event.preventDefault()
+  }
   const exit = () => {
     try { window.myflushAll && window.myflushAll() } catch (_) {}
     try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
@@ -477,7 +482,7 @@ function Player({ game, onBack }) {
     window.location.reload()
   }
   return (
-    <div className="player">
+    <div className="player" onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
       <button className="playerExit" onClick={requestBack} aria-label="返回大厅">‹</button>
       <div ref={stageRef} className="playerStage">
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} /> : <MrpPlayer game={game} onExit={requestBack} />}
