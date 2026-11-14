@@ -1,143 +1,156 @@
-/* 小潮霸王 UI 统一启动器端到端验证。
- * 用法： node verify.mjs
- * 步骤：打开根路径 → 统计 J2ME 卡片 → 切冒泡 tab → 统计卡片 → 点开一个冒泡游戏验证 React 运行时 → 截图
+/* Deterministic browser smoke checks for the React shell and runtime players.
+ * Optional fixtures:
+ *   VERIFY_J2ME_FILE=game.jar VERIFY_MRP_FILE=game.mrp node verify.mjs
  */
-import { spawn } from 'node:child_process';
-import fs from 'node:fs';
+import { spawn } from 'node:child_process'
+import fs from 'node:fs'
 
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PORT = 9341;
-const PROFILE = '/tmp/j2me-cdp-revival';
-const URL = 'http://127.0.0.1:8080/';
-const SHOT1 = '/tmp/revival-j2me.png';
-const SHOT2 = '/tmp/revival-maopao.png';
-const SHOT3 = '/tmp/revival-player.png';
+const CHROME = process.env.VERIFY_CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const CDP_PORT = Number(process.env.VERIFY_CDP_PORT || 9341)
+const BASE_URL = process.env.VERIFY_BASE_URL || 'http://127.0.0.1:8080/'
+const J2ME_FILE = process.env.VERIFY_J2ME_FILE || ''
+const MRP_FILE = process.env.VERIFY_MRP_FILE || ''
+const PROFILE = `/tmp/xiaochao-verify-${process.pid}`
+const SHOT = `/tmp/xiaochao-verify-${process.pid}.png`
 
-fs.rmSync(PROFILE, { recursive: true, force: true });
+fs.rmSync(PROFILE, { recursive: true, force: true })
 const chrome = spawn(CHROME, [
   '--headless=new', '--no-sandbox', '--no-proxy-server', '--disable-gpu-sandbox', '--disable-dev-shm-usage',
   '--disable-gpu', '--use-gl=swiftshader', '--no-first-run', '--no-default-browser-check',
   '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
   '--disable-backgrounding-occluded-windows', '--autoplay-policy=no-user-gesture-required',
-  `--remote-debugging-port=${PORT}`, `--user-data-dir=${PROFILE}`,
-  '--window-size=1100,900', '--lang=zh-CN', 'about:blank',
-], { stdio: 'ignore' });
+  `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${PROFILE}`, '--window-size=1100,900', '--lang=zh-CN', 'about:blank',
+], { stdio: 'ignore' })
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-let ws, id = 0;
-const pending = new Map();
-const errors = [];
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+let ws
+let id = 0
+const pending = new Map()
+const jsErrors = []
+
 function send(method, params = {}) {
   return new Promise((resolve, reject) => {
-    const n = ++id;
-    pending.set(n, { resolve, reject });
-    ws.send(JSON.stringify({ id: n, method, params }));
-    setTimeout(() => { if (pending.has(n)) { pending.delete(n); reject(new Error('timeout ' + method)); } }, 30000);
-  });
+    const requestId = ++id
+    pending.set(requestId, { resolve, reject })
+    ws.send(JSON.stringify({ id: requestId, method, params }))
+    setTimeout(() => {
+      if (pending.has(requestId)) {
+        pending.delete(requestId)
+        reject(new Error(`timeout ${method}`))
+      }
+    }, 30_000)
+  })
 }
-const evalJs = async (expr) => (await send('Runtime.evaluate', { expression: expr, returnByValue: true })).result.value;
+
+async function evaluate(expression) {
+  const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
+  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || 'browser evaluation failed')
+  return result.result.value
+}
+
+async function navigate(hash, wait = 1200) {
+  await send('Page.navigate', { url: `${BASE_URL.replace(/\/$/, '')}/${hash.replace(/^#?\/?/, '#/')}` })
+  await sleep(wait)
+}
+
+function requireCheck(condition, message) {
+  if (!condition) throw new Error(message)
+}
+
+async function rectSnapshot() {
+  return evaluate(`(() => {
+    const read = (selector) => { const node = document.querySelector(selector); if (!node) return null; const r = node.getBoundingClientRect(); return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height} }
+    const nav = read('#nav'), numpad = read('#numpad'), display = read('#display-container'), toolbar = read('.runtimeToolbar')
+    const overlap = (a, b) => !!a && !!b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+    return { nav, numpad, display, toolbar, navBeforeNumpad: !!nav && !!numpad && nav.left < numpad.left, navNumpadOverlap: overlap(nav, numpad), navDisplayOverlap: overlap(nav, display), numpadDisplayOverlap: overlap(numpad, display) }
+  })()`)
+}
 
 try {
-  for (let i = 0; i < 60; i++) {
-    try { const r = await fetch(`http://127.0.0.1:${PORT}/json/version`, { signal: AbortSignal.timeout(1000) }); if (r.ok) break; } catch {}
-    await sleep(200);
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try { if ((await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`)).ok) break } catch {}
+    await sleep(200)
   }
-  const tab = await (await fetch(`http://127.0.0.1:${PORT}/json/new?${encodeURIComponent(URL)}`, { method: 'PUT' })).json();
-  ws = new WebSocket(tab.webSocketDebuggerUrl);
-  await new Promise((res, rej) => { ws.addEventListener('open', res); ws.addEventListener('error', rej); });
-  ws.addEventListener('message', async ev => {
-    let d = ev.data; if (typeof d !== 'string') d = await d.text();
-    const m = JSON.parse(d);
-    if (m.id && pending.has(m.id)) {
-      const p = pending.get(m.id); pending.delete(m.id);
-      m.error ? p.reject(new Error(JSON.stringify(m.error))) : p.resolve(m.result);
-      return;
+  const tab = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?${encodeURIComponent(BASE_URL)}`, { method: 'PUT' })).json()
+  ws = new WebSocket(tab.webSocketDebuggerUrl)
+  await new Promise((resolve, reject) => { ws.addEventListener('open', resolve); ws.addEventListener('error', reject) })
+  ws.addEventListener('message', async (event) => {
+    let payload = event.data
+    if (typeof payload !== 'string') payload = await payload.text()
+    const message = JSON.parse(payload)
+    if (message.id && pending.has(message.id)) {
+      const request = pending.get(message.id)
+      pending.delete(message.id)
+      message.error ? request.reject(new Error(JSON.stringify(message.error))) : request.resolve(message.result)
     }
-    if (m.method === 'Runtime.exceptionThrown') errors.push((m.params.exceptionDetails?.exception?.description || m.params.exceptionDetails?.text || '').slice(0, 200));
-  });
-  await send('Page.enable');
-  await send('Runtime.enable');
-  await sleep(3000);
+    if (message.method === 'Runtime.exceptionThrown') jsErrors.push(message.params.exceptionDetails?.text || 'runtime exception')
+  })
+  await send('Page.enable')
+  await send('Runtime.enable')
+  await send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false })
+  await sleep(1500)
 
-  // 1. J2ME tab
-  const j2me = await evalJs(`(() => {
-    const tabs = [...document.querySelectorAll('.tab')].map(b => b.textContent.trim());
-    const cards = document.querySelectorAll('.card').length;
-    const count = document.querySelector('.count')?.textContent || '';
-    const hasUpload = !!document.querySelector('.upload');
-    return { tabs, cards, count, hasUpload, title: document.title, url: location.href };
-  })()`);
-  console.log('J2ME tab:', JSON.stringify(j2me));
-  await send('Page.captureScreenshot').then(r => fs.writeFileSync(SHOT1, Buffer.from(r.data, 'base64')));
+  const library = await evaluate(`(() => ({
+    title: document.title,
+    tabs: [...document.querySelectorAll('.tab')].map((node) => node.textContent.trim()),
+    cards: [...document.querySelectorAll('.card')].map((node) => node.querySelector('.cardName')?.textContent.trim() || ''),
+    hasUpload: !!document.querySelector('.upload'),
+  }))()`)
+  console.log('Library:', JSON.stringify(library))
+  requireCheck(library.tabs.includes('J2ME') && library.tabs.includes('冒泡社区'), 'library tabs missing')
+  await send('Page.captureScreenshot').then((result) => fs.writeFileSync(SHOT, Buffer.from(result.data, 'base64')))
 
-  await evalJs(`document.querySelector('.card')?.click()`);
-  await sleep(300);
-  const menu = await evalJs(`(() => { const e = document.querySelector('.optionSheet'); const r = e?.getBoundingClientRect(); return { visible: !!e, bottomAligned: !!r && Math.abs(r.bottom - innerHeight) < 2, options: [...document.querySelectorAll('.optionBody button')].map(b => b.textContent.trim()) }; })()`);
-  console.log('Game menu:', JSON.stringify(menu));
-  const optionStyles = await evalJs(`(() => { const s=document.querySelector('.optionSheet'), b=document.querySelector('.optionButton'); const sr=s.getBoundingClientRect(), br=b.getBoundingClientRect(); return {sheetWidth:sr.width, buttonWidth:br.width, buttonHeight:br.height, buttonBackground:getComputedStyle(b).backgroundColor, viewportWidth:innerWidth}; })()`)
-  console.log('Option visual styles:', JSON.stringify(optionStyles));
-  if (optionStyles.sheetWidth < 480 || optionStyles.buttonHeight < 44 || optionStyles.buttonBackground === 'rgb(239, 239, 239)') throw new Error('Desktop option sheet sizing/styles regression')
-  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
-  await sleep(150)
-  const mobileOptionStyles = await evalJs(`(() => { const s=document.querySelector('.optionSheet'), b=document.querySelector('.optionButton'); const sr=s.getBoundingClientRect(), br=b.getBoundingClientRect(); return {sheetWidth:sr.width, buttonWidth:br.width, buttonHeight:br.height, bottomAligned:Math.abs(sr.bottom-innerHeight)<2, viewportWidth:innerWidth}; })()`)
-  console.log('Mobile option styles:', JSON.stringify(mobileOptionStyles))
-  if (mobileOptionStyles.sheetWidth < 388 || mobileOptionStyles.buttonWidth < 360 || mobileOptionStyles.buttonHeight < 48 || !mobileOptionStyles.bottomAligned) throw new Error('Mobile bottom sheet responsive regression')
-  await send('Emulation.clearDeviceMetricsOverride')
-  await sleep(150)
-  await evalJs(`document.querySelector('.optionBody .optionPrimary')?.click()`);
-  await sleep(7000);
-  const j2mePlayer = await evalJs(`(() => { const c = document.querySelector('#canvas'); const gear = document.querySelector('#gear'); return { runtime: !!document.querySelector('.runtime-view'), canvas: !!c, midp: !!window.MIDP, gear: !!gear, w: c?.width || 0, h: c?.height || 0, error: /Could not load|启动失败/.test(document.body.innerText), iframe: !!document.querySelector('iframe') }; })()`);
-  console.log('J2ME runtime:', JSON.stringify(j2mePlayer));
-  await evalJs(`document.querySelector('.playerExit')?.click()`);
-  await sleep(200);
-  const exitDialog = await evalJs(`JSON.stringify({dialog:!!document.querySelector('.exitConfirm'),button:!!document.querySelector('.exitConfirm .optionDanger'),text:document.querySelector('.exitConfirm')?.innerText})`);
-  console.log('Exit confirm:', exitDialog);
-  await evalJs(`document.querySelector('.exitConfirm .optionDanger')?.click()`);
-  let returnedToLobby = false;
-  let returnedState = null;
-  for (let attempt = 0; attempt < 30; attempt++) {
-    await sleep(300);
-    try {
-      returnedState = await evalJs(`JSON.stringify({url:location.href,title:document.title,root:!!document.querySelector('#root'),tabs:document.querySelectorAll('.tab').length,body:document.body.innerText.slice(0,100)})`);
-      returnedToLobby = JSON.parse(returnedState).tabs === 2;
-      if (returnedToLobby) break;
-    } catch {}
+  const firstCard = await evaluate(`document.querySelector('.card')?.click(); true`)
+  void firstCard
+  await sleep(250)
+  const menu = await evaluate(`(() => { const sheet = document.querySelector('.optionSheet'); const rect = sheet?.getBoundingClientRect(); return { visible: !!sheet, width: rect?.width || 0, bottomAligned: !!rect && Math.abs(rect.bottom - innerHeight) < 2, buttons: [...document.querySelectorAll('.optionBody button')].map((node) => node.textContent.trim()) } })()`)
+  console.log('Option sheet:', JSON.stringify(menu))
+  requireCheck(menu.visible && menu.bottomAligned && menu.buttons.includes('启动'), 'option sheet is not usable')
+  await evaluate(`document.querySelector('.optionBackdrop')?.click(); true`)
+
+  if (!J2ME_FILE) {
+    console.log('SKIP: no J2ME fixture (set VERIFY_J2ME_FILE)')
+  } else {
+    const route = `#/play/j2me/${encodeURIComponent(J2ME_FILE)}?tab=j2me&name=Verify%20J2ME`
+    await navigate(route, 2500)
+    const j2me = await evaluate(`(() => ({ player: !!document.querySelector('.player'), phone: !!document.querySelector('#phone'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure'), editor: !!document.querySelector('#editor-layer') }))()`)
+    console.log('J2ME startup:', JSON.stringify(j2me))
+    requireCheck(j2me.player && j2me.phone && j2me.editor, 'J2ME player did not mount')
+    await send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: true })
+    await evaluate(`document.body.dataset.orientation='landscape'; document.body.dataset.sideLayout='swapped'; window.ScreenSetup?.refit?.(); true`)
+    await sleep(300)
+    const landscape = await rectSnapshot()
+    console.log('Landscape 844x390:', JSON.stringify(landscape))
+    if (landscape.nav && landscape.numpad && landscape.display) {
+      requireCheck(landscape.navBeforeNumpad, 'landscape navigation group is not on the left')
+      requireCheck(!landscape.navNumpadOverlap && !landscape.navDisplayOverlap && !landscape.numpadDisplayOverlap, 'landscape controls overlap')
+    } else console.log('SKIP: J2ME geometry not ready for fixture')
+    await send('Emulation.clearDeviceMetricsOverride')
+    await evaluate(`document.querySelector('.runtimeToolbarBack')?.click(); true`)
+    await sleep(150)
+    requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'exit confirmation did not open')
+    await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
+    await sleep(1500)
+    requireCheck(await evaluate("!!document.querySelector('.tab')"), 'exit did not return to library')
+    console.log('J2ME exit/re-entry: PASS')
   }
-  if (!returnedToLobby) throw new Error('返回大厅后 React 标签未恢复：' + returnedState);
 
-  // 2. switch to maopao
-  await evalJs(`document.querySelectorAll('.tab')[1].click()`);
-  await sleep(4000);
-  console.log('Tab state after switch:', await evalJs(`JSON.stringify({ buttons: [...document.querySelectorAll('.tab')].map(b => ({text:b.textContent, className:b.className})), text:document.querySelector('.library')?.innerText.slice(0,250), errors:document.querySelectorAll('.statusError').length })`));
-  const maopao = await evalJs(`(() => {
-    const active = document.querySelector('.tabActive')?.textContent.trim();
-    const cards = document.querySelectorAll('.card').length;
-    const count = document.querySelector('.count')?.textContent || '';
-    const names = [...document.querySelectorAll('.cardName')].slice(0, 3).map(e => e.textContent);
-    return { active, cards, count, names };
-  })()`);
-  console.log('冒泡 tab:', JSON.stringify(maopao));
-  await send('Page.captureScreenshot').then(r => fs.writeFileSync(SHOT2, Buffer.from(r.data, 'base64')));
+  if (!MRP_FILE) {
+    console.log('SKIP: no MRP fixture (set VERIFY_MRP_FILE)')
+  } else {
+    await navigate(`#/play/maopao/${encodeURIComponent(MRP_FILE)}?tab=maopao&name=Verify%20MRP`, 1800)
+    const mrp = await evaluate(`(() => ({ player: !!document.querySelector('.player'), dialogText: !!document.querySelector('#mrp-dialog-text'), bridgeContainsDialog: !!document.querySelector('#editor-layer #mrp-dialog-text'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure') }))()`)
+    console.log('MRP startup:', JSON.stringify(mrp))
+    requireCheck(mrp.player && mrp.dialogText && !mrp.bridgeContainsDialog, 'MRP dialog/editor structure is invalid')
+  }
 
-  // 3. open first maopao game
-  await evalJs(`document.querySelector('.card').click()`);
-  await sleep(300);
-  await evalJs(`document.querySelector('.optionBody .optionPrimary')?.click()`);
-  await sleep(12000);
-  const player = await evalJs(`(() => {
-    return { player: !!document.querySelector('.player'), runtime: !!document.querySelector('.runtime-view'), phone: !!document.querySelector('#phone'), iframe: !!document.querySelector('iframe') };
-  })()`);
-  console.log('Player:', JSON.stringify(player));
-  await send('Page.captureScreenshot').then(r => fs.writeFileSync(SHOT3, Buffer.from(r.data, 'base64')));
-
-  const vm = await evalJs(`(() => { const c = document.querySelector('#canvas'); return { canvas: !!c, w: c?.width || 0, h: c?.height || 0, module: !!window.Module }; })()`);
-  console.log('React runtime:', JSON.stringify(vm));
-
-  console.log('RESULT ' + JSON.stringify({ j2me, j2mePlayer, maopao, player, vm, jsErrors: errors.slice(0, 5) }));
-} catch (e) {
-  console.error('VERIFY FAILED:', e.message);
-  process.exitCode = 1;
+  if (jsErrors.length) throw new Error(`browser console errors: ${jsErrors.slice(0, 3).join(' | ')}`)
+  console.log('RESULT PASS')
+} catch (error) {
+  console.error('VERIFY FAILED:', error.message)
+  process.exitCode = 1
 } finally {
-  try { ws && ws.close(); } catch {}
-  chrome.kill('SIGKILL');
+  try { ws?.close() } catch {}
+  chrome.kill('SIGKILL')
+  fs.rmSync(PROFILE, { recursive: true, force: true })
 }

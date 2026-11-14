@@ -20,7 +20,7 @@ export function PhoneMarkup({ mrp = false }) {
     if (target.closest?.('input, textarea, [contenteditable="true"]')) return
     event.preventDefault()
   }
-  return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
+  return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} data-runtime-stage onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
     <div id="phone" className="runtime-phone">
     <div id="editor-layer" className="runtime-editor-layer" style={initialEditorLayerStyle}>
       <div id="textarea-editor" className="textEditor" contentEditable="true" />
@@ -30,7 +30,7 @@ export function PhoneMarkup({ mrp = false }) {
       <input id="tel-editor" className="textEditor" type="tel" />
       <input id="url-editor" className="textEditor" type="url" />
     </div>
-    <div id="display-container">
+    <div id="display-container" data-runtime-control="display">
       <div id="display">
         <canvas id="canvas" tabIndex="-1" onContextMenu={(e) => e.preventDefault()} />
         {mrp ? <>
@@ -49,12 +49,12 @@ export function PhoneMarkup({ mrp = false }) {
       </div>
     </div>
     <div id="keypad">
-      <div id="nav">
+      <div id="nav" data-runtime-control="nav">
         <button id="choice" className="key soft" title="左软键" />
         <div id="dpad"><button id="up" className="key dir" /><button id="left" className="key dir" /><button id="ok" className="key" /><button id="right" className="key dir" /><button id="down" className="key dir" /></div>
         <button id="back" className="key soft" title="右软键" /><button id="ret" className="key mini" title="挂机键">↩</button><button id="clear" className="key mini" title="清除">C</button>
       </div>
-      <div id="numpad">{[['1','.,?'],['2','abc'],['3','def'],['4','ghi'],['5','jkl'],['6','mno'],['7','pqrs'],['8','tuv'],['9','wxyz'],['*','+'],['0','␣'],['#','⇧']].map(([n, sub]) => <button key={n} id={n === '*' ? 'star' : n === '#' ? 'pound' : `num${n}`} className="key"><b>{n}</b><i>{sub}</i></button>)}</div>
+      <div id="numpad" data-runtime-control="numpad">{[['1','.,?'],['2','abc'],['3','def'],['4','ghi'],['5','jkl'],['6','mno'],['7','pqrs'],['8','tuv'],['9','wxyz'],['*','+'],['0','␣'],['#','⇧']].map(([n, sub]) => <button key={n} id={n === '*' ? 'star' : n === '#' ? 'pound' : `num${n}`} className="key"><b>{n}</b><i>{sub}</i></button>)}</div>
     </div>
     </div>
   </div>
