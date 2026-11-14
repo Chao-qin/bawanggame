@@ -33,3 +33,14 @@ and its CSS size together.
 - Entering and leaving fullscreen preserves the same orientation geometry and
   recalculates the canvas scale.
 - The old grid reset cannot override the landscape column assignment.
+
+## Touch Layout Customization
+
+- Touch layout configuration is separate from external keyboard mapping.
+- Presets cover standard, mirrored/rotated D-pad, swapped landscape side groups,
+  and numeric keypad order changes while keeping a stable 3x4 grid.
+- A visual slot can map to a different game action. Active pointers are released
+  before a mapping is changed so no key remains stuck.
+- Layout is stored per game with validated values and can be reset independently
+  from the other game settings.
+- Fullscreen overlays remain inside the fullscreen player element.

@@ -60,3 +60,35 @@
   git add runtime/j2me/screen.js runtime/j2me/style/main.css
   git commit -m "fix: make orientation layouts fill the runtime viewport"
   ```
+
+## Chunk 3: Add Touch Layout Customization
+
+**Files:**
+- Create: `runtime/j2me/touch-layout.js`
+- Modify: `runtime/j2me/config/settings.js`
+- Modify: `runtime/j2me/config/urlparams.js`
+- Modify: `runtime/j2me/keymap.js`
+- Modify: `runtime/j2me/touchpad.js`
+- Modify: `runtime/j2me/panel.js`
+- Modify: `runtime/j2me/style/main.css`
+- Modify: `apps/web/src/runtime/J2MEPlayer.jsx`
+
+- [ ] **Step 1: Add a validated per-game touch layout model**
+
+  Store preset, side placement, numeric slot order, and visual-slot action mapping separately from external keyboard `keymap` values.
+
+- [ ] **Step 2: Add stable preset and slot application**
+
+  Apply D-pad placement, side-group placement, and numeric grid order through data attributes and slot order. Keep the DOM grid stable and validate every permutation before applying it.
+
+- [ ] **Step 3: Route touch gestures through visual-slot mappings**
+
+  Make touch hit testing resolve a visual slot first, then convert that slot to the configured game action. Release all active pointers before rebinding so changes cannot leave a key pressed.
+
+- [ ] **Step 4: Add settings controls**
+
+  Add preset selectors, side swap, numeric order editing, action mapping controls, and independent reset in the settings panel. Keep external keyboard mapping in its existing section.
+
+- [ ] **Step 5: Verify the settings/fullscreen lifecycle**
+
+  Check applying, resetting, and re-entering fullscreen in portrait and landscape. Confirm overlays remain clickable and `TouchDiagnostics.sizes()` reports stable key rectangles.
