@@ -16,12 +16,15 @@ events.
 - `runtime/j2me/touchpad.js`: make pointer capture explicit, keep active keys
   stable while a pointer is held, and stop rejecting valid touches in the
   outer d-pad guard band.
-- `runtime/j2me/touchpad.js` and `runtime/j2me/keymap.js`: carry an optional
-  `sourceAt` timestamp captured at the original `pointerdown` through the sink
-  edge. Extend `KeyTrace.edges()` entries with optional `sourceAt`,
-  `deliveredAt`, and `latencyMs` fields. `deliveredAt` is recorded immediately
-  around the corresponding MIDP send call. This measures the complete
-  pointerdown-to-delivery path without changing existing `t`, `f`, `c`, or `k`
+- `runtime/j2me/touchpad.js` and `runtime/j2me/keymap.js`: carry a mandatory
+  `sourceAt` timestamp for pointer-originated edges, captured at the original
+  `pointerdown` with `performance.now()`, through the sink edge. Extend
+  `KeyTrace.edges()` entries with `sourceAt`, `deliveredAt`, and `latencyMs` for
+  those edges. `deliveredAt` uses the same `performance.now()` clock and is
+  sampled immediately after the corresponding `MIDP.sendKeyPress` call;
+  `latencyMs` is `deliveredAt - sourceAt`. Missing fields invalidate that tap
+  sample instead of being silently omitted. Existing `t`, `f`, `c`, and `k`
+  fields remain unchanged; keyboard-originated edges may omit the pointer-only
   fields.
 
 ## Preserved Behavior
@@ -41,11 +44,13 @@ chance to sample the press is deferred only until the next observed
 is never delayed by a fixed 60ms fallback during normal play. If no frame
 arrives, the queued release is flushed by `releaseAll()` on `blur`,
 `visibilitychange` (when hidden), or `pagehide`, by runtime teardown, and by a
-release-only watchdog after the measured frame interval budget. The watchdog
-is a liveness escape for a stalled visible runtime and never runs for a normal
-press. This prevents an inactive runtime from holding a logical key forever
-while preserving a one-frame tap window during normal play. MRP continues to
-receive its native press/release pair immediately.
+release-only watchdog. The watchdog budget is
+`clamp(2 * median(last 9 frame gaps), 32ms, 120ms)` with a 34ms startup frame
+estimate before two real gaps exist. It is scheduled only for a queued release,
+cancelled by the next `onFrame` flush or any cleanup, and never scheduled for a
+normal press. This gives a deterministic liveness escape for a stalled visible
+runtime while preserving a one-frame tap window during normal play. MRP
+continues to receive its native press/release pair immediately.
 
 Pointer capture keeps the original keypad pointer associated with its active
 key even when the finger leaves the element during a slide. D-pad hit testing
@@ -64,8 +69,9 @@ band that turns edge presses into no-ops.
 5. Pointer cancellation, blur, visibility change, and pagehide release all
    active keys.
 6. For at least 100 taps per runtime on desktop Chrome and Android WebView,
-   pointerdown-to-`sendKeyPress` p95 is <= 16 ms, with no sample above 50 ms;
-   report device/runtime, test duration, average frame interval/FPS, p95, and
+   pointerdown-to-`sendKeyPress` p95 is <= 16 ms, with no normal-play sample
+   above 50 ms; any missing pointer timestamp invalidates the run. Report
+   device/runtime, test duration, average frame interval/FPS, p95, and
    abnormal-frame count. Real-device touch results are reported separately
    from desktop emulation; an unavailable platform is marked unverified.
 7. MRP receives exactly one native press and one native release for a short
