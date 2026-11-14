@@ -18,5 +18,5 @@ export function cleanupRuntimeArtifacts() {
   document.querySelectorAll('link[data-runtime-style]').forEach((node) => node.remove())
   const body = document.body
   ;['runtime-active', 'fullscreen-active', 'settings-open', 'fixed-screen'].forEach((name) => body.classList.remove(name))
-  ;['theme', 'orientation'].forEach((name) => delete body.dataset[name])
+  ;['theme', 'orientation', 'dpadLayout', 'sideLayout'].forEach((name) => delete body.dataset[name])
 }
