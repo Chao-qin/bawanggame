@@ -217,9 +217,12 @@ var BtRoom = (function () {
   overlay.addEventListener("keyup", function (e) { e.stopPropagation(); });
   form.name = new URLSearchParams(location.search).get("btname") || stored() || "Player" + rnd(2);
   fresh();
-  document.addEventListener("DOMContentLoaded", function () {
-    document.body.appendChild(overlay);
-  });
+  function mount(root) {
+    var host = root || document.querySelector(".runtime-overlay-root") || document.body;
+    host.appendChild(overlay);
+  }
+  window.__XIAOCHAO_BTROOM_MOUNT__ = mount;
+  mount();
 
   return {
     ask: ask,

@@ -103,11 +103,11 @@ body[data-rotation="270"] .runtime-stage {
   height: min(calc(100vw - 20px), calc((100dvh - 20px) / .6), 800px);
 }
 body.rotate-90 .runtime-stage,
-body[data-rotation="90"] .runtime-stage { transform: rotate(90deg); }
+body[data-rotation="90"] .runtime-stage { transform: rotate(90deg) scale(var(--rotation-scale, 1)); }
 body.rotate--90 .runtime-stage,
-body[data-rotation="270"] .runtime-stage { transform: rotate(270deg); }
+body[data-rotation="270"] .runtime-stage { transform: rotate(270deg) scale(var(--rotation-scale, 1)); }
 body.rotate-180 .runtime-stage,
-body[data-rotation="180"] .runtime-stage { transform: rotate(180deg); }
+body[data-rotation="180"] .runtime-stage { transform: rotate(180deg) scale(var(--rotation-scale, 1)); }
 body.runtime-active { display: flex !important; flex-direction: column !important; }
 body.fullscreen-active { background: #05070a !important; }
 body.runtime-active #display-container { grid-row: auto !important; grid-column: auto !important; height: auto !important; }
@@ -910,6 +910,8 @@ body.runtime-active.settings-open .panel-box {
    dimension is authoritative for the virtual phone. */
 .player:fullscreen,
 .player:-webkit-full-screen {
+  --runtime-toolbar-height: 48px;
+  --runtime-toolbar-space: calc(max(8px, env(safe-area-inset-top, 0px)) + var(--runtime-toolbar-height) + 8px);
   position: fixed;
   inset: 0;
   width: 100%;
@@ -924,23 +926,26 @@ body.runtime-active.settings-open .panel-box {
 .player:fullscreen .playerStage,
 .player:-webkit-full-screen .playerStage {
   position: absolute;
-  inset: 0;
+  inset: var(--runtime-toolbar-space, 72px) 0 0;
 }
 
 .player:fullscreen .runtime-stage,
 .player:-webkit-full-screen .runtime-stage {
   width: min(100vw, calc(100dvh * 0.62));
-  height: 100dvh;
+  height: 100%;
+  max-height: 100%;
 }
 
 .player:fullscreen[data-fullscreen-fit="height"] .runtime-stage,
 .player:-webkit-full-screen[data-fullscreen-fit="height"] .runtime-stage {
   width: 100vw;
-  height: min(100dvh, calc(100vw / 0.62));
+  height: 100%;
+  max-height: 100%;
 }
 
 .player:fullscreen .runtimeToolbar,
 .player:-webkit-full-screen .runtimeToolbar {
+  position: absolute;
   z-index: 220;
 }
 
@@ -950,7 +955,21 @@ body.runtime-active.fullscreen-active[data-fullscreen-fit="width"] .runtime-stag
 
 body.runtime-active.fullscreen-active[data-fullscreen-fit="height"] .runtime-stage {
   width: 100vw;
-  height: min(100dvh, calc(100vw / 0.62));
+  height: 100%;
+  max-height: 100%;
+}
+
+/* Landscape runtime uses three columns, so fullscreen must expose the whole
+   viewport instead of applying the portrait phone aspect ratio. */
+@media (orientation: landscape) {
+  .player:fullscreen .runtime-stage,
+  .player:-webkit-full-screen .runtime-stage,
+  body.runtime-active.fullscreen-active .runtime-stage {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+  }
 }
 
 .panel-box h3 {

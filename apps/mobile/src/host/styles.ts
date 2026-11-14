@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native'
 
 export const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#05070a' },
   root: { flex: 1, backgroundColor: '#05070a' },
   webView: { flex: 1, backgroundColor: '#05070a' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#05070a', padding: 24 },

@@ -68,7 +68,7 @@
     hud = document.createElement("div");
     hud.id = "fps-hud";
     hud.hidden = true;
-    document.body.appendChild(hud);
+    (window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__ || function (node) { (document.querySelector(".runtime-overlay-root") || document.body).appendChild(node); })(hud);
 
     var last = MIDP.frames | 0;
     var prev = performance.now();

@@ -36,7 +36,19 @@ export function J2MEPlayer({ game, onExit, onReady }) {
       try {
         for (const src of scripts) await loadClassic(src)
         if (!alive) return
+        const overlayRoot = document.querySelector('.runtime-overlay-root')
+        window.__XIAOCHAO_PANEL_MOUNT__?.(overlayRoot)
+        window.__XIAOCHAO_BTROOM_MOUNT__?.(overlayRoot)
+        window.__XIAOCHAO_FILES_MOUNT__?.(overlayRoot)
+        window.__XIAOCHAO_FEEDBACK_MOUNT__?.(overlayRoot)
+        window.__XIAOCHAO_DEBUG_NATIVE_MOUNT__?.(overlayRoot)
+        const mountOverlay = window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__
+        ;['gear', 'panel', 'btroom', 'files', 'fb-toast', 'fps-hud', 'drawlog-btn'].forEach((id) => {
+          const node = document.getElementById(id)
+          if (node && mountOverlay) mountOverlay(node)
+        })
         applyRuntimeSettings()
+        window.ScreenSetup?.refit?.()
         window.__XIAOCHAO_RUNTIME_EXTRAS_INIT__?.()
         window.__XIAOCHAO_KEYMAP_BOOT__?.()
         window.__XIAOCHAO_REQUEST_EXIT = onExit

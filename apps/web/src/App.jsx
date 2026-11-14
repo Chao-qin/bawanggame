@@ -42,6 +42,15 @@ function routeHash(route) {
   return '#/library/' + route.tab
 }
 
+function fullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null
+}
+
+function exitFullscreen() {
+  const exit = document.exitFullscreen || document.webkitExitFullscreen
+  return typeof exit === 'function' ? Promise.resolve(exit.call(document)) : Promise.resolve()
+}
+
 function parseRoute(hash = '') {
   const value = String(hash || '').replace(/^#\/?/, '')
   const [path, queryString = ''] = value.split('?')
@@ -482,26 +491,88 @@ function Store({ onRefreshLibrary }) {
 
 function Player({ game, onBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement))
+  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(fullscreenElement()))
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
   const playerRef = useRef(null)
   const stageRef = useRef(null)
+  const toolbarRef = useRef(null)
   const lastNativeBackSignal = useRef(nativeBackSignal)
   const settingsReady = game.kind === 'j2me' && runtimeReadyFor === game.file
   useEffect(() => {
+    const player = playerRef.current
+    const toolbar = toolbarRef.current
+    if (!player || !toolbar) return
+    const updateToolbarSize = () => {
+      player.style.setProperty('--runtime-toolbar-height', `${Math.ceil(toolbar.getBoundingClientRect().height)}px`)
+    }
+    updateToolbarSize()
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(updateToolbarSize)
+    observer.observe(toolbar)
+    return () => observer.disconnect()
+  }, [])
+  useEffect(() => {
+    const mountOverlay = (node) => {
+      if (!node) return node
+      const root = playerRef.current?.querySelector('.runtime-overlay-root')
+      if (root) root.append(node)
+      else if (!node.isConnected) document.body.append(node)
+      return node
+    }
+    window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__ = mountOverlay
+    return () => {
+      if (window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__ === mountOverlay) delete window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__
+    }
+  }, [])
+  useEffect(() => {
     const stage = stageRef.current
     if (!stage) return
+    let refitFrame = 0
+    let refitting = false
+    let viewportKey = ''
+    const currentViewportKey = () => {
+      const viewport = window.visualViewport
+      return [window.innerWidth, window.innerHeight, viewport?.width || 0, viewport?.height || 0].join(':')
+    }
+    const requestRefit = (force = false) => {
+      const nextKey = currentViewportKey()
+      if (!force && nextKey === viewportKey) return
+      viewportKey = nextKey
+      if (refitFrame) return
+      const schedule = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 0))
+      refitFrame = schedule(() => {
+        refitFrame = 0
+        const refit = window.ScreenSetup?.refit
+        if (typeof refit !== 'function') return
+        refitting = true
+        try { refit.call(window.ScreenSetup) } finally { refitting = false }
+      })
+    }
     const syncFullscreen = () => {
-      const active = !!document.fullscreenElement
+      const active = !!fullscreenElement()
       document.body.classList.toggle('fullscreen-active', active)
+      requestRefit(true)
       setIsFullscreen(active)
     }
     syncFullscreen()
+    const onViewportResize = () => { if (!refitting) requestRefit() }
     document.addEventListener('fullscreenchange', syncFullscreen)
+    document.addEventListener('webkitfullscreenchange', syncFullscreen)
+    window.addEventListener('resize', onViewportResize)
+    window.addEventListener('orientationchange', onViewportResize)
+    window.visualViewport?.addEventListener('resize', onViewportResize)
     return () => {
+      if (refitFrame) {
+        const cancel = window.cancelAnimationFrame || window.clearTimeout
+        cancel(refitFrame)
+      }
       delete document.body.dataset.fullscreenFit
       document.body.classList.remove('fullscreen-active')
       document.removeEventListener('fullscreenchange', syncFullscreen)
+      document.removeEventListener('webkitfullscreenchange', syncFullscreen)
+      window.removeEventListener('resize', onViewportResize)
+      window.removeEventListener('orientationchange', onViewportResize)
+      window.visualViewport?.removeEventListener('resize', onViewportResize)
     }
   }, [])
   useEffect(() => {
@@ -510,25 +581,30 @@ function Player({ game, onBack, nativeBackSignal }) {
     setConfirming(true)
   }, [nativeBackSignal])
   useEffect(() => () => {
-    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
+    if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
   }, [])
   const requestBack = useCallback(() => setConfirming(true), [])
   const toggleFullscreen = async () => {
     try {
-      if (document.fullscreenElement) await document.exitFullscreen()
-      else if (playerRef.current?.requestFullscreen) {
+      if (fullscreenElement()) await exitFullscreen()
+      else if (playerRef.current?.requestFullscreen || playerRef.current?.webkitRequestFullscreen) {
+        const request = playerRef.current.requestFullscreen || playerRef.current.webkitRequestFullscreen
         try {
-          await playerRef.current.requestFullscreen({ navigationUI: 'hide' })
+          await request.call(playerRef.current, { navigationUI: 'hide' })
         } catch (_) {
           // Older Android WebViews reject the options object but still support
           // the fullscreen request itself.
-          await playerRef.current.requestFullscreen()
+          await request.call(playerRef.current)
         }
       }
     } catch (_) {}
   }
   const openSettings = () => {
+    if (typeof window.__XIAOCHAO_OPEN_SETTINGS__ === 'function') {
+      window.__XIAOCHAO_OPEN_SETTINGS__()
+      return
+    }
     const gear = document.getElementById('gear')
     if (gear) gear.click()
   }
@@ -540,7 +616,7 @@ function Player({ game, onBack, nativeBackSignal }) {
   const exit = () => {
     try { window.myflushAll && window.myflushAll() } catch (_) {}
     try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
-    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
+    if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
     setConfirming(false)
     onBack()
@@ -551,7 +627,7 @@ function Player({ game, onBack, nativeBackSignal }) {
   }
   return (
     <div ref={playerRef} className="player" onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
-      <div className="runtimeToolbar" role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
+      <div ref={toolbarRef} className="runtimeToolbar" role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅">‹</button>
         <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
         <span className="runtimeToolbarSpacer" />
@@ -561,6 +637,7 @@ function Player({ game, onBack, nativeBackSignal }) {
       <div ref={stageRef} className="playerStage">
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : <MrpPlayer game={game} onExit={requestBack} />}
       </div>
+      <div className="runtime-overlay-root" />
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true">
           <div className="exitBox">
