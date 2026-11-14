@@ -910,7 +910,8 @@ body.runtime-active.settings-open .panel-box {
    dimension is authoritative for the virtual phone. */
 .player:fullscreen,
 .player:-webkit-full-screen {
-  --runtime-toolbar-space: calc(max(8px, env(safe-area-inset-top, 0px)) + 64px);
+  --runtime-toolbar-height: 48px;
+  --runtime-toolbar-space: calc(max(8px, env(safe-area-inset-top, 0px)) + var(--runtime-toolbar-height) + 8px);
   position: fixed;
   inset: 0;
   width: 100%;

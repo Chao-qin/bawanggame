@@ -475,8 +475,22 @@ function Player({ game, onBack, nativeBackSignal }) {
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
   const playerRef = useRef(null)
   const stageRef = useRef(null)
+  const toolbarRef = useRef(null)
   const lastNativeBackSignal = useRef(nativeBackSignal)
   const settingsReady = game.kind === 'j2me' && runtimeReadyFor === game.file
+  useEffect(() => {
+    const player = playerRef.current
+    const toolbar = toolbarRef.current
+    if (!player || !toolbar) return
+    const updateToolbarSize = () => {
+      player.style.setProperty('--runtime-toolbar-height', `${Math.ceil(toolbar.getBoundingClientRect().height)}px`)
+    }
+    updateToolbarSize()
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(updateToolbarSize)
+    observer.observe(toolbar)
+    return () => observer.disconnect()
+  }, [])
   useEffect(() => {
     const mountOverlay = (node) => {
       if (!node) return node
@@ -593,7 +607,7 @@ function Player({ game, onBack, nativeBackSignal }) {
   }
   return (
     <div ref={playerRef} className="player" onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
-      <div className="runtimeToolbar" role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
+      <div ref={toolbarRef} className="runtimeToolbar" role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅">‹</button>
         <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
         <span className="runtimeToolbarSpacer" />
