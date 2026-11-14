@@ -649,6 +649,10 @@
     else if (panel.contains(document.activeElement)) document.activeElement.blur();
   }
 
+  window.__XIAOCHAO_OPEN_SETTINGS__ = function () {
+    toggle(panel.hidden);
+  };
+
   function place() {
     var c = document.getElementById("display").getBoundingClientRect();
     var s = 46, top = c.top >= s, right = innerWidth - c.right >= s, left = c.left >= s;
