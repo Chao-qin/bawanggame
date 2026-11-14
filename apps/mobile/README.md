@@ -18,6 +18,7 @@
 pnpm mobile:prepare-web
 pnpm --filter @xiaochao/mobile start
 pnpm --filter @xiaochao/mobile android
+pnpm mobile:build-android
 pnpm --filter @xiaochao/mobile ios
 pnpm mobile:typecheck
 pnpm mobile:verify-web
@@ -25,9 +26,25 @@ pnpm mobile:verify-web
 
 `mobile:prepare-web` 会执行根项目的 Web build 和 `pack-site.sh`，生成 `apps/mobile/web`。这个目录是生成物，不能手工编辑；下一次准备资源会完整覆盖它。
 
+`mobile:build-android` 会准备 Web 资源并生成可独立运行的 release APK：
+`apps/mobile/android/app/build/outputs/apk/release/app-release.apk`。
+这个包内置 React Native bundle 和 `assets/web`，安装后不需要启动 Metro。
+开发调试仍使用 `pnpm --filter @xiaochao/mobile android`，该命令依赖 Metro。
+
+需要让 APK 使用 52java 商城时，构建前设置 Node 服务的可访问地址：
+
+```bash
+MOBILE_52JAVA_API_BASE=http://192.168.0.100:8080 pnpm mobile:build-android
+```
+
+手机和 Node 服务必须在同一局域网；正式环境应使用 HTTPS 公网地址。未设置该变量时，APK 仍可离线运行内置游戏，商城会显示未配置提示。
+
+发布包的 J2ME 游戏清单由构建时生成的 `web/jar-manifest.json` 提供，内置 JAR 不需要桌面 Node 服务。
+52java 商城是在线目录，安装包中会明确显示离线提示；“大宋豪侠 · 本地复活”仍需要单独运行 `dasong-server`。
+
 ## 宿主行为
 
-- WebView 只加载应用内置的 `127.0.0.1` 本地资源，不依赖远程 Web 首页。
+- WebView 只加载应用内置的 `127.0.0.1` 本地资源服务，不依赖远程 Web 首页；这个地址是应用内回环桥接，不是远端服务器。
 - Android 首次启动会把 APK assets 中的 Web 目录复制到应用私有目录；资源版本变化时重新复制。
 - Android 返回键先交给 Web 页面。游戏路由会触发现有退出确认，回到大厅后再允许退出宿主。
 - Web 页面、J2ME/MRP 运行时和全屏/旋转设置仍由现有 React 应用负责。

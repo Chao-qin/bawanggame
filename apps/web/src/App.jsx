@@ -14,6 +14,16 @@ const TABS = [
 const TAB_IDS = new Set(TABS.map((item) => item.id))
 const GAME_KINDS = new Set(['j2me', 'maopao', 'local-revival'])
 
+function isEmbeddedHost() {
+  return new URLSearchParams(window.location.search).get('host') === 'rn'
+}
+
+const mobileApiBase = String(import.meta.env.VITE_52JAVA_API_BASE || '').replace(/\/+$/, '')
+
+function apiPath(path) {
+  return isEmbeddedHost() && mobileApiBase ? mobileApiBase + path : path
+}
+
 function decodeRoutePart(value, fallback = '') {
   try { return decodeURIComponent(value || fallback) } catch (_) { return fallback }
 }
@@ -111,7 +121,10 @@ function useServerJars() {
   const [state, setState] = useState({ loading: true, error: null, games: [] })
   useEffect(() => {
     let alive = true
-    fetch('/__jars')
+    // The RN package serves a static manifest from APK assets; desktop keeps
+    // the Node endpoint so its live catalog and icon extraction still work.
+    const endpoint = isEmbeddedHost() ? '/jar-manifest.json' : '/__jars'
+    fetch(endpoint)
       .then((r) => {
         if (!r.ok) throw new Error('HTTP ' + r.status)
         return r.json()
@@ -144,21 +157,27 @@ function useServerJars() {
 }
 
 function useJavaStore(query, category, page) {
-  const [state, setState] = useState({ loading: true, error: null, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
+  const embedded = isEmbeddedHost()
+  const online = !embedded || Boolean(mobileApiBase)
+  const [state, setState] = useState({ loading: online, error: null, offline: !online, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
   const [tick, setTick] = useState(0)
   useEffect(() => {
     let alive = true
+    if (!online) {
+      setState({ loading: false, error: null, offline: true, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
+      return () => { alive = false }
+    }
     setState((current) => ({ ...current, loading: true, error: null }))
     const params = new URLSearchParams({ page: String(page) })
     if (query) params.set('query', query)
     if (category) params.set('category', category)
     if (tick) params.set('refresh', '1')
-    fetch('/__52java/catalog?' + params)
+    fetch(apiPath('/__52java/catalog?' + params))
       .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json() })
-      .then((data) => { if (alive) setState({ loading: false, error: null, games: data.games || [], siteUrl: data.siteUrl || 'https://java.52emu.cn', pages: data.pages || 1, total: data.total || 0 }) })
+      .then((data) => { if (alive) setState({ loading: false, error: null, offline: false, games: data.games || [], siteUrl: data.siteUrl || 'https://java.52emu.cn', pages: data.pages || 1, total: data.total || 0 }) })
       .catch((e) => { if (alive) setState((current) => ({ ...current, loading: false, error: String(e.message || e) })) })
     return () => { alive = false }
-  }, [tick, query, category, page])
+  }, [online, tick, query, category, page])
   return { ...state, refresh: () => setTick((value) => value + 1) }
 }
 
@@ -431,7 +450,7 @@ function Store({ onRefreshLibrary }) {
     setBusy(game.id); setDone('')
     try {
       if (!hasLocalJars()) throw new Error('浏览器本机存储不可用')
-      const response = await fetch('/__52java/download?id=' + encodeURIComponent(game.id))
+      const response = await fetch(apiPath('/__52java/download?id=' + encodeURIComponent(game.id)))
       if (!response.ok) {
         let message = '下载失败'
         try { message = (await response.json()).error || message } catch (_) {}
@@ -444,6 +463,14 @@ function Store({ onRefreshLibrary }) {
       onRefreshLibrary()
     } catch (error) { window.alert('下载失败：' + (error.message || error)) }
     finally { setBusy('') }
+  }
+  if (store.offline) {
+    return <section className="storePage">
+      <div className="emptyPanel">
+        <strong>在线商城服务未配置</strong>
+        <span>打包时设置 MOBILE_52JAVA_API_BASE 后重新构建，即可在安装包中使用 52java 商城。</span>
+      </div>
+    </section>
   }
   return <section className="storePage">
     <div className="storeHero">

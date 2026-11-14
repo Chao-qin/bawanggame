@@ -59,6 +59,7 @@ yarn-error.log
 # Generated WebView payload
 /web/
 !/web/.gitkeep
+/android/app/src/main/assets/
 
 # Ruby / CocoaPods
 **/Pods/

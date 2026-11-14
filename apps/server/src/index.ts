@@ -31,7 +31,13 @@ type StoreCatalog = { games: StoreGame[]; page: number; pages: number; total: nu
 const storeCache = new Map<string, { expires: number; value: StoreCatalog }>()
 
 function json(res: ServerResponse, status: number, value: unknown) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' })
+  res.writeHead(status, {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-cache',
+  })
   res.end(JSON.stringify(value))
 }
 
@@ -135,6 +141,7 @@ async function streamStoreResponse(res: ServerResponse, game: StoreGame, respons
     const name = baseName.toLowerCase().endsWith('.jar') ? baseName : `${baseName}.jar`
     const encodedName = encodeURIComponent(name)
     res.writeHead(200, {
+      'Access-Control-Allow-Origin': '*',
       'Content-Type': 'application/java-archive',
       ...(length ? { 'Content-Length': String(length) } : {}),
       'Content-Disposition': `attachment; filename*=UTF-8''${encodedName}`,
@@ -268,6 +275,14 @@ async function jars(res: ServerResponse) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
+  if (req.method === 'OPTIONS' && url.pathname.startsWith('/__52java/')) {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    })
+    return res.end()
+  }
   if (url.pathname === '/__jars') return jars(res)
   if (url.pathname === '/__icon') {
     const name = url.searchParams.get('jar') ?? ''

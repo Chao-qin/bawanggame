@@ -16,6 +16,7 @@ const requiredFiles = [
   'mrp-runtime.js',
   'maopao/vmrp_v1.0/vmrp.js',
   'maopao/hall/manifest.json',
+  'jar-manifest.json',
   'jar',
 ]
 
