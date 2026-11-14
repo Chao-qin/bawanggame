@@ -567,6 +567,10 @@ function Player({ game, onBack, nativeBackSignal }) {
     } catch (_) {}
   }
   const openSettings = () => {
+    if (typeof window.__XIAOCHAO_OPEN_SETTINGS__ === 'function') {
+      window.__XIAOCHAO_OPEN_SETTINGS__()
+      return
+    }
     const gear = document.getElementById('gear')
     if (gear) gear.click()
   }
