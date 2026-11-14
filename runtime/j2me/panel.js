@@ -748,7 +748,7 @@
     place();
     render();
   });
-  window.addEventListener("resize", place);
+  window.addEventListener("xiaochao:viewportchange", place);
   var origStarted = ScreenSetup.started;
   ScreenSetup.started = function () {
     startSize = canvasSize();

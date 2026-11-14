@@ -79,6 +79,12 @@
       return target && target.closest && target.closest("#keypad");
     }
 
+    function keypadGestureTarget(target) {
+      if (!inKeypad(target)) return false;
+      if (target.closest("#editor-layer, #mrp-dialog-text, #panel")) return false;
+      return true;
+    }
+
     function clearSelection() {
       var selection = window.getSelection && window.getSelection();
       if (selection && selection.rangeCount) selection.removeAllRanges();
@@ -363,18 +369,17 @@
     }
     listen(document, "pointerup", up);
     listen(document, "pointercancel", up);
-    listen(document, "contextmenu", function (e) {
-      if (inKeypad(e.target)) e.preventDefault();
+    // Android WebView may begin its long-press callout before a bubbling
+    // React/document listener runs. Capture non-passive native gestures on
+    // the keypad itself, while leaving editor and settings controls alone.
+    function blockKeypadGesture(e) {
+      if (!keypadGestureTarget(e.target)) return;
+      e.preventDefault();
+      if (e.type === "selectstart" || e.type === "contextmenu") clearSelection();
+    }
+    ["touchstart", "touchmove", "gesturestart", "contextmenu", "selectstart", "dragstart"].forEach(function (type) {
+      listen(document, type, blockKeypadGesture, { capture: true, passive: false });
     });
-    listen(document, "selectstart", function (e) {
-      if (inKeypad(e.target)) {
-        clearSelection();
-        e.preventDefault();
-      }
-    }, true);
-    listen(document, "dragstart", function (e) {
-      if (inKeypad(e.target)) e.preventDefault();
-    }, true);
 
     // ---------- 防卡键 ----------
     listen(window, "blur", releaseAll);

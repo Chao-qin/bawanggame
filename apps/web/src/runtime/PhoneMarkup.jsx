@@ -17,10 +17,11 @@ const initialEditorLayerStyle = {
 export function PhoneMarkup({ mrp = false }) {
   const blockRuntimeGesture = (event) => {
     const target = event.target
-    if (target.closest?.('input, textarea, [contenteditable="true"]')) return
+    if (!target.closest?.('#keypad')) return
+    if (target.closest?.('#editor-layer, #mrp-dialog-text, #panel')) return
     event.preventDefault()
   }
-  return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} data-runtime-stage onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
+  return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} data-runtime-stage>
     <div id="phone" className="runtime-phone">
     <div id="editor-layer" className="runtime-editor-layer" style={initialEditorLayerStyle}>
       <div id="textarea-editor" className="textEditor" contentEditable="true" />
@@ -48,7 +49,7 @@ export function PhoneMarkup({ mrp = false }) {
         </>}
       </div>
     </div>
-    <div id="keypad">
+    <div id="keypad" onTouchStartCapture={blockRuntimeGesture} onTouchMoveCapture={blockRuntimeGesture} onContextMenuCapture={blockRuntimeGesture} onSelectStartCapture={blockRuntimeGesture} onDragStartCapture={blockRuntimeGesture}>
       <canvas id="keypad-canvas" aria-hidden="true" />
       <div id="nav" data-runtime-control="nav">
         <button id="choice" className="key soft" title="左软键" />

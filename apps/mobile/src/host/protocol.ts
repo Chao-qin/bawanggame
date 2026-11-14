@@ -34,7 +34,26 @@ export const injectedBridge = `
     if (isGame) window.history.back();
     return isGame;
   };
-  window.__XIAOCHAO_RN_HOST__ = { version: version, send: send };
+  function setInsets(payload) {
+    if (!payload || payload.version !== 1) return false;
+    var insets = {
+      version: 1,
+      top: Math.max(0, Number(payload.top) || 0),
+      right: Math.max(0, Number(payload.right) || 0),
+      bottom: Math.max(0, Number(payload.bottom) || 0),
+      left: Math.max(0, Number(payload.left) || 0)
+    };
+    window.__XIAOCHAO_RESPONSIVE_INSETS__ = insets;
+    window.__XIAOCHAO_RESPONSIVE_HOST__ = window.__XIAOCHAO_RESPONSIVE_HOST__ || {};
+    window.__XIAOCHAO_RESPONSIVE_HOST__.version = 1;
+    window.__XIAOCHAO_RESPONSIVE_HOST__.insets = insets;
+    if (typeof window.__XIAOCHAO_RESPONSIVE_HOST__.setInsets === 'function') {
+      window.__XIAOCHAO_RESPONSIVE_HOST__.setInsets(insets);
+    }
+    window.dispatchEvent(new CustomEvent('xiaochao:hostinsets', { detail: insets }));
+    return true;
+  }
+  window.__XIAOCHAO_RN_HOST__ = { version: version, send: send, setInsets: setInsets };
   send('app.ready', { url: window.location.href });
 })();
 true;

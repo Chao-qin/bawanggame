@@ -6630,7 +6630,7 @@ if (typeof module !== "undefined" && module.exports) {
   }
   updatePhysicalScreenSize();
   updateCanvas();
-  window.addEventListener("resize", onWindowResize);
+  window.addEventListener("xiaochao:viewportchange", onWindowResize);
   function sendPenEvent(pt, whichType) {
     
     FG.sendNativeEventToForeground({type:PEN_EVENT, intParam1:whichType, intParam2:pt.x, intParam3:pt.y}, true);
