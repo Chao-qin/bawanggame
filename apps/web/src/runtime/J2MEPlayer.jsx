@@ -35,31 +35,47 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     window.__XIAOCHAO_RUNTIME_SESSION__ = session
     ;(async () => {
       try {
+        const ensureActive = () => {
+          if (!alive || !session.active) throw new Error('运行时已退出')
+        }
         await Promise.all(styles.map((src) => loadStyle(src, session)))
         for (const src of scripts) {
           await loadClassic(src, session)
-          if (!alive || !session.active) return
+          ensureActive()
         }
-        if (!alive || !session.active) return
+        ensureActive()
         const overlayRoot = document.querySelector('.runtime-overlay-root')
-        window.__XIAOCHAO_PANEL_MOUNT__?.(overlayRoot)
-        window.__XIAOCHAO_BTROOM_MOUNT__?.(overlayRoot)
-        window.__XIAOCHAO_FILES_MOUNT__?.(overlayRoot)
-        window.__XIAOCHAO_FEEDBACK_MOUNT__?.(overlayRoot)
-        window.__XIAOCHAO_DEBUG_NATIVE_MOUNT__?.(overlayRoot)
+        ;[
+          window.__XIAOCHAO_PANEL_MOUNT__,
+          window.__XIAOCHAO_BTROOM_MOUNT__,
+          window.__XIAOCHAO_FILES_MOUNT__,
+          window.__XIAOCHAO_FEEDBACK_MOUNT__,
+          window.__XIAOCHAO_DEBUG_NATIVE_MOUNT__,
+        ].forEach((mount) => {
+          ensureActive()
+          mount?.(overlayRoot)
+        })
         const mountOverlay = window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__
         ;['gear', 'panel', 'btroom', 'files', 'fb-toast', 'fps-hud', 'drawlog-btn'].forEach((id) => {
+          ensureActive()
           const node = document.getElementById(id)
           if (node && mountOverlay) mountOverlay(node)
         })
+        ensureActive()
         applyRuntimeSettings()
+        ensureActive()
         window.ScreenSetup?.setOrientation?.(window.config?.orientation)
         window.ScreenSetup?.refit?.()
+        ensureActive()
         window.__XIAOCHAO_RUNTIME_EXTRAS_INIT__?.()
+        ensureActive()
         window.__XIAOCHAO_KEYMAP_BOOT__?.()
+        ensureActive()
         window.__XIAOCHAO_REQUEST_EXIT = onExit
         window.showExitScreen = onExit
+        ensureActive()
         if (typeof window.onload === 'function') window.onload(new Event('load'))
+        ensureActive()
         onReady?.()
         setLoading(false)
       } catch (e) {

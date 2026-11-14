@@ -31,14 +31,14 @@ const jsErrors = []
 function send(method, params = {}) {
   return new Promise((resolve, reject) => {
     const requestId = ++id
-    pending.set(requestId, { resolve, reject })
-    ws.send(JSON.stringify({ id: requestId, method, params }))
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       if (pending.has(requestId)) {
         pending.delete(requestId)
         reject(new Error(`timeout ${method}`))
       }
     }, 30_000)
+    pending.set(requestId, { resolve, reject, timer })
+    ws.send(JSON.stringify({ id: requestId, method, params }))
   })
 }
 
@@ -62,7 +62,7 @@ async function rectSnapshot() {
     const read = (selector) => { const node = document.querySelector(selector); if (!node) return null; const r = node.getBoundingClientRect(); return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height} }
     const nav = read('#nav'), numpad = read('#numpad'), display = read('#display-container'), toolbar = read('.runtimeToolbar')
     const overlap = (a, b) => !!a && !!b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
-    return { nav, numpad, display, toolbar, navBeforeNumpad: !!nav && !!numpad && nav.left < numpad.left, navNumpadOverlap: overlap(nav, numpad), navDisplayOverlap: overlap(nav, display), numpadDisplayOverlap: overlap(numpad, display) }
+    return { nav, numpad, display, toolbar, sideLayout: document.body.dataset.sideLayout || '', navBeforeNumpad: !!nav && !!numpad && nav.left < numpad.left, navNumpadOverlap: overlap(nav, numpad), navDisplayOverlap: overlap(nav, display), numpadDisplayOverlap: overlap(numpad, display) }
   })()`)
 }
 
@@ -81,12 +81,22 @@ try {
     if (message.id && pending.has(message.id)) {
       const request = pending.get(message.id)
       pending.delete(message.id)
+      clearTimeout(request.timer)
       message.error ? request.reject(new Error(JSON.stringify(message.error))) : request.resolve(message.result)
     }
     if (message.method === 'Runtime.exceptionThrown') jsErrors.push(message.params.exceptionDetails?.text || 'runtime exception')
   })
   await send('Page.enable')
   await send('Runtime.enable')
+  const runtimeStateObserver = `
+    window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ = []
+    new MutationObserver(() => {
+      if (document.querySelector('.runtimeBoot') && !window.__XIAOCHAO_VERIFY_RUNTIME_STATES__.includes('boot')) window.__XIAOCHAO_VERIFY_RUNTIME_STATES__.push('boot')
+      if (document.querySelector('.runtimeFailure') && !window.__XIAOCHAO_VERIFY_RUNTIME_STATES__.includes('failure')) window.__XIAOCHAO_VERIFY_RUNTIME_STATES__.push('failure')
+    }).observe(document.documentElement, { childList: true, subtree: true })
+  `
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: runtimeStateObserver })
+  await evaluate(`(() => { ${runtimeStateObserver} })()`)
   await send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false })
   await sleep(1500)
 
@@ -100,31 +110,45 @@ try {
   requireCheck(library.tabs.includes('J2ME') && library.tabs.includes('冒泡社区'), 'library tabs missing')
   await send('Page.captureScreenshot').then((result) => fs.writeFileSync(SHOT, Buffer.from(result.data, 'base64')))
 
-  const firstCard = await evaluate(`document.querySelector('.card')?.click(); true`)
-  void firstCard
-  await sleep(250)
-  const menu = await evaluate(`(() => { const sheet = document.querySelector('.optionSheet'); const rect = sheet?.getBoundingClientRect(); return { visible: !!sheet, width: rect?.width || 0, bottomAligned: !!rect && Math.abs(rect.bottom - innerHeight) < 2, buttons: [...document.querySelectorAll('.optionBody button')].map((node) => node.textContent.trim()) } })()`)
-  console.log('Option sheet:', JSON.stringify(menu))
-  requireCheck(menu.visible && menu.bottomAligned && menu.buttons.includes('启动'), 'option sheet is not usable')
-  await evaluate(`document.querySelector('.optionBackdrop')?.click(); true`)
+  const optionTarget = await evaluate(`(() => {
+    const card = [...document.querySelectorAll('.card')].find((node) => node.querySelector('.cardName')?.textContent.includes('本地复活'))
+    card?.click()
+    return !!card
+  })()`)
+  if (optionTarget) {
+    await sleep(250)
+    const menu = await evaluate(`(() => { const sheet = document.querySelector('.optionSheet'); const rect = sheet?.getBoundingClientRect(); return { visible: !!sheet, width: rect?.width || 0, bottomAligned: !!rect && Math.abs(rect.bottom - innerHeight) < 2, buttons: [...document.querySelectorAll('.optionBody button')].map((node) => node.textContent.trim()) } })()`)
+    console.log('Option sheet:', JSON.stringify(menu))
+    requireCheck(menu.visible && menu.bottomAligned && menu.buttons.includes('启动'), 'option sheet is not usable')
+    await evaluate(`document.querySelector('.optionBackdrop')?.click(); true`)
+  } else console.log('SKIP: no local-revival card for option sheet')
 
   if (!J2ME_FILE) {
     console.log('SKIP: no J2ME fixture (set VERIFY_J2ME_FILE)')
   } else {
     const route = `#/play/j2me/${encodeURIComponent(J2ME_FILE)}?tab=j2me&name=Verify%20J2ME`
     await navigate(route, 2500)
-    const j2me = await evaluate(`(() => ({ player: !!document.querySelector('.player'), phone: !!document.querySelector('#phone'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure'), editor: !!document.querySelector('#editor-layer') }))()`)
+    const j2me = await evaluate(`(() => ({ player: !!document.querySelector('.player'), phone: !!document.querySelector('#phone'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure'), editor: !!document.querySelector('#editor-layer'), states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [] }))()`)
     console.log('J2ME startup:', JSON.stringify(j2me))
     requireCheck(j2me.player && j2me.phone && j2me.editor, 'J2ME player did not mount')
+    requireCheck(j2me.states.includes('boot') || j2me.states.includes('failure') || j2me.boot || j2me.failure, 'J2ME startup state was never rendered')
+    const viewports = [[844, 390], [1280, 720], [390, 844]]
+    for (const [width, height] of viewports) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+      await evaluate(`document.body.dataset.orientation='${width > height ? 'landscape' : 'portrait'}'; window.TouchLayout?.apply(window.TouchLayout.defaults()); window.ScreenSetup?.refit?.(); true`)
+      await sleep(100)
+      const snapshot = await rectSnapshot()
+      console.log(`Viewport ${width}x${height}:`, JSON.stringify(snapshot))
+      if (snapshot.nav && snapshot.numpad && snapshot.display) {
+        requireCheck(!snapshot.navNumpadOverlap && !snapshot.navDisplayOverlap && !snapshot.numpadDisplayOverlap, `controls overlap at ${width}x${height}`)
+        if (width > height) requireCheck(snapshot.navBeforeNumpad && snapshot.sideLayout === 'swapped', `default navigation is not on the left at ${width}x${height}`)
+      } else console.log(`SKIP: J2ME geometry not ready at ${width}x${height}`)
+    }
     await send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: true })
-    await evaluate(`document.body.dataset.orientation='landscape'; document.body.dataset.sideLayout='swapped'; window.ScreenSetup?.refit?.(); true`)
-    await sleep(300)
-    const landscape = await rectSnapshot()
-    console.log('Landscape 844x390:', JSON.stringify(landscape))
-    if (landscape.nav && landscape.numpad && landscape.display) {
-      requireCheck(landscape.navBeforeNumpad, 'landscape navigation group is not on the left')
-      requireCheck(!landscape.navNumpadOverlap && !landscape.navDisplayOverlap && !landscape.numpadDisplayOverlap, 'landscape controls overlap')
-    } else console.log('SKIP: J2ME geometry not ready for fixture')
+    await evaluate(`document.body.dataset.orientation='landscape'; document.body.dataset.sideLayout='standard'; window.ScreenSetup?.refit?.(); true`)
+    const standard = await rectSnapshot()
+    requireCheck(!standard.navBeforeNumpad, 'standard side layout should keep navigation on the right')
+    await evaluate(`document.body.dataset.sideLayout='swapped'; window.ScreenSetup?.refit?.(); true`)
     await send('Emulation.clearDeviceMetricsOverride')
     await evaluate(`document.querySelector('.runtimeToolbarBack')?.click(); true`)
     await sleep(150)
@@ -132,7 +156,14 @@ try {
     await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
     await sleep(1500)
     requireCheck(await evaluate("!!document.querySelector('.tab')"), 'exit did not return to library')
-    console.log('J2ME exit/re-entry: PASS')
+    await navigate(route, 2500)
+    const secondEntry = await evaluate(`(() => ({ player: !!document.querySelector('.player'), states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [] }))()`)
+    requireCheck(secondEntry.player, 'J2ME second entry did not mount')
+    console.log('J2ME exit/re-entry: PASS', JSON.stringify(secondEntry))
+    await evaluate(`document.querySelector('.runtimeToolbarBack')?.click(); true`)
+    await sleep(150)
+    await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
+    await sleep(1500)
   }
 
   if (!MRP_FILE) {
