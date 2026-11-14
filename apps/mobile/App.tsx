@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState, BackHandler, Pressable, StatusBar, Text, View } from 'react-native'
 import { WebView } from 'react-native-webview'
 import type { WebViewErrorEvent, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview/lib/WebViewTypes'
-import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { startAssetServer, stopAssetServer } from './src/host/assetServer'
 import { injectedBridge, parseHostMessage } from './src/host/protocol'
 import { styles } from './src/host/styles'
@@ -73,42 +73,44 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.root}>
-        {origin && !error ? (
-          <BrowserView
-            ref={webViewRef}
-            source={{ uri: origin }}
-            style={styles.webView}
-            originWhitelist={['http://localhost:*', 'http://127.0.0.1:*']}
-            javaScriptEnabled
-            domStorageEnabled
-            mediaPlaybackRequiresUserAction={false}
-            allowsInlineMediaPlayback
-            allowsFullscreenVideo
-            mixedContentMode="always"
-            setSupportMultipleWindows={false}
-            injectedJavaScriptBeforeContentLoaded={injectedBridge}
-            onMessage={handleMessage}
-            onError={handleWebError}
-            onNavigationStateChange={handleNavigation}
-            onLoadEnd={() => setAttempt(0)}
-          />
-        ) : error ? (
-          <View style={styles.center}>
-            <Text style={styles.title}>模拟器启动失败</Text>
-            <Text style={styles.message}>{error}</Text>
-            <Pressable style={styles.action} onPress={() => { setAttempt(0); start().catch(() => {}) }}>
-              <Text style={styles.actionText}>重试</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.center}>
-            <Text style={styles.title}>正在启动小潮霸王</Text>
-            <Text style={styles.message}>正在准备内置模拟器资源…</Text>
-          </View>
-        )}
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.root}>
+          {origin && !error ? (
+            <BrowserView
+              ref={webViewRef}
+              source={{ uri: origin }}
+              style={styles.webView}
+              originWhitelist={['http://localhost:*', 'http://127.0.0.1:*']}
+              javaScriptEnabled
+              domStorageEnabled
+              mediaPlaybackRequiresUserAction={false}
+              allowsInlineMediaPlayback
+              allowsFullscreenVideo
+              mixedContentMode="always"
+              setSupportMultipleWindows={false}
+              injectedJavaScriptBeforeContentLoaded={injectedBridge}
+              onMessage={handleMessage}
+              onError={handleWebError}
+              onNavigationStateChange={handleNavigation}
+              onLoadEnd={() => setAttempt(0)}
+            />
+          ) : error ? (
+            <View style={styles.center}>
+              <Text style={styles.title}>模拟器启动失败</Text>
+              <Text style={styles.message}>{error}</Text>
+              <Pressable style={styles.action} onPress={() => { setAttempt(0); start().catch(() => {}) }}>
+                <Text style={styles.actionText}>重试</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.center}>
+              <Text style={styles.title}>正在启动小潮霸王</Text>
+              <Text style={styles.message}>正在准备内置模拟器资源…</Text>
+            </View>
+          )}
+        </View>
+      </SafeAreaView>
     </SafeAreaProvider>
   )
 }
