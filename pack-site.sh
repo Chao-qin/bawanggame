@@ -23,6 +23,24 @@ for file in btroom.js compat.html debug-graphics.js debug-native.js files.js key
 done
 cp runtime/mrp/mrp-runtime.js "$DEST/mrp-runtime.js"
 
+# Ruffle's self-hosted runtime and its offline Flash smoke-test game.
+RUFFLE_PACKAGE="$ROOT/apps/web/node_modules/@ruffle-rs/ruffle"
+RUFFLE_DEST="$DEST/ruffle"
+mkdir -p "$RUFFLE_DEST" "$DEST/flash"
+shopt -s nullglob
+ruffle_cores=("$RUFFLE_PACKAGE"/core.ruffle.*.js)
+ruffle_wasm=("$RUFFLE_PACKAGE"/*.wasm)
+if [[ ! -f "$RUFFLE_PACKAGE/ruffle.js" || ! -f "$RUFFLE_PACKAGE/LICENSE_MIT" || ! -f "$RUFFLE_PACKAGE/LICENSE_APACHE" || ${#ruffle_cores[@]} -ne 2 || ${#ruffle_wasm[@]} -ne 2 ]]; then
+  echo "Ruffle 运行时资源不完整（需要 loader、2 个 core、2 个 WASM 和两份许可证）" >&2
+  exit 1
+fi
+cp "$RUFFLE_PACKAGE/ruffle.js" "$RUFFLE_PACKAGE/LICENSE_MIT" "$RUFFLE_PACKAGE/LICENSE_APACHE" "${ruffle_cores[@]}" "${ruffle_wasm[@]}" "$RUFFLE_DEST/"
+if [[ ! -f "$ROOT/games/flash/sample-game.swf" ]]; then
+  echo "缺少内置 Flash 测试游戏: games/flash/sample-game.swf" >&2
+  exit 1
+fi
+cp "$ROOT/games/flash/sample-game.swf" "$DEST/flash/sample-game.swf"
+
 # JAR 游戏通过 /jar/* 提供
 mkdir -p "$DEST/jar"
 find games/jar -maxdepth 1 -type f -name '*.jar' -exec cp {} "$DEST/jar/" \;

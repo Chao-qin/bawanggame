@@ -55,5 +55,5 @@ The test game will be a small original AS3 arcade game with vector-only visuals 
 
 - The current official Ruffle npm package is about 30 MB unpacked and includes two WASM variants. This increases the app download size; keeping both allows Ruffle to select the compatible module at runtime.
 - Ruffle's ActionScript and Flash API support is incomplete. The bundled AS3 smoke game validates only basic AVM2 execution, display-list drawing, and input handling.
-- Building the SWF requires a compatible AS3 compiler. Keep the source and compiler invocation documented so the binary is reproducible.
+- Rebuilding the SWF requires Apache Flex SDK 4.16.1 and the MPL-1.1 `playerglobal.swc` API definitions for Flash Player 27.0. Record the exact source/license and command; do not bundle this compiler-only file in the app.
 - This integration does not restore closed Flash backends or server-side services used by historical games.

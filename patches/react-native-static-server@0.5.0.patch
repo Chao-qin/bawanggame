@@ -22,7 +22,7 @@ index 0c7bca6da7a6cf057ca933930411d49886cf11d3..0ab953f40d37493c25601c89b9785e24
 +plugins {
 +    id 'com.android.library'
 +}
- 
+
  def safeExtGet(prop, fallback) {
      rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
  }
@@ -164,3 +164,17 @@ index 0c7bca6da7a6cf057ca933930411d49886cf11d3..0ab953f40d37493c25601c89b9785e24
 -        }
 -    }
 -}
+diff --git a/android/src/main/java/com/futurepress/staticserver/WebServer.java b/android/src/main/java/com/futurepress/staticserver/WebServer.java
+index cb0a0d62f003fd2493dfee9a3c45b8d4c95166bb..c61e3ee7abd2e66cceb0199e8dae2f2d9f08399e 100644
+--- a/android/src/main/java/com/futurepress/staticserver/WebServer.java
++++ b/android/src/main/java/com/futurepress/staticserver/WebServer.java
+@@ -20,0 +21 @@ public class WebServer extends SimpleWebServer
++        mimeTypes().put("wasm", "application/wasm");
+diff --git a/ios/FPStaticServer.m b/ios/FPStaticServer.m
+index a55a18f1e559142f2d2a7ed2ecde456e3775dfab..2801aa57c96bf8466bec062286ecc92ebb3eeb20 100644
+--- a/ios/FPStaticServer.m
++++ b/ios/FPStaticServer.m
+@@ -115,0 +116,3 @@ - (dispatch_queue_t)methodQueue
++          if ([filePath.pathExtension.lowercaseString isEqualToString:@"wasm"]) {
++            response.contentType = @"application/wasm";
++          }
