@@ -38,6 +38,15 @@ function routeHash(route) {
   return '#/library/' + route.tab
 }
 
+function fullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null
+}
+
+function exitFullscreen() {
+  const exit = document.exitFullscreen || document.webkitExitFullscreen
+  return typeof exit === 'function' ? Promise.resolve(exit.call(document)) : Promise.resolve()
+}
+
 function parseRoute(hash = '') {
   const value = String(hash || '').replace(/^#\/?/, '')
   const [path, queryString = ''] = value.split('?')
@@ -462,7 +471,7 @@ function Store({ onRefreshLibrary }) {
 
 function Player({ game, onBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement))
+  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(fullscreenElement()))
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
   const playerRef = useRef(null)
   const stageRef = useRef(null)
@@ -506,7 +515,7 @@ function Player({ game, onBack, nativeBackSignal }) {
       })
     }
     const syncFullscreen = () => {
-      const active = !!document.fullscreenElement
+      const active = !!fullscreenElement()
       document.body.classList.toggle('fullscreen-active', active)
       requestRefit(true)
       setIsFullscreen(active)
@@ -514,6 +523,7 @@ function Player({ game, onBack, nativeBackSignal }) {
     syncFullscreen()
     const onViewportResize = () => { if (!refitting) requestRefit() }
     document.addEventListener('fullscreenchange', syncFullscreen)
+    document.addEventListener('webkitfullscreenchange', syncFullscreen)
     window.addEventListener('resize', onViewportResize)
     window.addEventListener('orientationchange', onViewportResize)
     window.visualViewport?.addEventListener('resize', onViewportResize)
@@ -525,6 +535,7 @@ function Player({ game, onBack, nativeBackSignal }) {
       delete document.body.dataset.fullscreenFit
       document.body.classList.remove('fullscreen-active')
       document.removeEventListener('fullscreenchange', syncFullscreen)
+      document.removeEventListener('webkitfullscreenchange', syncFullscreen)
       window.removeEventListener('resize', onViewportResize)
       window.removeEventListener('orientationchange', onViewportResize)
       window.visualViewport?.removeEventListener('resize', onViewportResize)
@@ -536,20 +547,21 @@ function Player({ game, onBack, nativeBackSignal }) {
     setConfirming(true)
   }, [nativeBackSignal])
   useEffect(() => () => {
-    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
+    if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
   }, [])
   const requestBack = useCallback(() => setConfirming(true), [])
   const toggleFullscreen = async () => {
     try {
-      if (document.fullscreenElement) await document.exitFullscreen()
-      else if (playerRef.current?.requestFullscreen) {
+      if (fullscreenElement()) await exitFullscreen()
+      else if (playerRef.current?.requestFullscreen || playerRef.current?.webkitRequestFullscreen) {
+        const request = playerRef.current.requestFullscreen || playerRef.current.webkitRequestFullscreen
         try {
-          await playerRef.current.requestFullscreen({ navigationUI: 'hide' })
+          await request.call(playerRef.current, { navigationUI: 'hide' })
         } catch (_) {
           // Older Android WebViews reject the options object but still support
           // the fullscreen request itself.
-          await playerRef.current.requestFullscreen()
+          await request.call(playerRef.current)
         }
       }
     } catch (_) {}
@@ -566,7 +578,7 @@ function Player({ game, onBack, nativeBackSignal }) {
   const exit = () => {
     try { window.myflushAll && window.myflushAll() } catch (_) {}
     try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
-    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
+    if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
     setConfirming(false)
     onBack()

@@ -42,7 +42,7 @@ export function J2MEPlayer({ game, onExit, onReady }) {
         window.__XIAOCHAO_FILES_MOUNT__?.(overlayRoot)
         window.__XIAOCHAO_FEEDBACK_MOUNT__?.(overlayRoot)
         const mountOverlay = window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__
-        ;['gear', 'panel', 'btroom', 'files', 'fb-toast', 'fps-hud'].forEach((id) => {
+        ;['gear', 'panel', 'btroom', 'files', 'fb-toast', 'fps-hud', 'drawlog-btn'].forEach((id) => {
           const node = document.getElementById(id)
           if (node && mountOverlay) mountOverlay(node)
         })

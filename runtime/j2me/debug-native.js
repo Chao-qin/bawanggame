@@ -126,6 +126,13 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
   }
 
+  function mount(node) {
+    var root = document.querySelector(".runtime-overlay-root");
+    (window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__ || function (item) {
+      (root || document.body).appendChild(item);
+    })(node);
+  }
+
   function addButton() {
     if (document.getElementById("drawlog-btn")) return;
     var b = document.createElement("button");
@@ -135,7 +142,7 @@
       "font:600 13px/1 -apple-system,system-ui,sans-serif;color:#0b1218;background:#7fe3a0;" +
       "border:0;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.35);opacity:.92";
     b.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); downloadBundle(); }, true);
-    document.body.appendChild(b);
+    mount(b);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", addButton);
   else addButton();
