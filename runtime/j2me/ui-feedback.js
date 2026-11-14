@@ -6,6 +6,12 @@
   var debug = /[?&]debug=1(?:&|$)/.test(location.search);
   var nativeWarn = console.warn;
 
+  function mount(root) {
+    if (!host) return;
+    (root || document.querySelector(".runtime-overlay-root") || document.body).appendChild(host);
+  }
+  window.__XIAOCHAO_FEEDBACK_MOUNT__ = mount;
+
   console.warn = function () {
     var msg = arguments[0];
     if (typeof msg === "string" && / not implemented/.test(msg)) {
@@ -22,7 +28,7 @@
       host.setAttribute("role", "status");
       host.setAttribute("aria-live", "polite");
       host.hidden = true;
-      document.body.appendChild(host);
+      mount();
     }
     clearTimeout(hideTimer);
     clearTimeout(clearTimer);

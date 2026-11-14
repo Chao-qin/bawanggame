@@ -103,11 +103,11 @@ body[data-rotation="270"] .runtime-stage {
   height: min(calc(100vw - 20px), calc((100dvh - 20px) / .6), 800px);
 }
 body.rotate-90 .runtime-stage,
-body[data-rotation="90"] .runtime-stage { transform: rotate(90deg); }
+body[data-rotation="90"] .runtime-stage { transform: rotate(90deg) scale(var(--rotation-scale, 1)); }
 body.rotate--90 .runtime-stage,
-body[data-rotation="270"] .runtime-stage { transform: rotate(270deg); }
+body[data-rotation="270"] .runtime-stage { transform: rotate(270deg) scale(var(--rotation-scale, 1)); }
 body.rotate-180 .runtime-stage,
-body[data-rotation="180"] .runtime-stage { transform: rotate(180deg); }
+body[data-rotation="180"] .runtime-stage { transform: rotate(180deg) scale(var(--rotation-scale, 1)); }
 body.runtime-active { display: flex !important; flex-direction: column !important; }
 body.fullscreen-active { background: #05070a !important; }
 body.runtime-active #display-container { grid-row: auto !important; grid-column: auto !important; height: auto !important; }
@@ -951,6 +951,19 @@ body.runtime-active.fullscreen-active[data-fullscreen-fit="width"] .runtime-stag
 body.runtime-active.fullscreen-active[data-fullscreen-fit="height"] .runtime-stage {
   width: 100vw;
   height: min(100dvh, calc(100vw / 0.62));
+}
+
+/* Landscape runtime uses three columns, so fullscreen must expose the whole
+   viewport instead of applying the portrait phone aspect ratio. */
+@media (orientation: landscape) {
+  .player:fullscreen .runtime-stage,
+  .player:-webkit-full-screen .runtime-stage,
+  body.runtime-active.fullscreen-active .runtime-stage {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+  }
 }
 
 .panel-box h3 {

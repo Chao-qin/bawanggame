@@ -18,6 +18,7 @@ const proxyTargets = [
   '/libs',
   '/index.js',
   '/files.js',
+  '/touchpad.js',
   '/keymap.js',
   '/layout.js',
   '/mrp-runtime.js',

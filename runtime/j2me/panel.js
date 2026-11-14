@@ -4,7 +4,11 @@
   var panel = el("div", "", { id: "panel", hidden: true });
   var box = el("div", "panel-box", { tabIndex: -1 });
   panel.appendChild(box);
-  document.body.append(gear, panel);
+  function mount(root) {
+    (root || document.querySelector(".runtime-overlay-root") || document.body).append(gear, panel);
+  }
+  mount();
+  window.__XIAOCHAO_PANEL_MOUNT__ = mount;
 
   var startSize = null, btKey = "", btStatus = null, page = "main";
   var state = Settings.resolve(id);
@@ -434,7 +438,7 @@
       line(tr("Диагностика спрайтов: добавьте ?gfxdiag=1", "Sprite diagnostics: add ?gfxdiag=1", "贴图诊断：URL 加 ?gfxdiag=1 后重开"), "#c9d1dd", 11);
     }
     line(tr("Если китайский виден — дело в ресурсах игры", "Chinese visible? The game resources are at fault", "中文正常 → 模拟器没问题，问题在游戏资源"), "#8ef0a8", 11);
-    document.body.appendChild(ov);
+    (window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__ || function (node) { (document.querySelector(".runtime-overlay-root") || document.body).appendChild(node); })(ov);
     setTimeout(function () { ov.remove(); }, 5000);
   }
 

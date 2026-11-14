@@ -14247,7 +14247,7 @@ function chooseMIDlet(done) {
     b.title = entry.cls;
     b.addEventListener("click", function() {
       document.head.removeChild(style);
-      document.body.removeChild(overlay);
+      overlay.remove();
       config.midletClassName = entry.cls;
       done();
     });
@@ -14269,7 +14269,7 @@ function chooseMIDlet(done) {
   box.appendChild(list);
   overlay.appendChild(box);
   document.head.appendChild(style);
-  document.body.appendChild(overlay);
+  (window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__ || function(node) { (document.querySelector('.runtime-overlay-root') || document.body).appendChild(node); })(overlay);
   buttons[0].focus();
 }
 // ---- end MIDlet chooser ----
