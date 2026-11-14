@@ -4,7 +4,8 @@
   var panel = el("div", "", { id: "panel", hidden: true });
   var box = el("div", "panel-box", { tabIndex: -1 });
   panel.appendChild(box);
-  document.body.append(gear, panel);
+  var overlayRoot = document.querySelector(".runtime-overlay-root") || document.body;
+  overlayRoot.append(gear, panel);
 
   var startSize = null, btKey = "", btStatus = null, page = "main";
   var state = Settings.resolve(id);

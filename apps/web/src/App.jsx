@@ -542,6 +542,7 @@ function Player({ game, onBack, nativeBackSignal }) {
       <div ref={stageRef} className="playerStage">
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : <MrpPlayer game={game} onExit={requestBack} />}
       </div>
+      <div className="runtime-overlay-root" />
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true">
           <div className="exitBox">
