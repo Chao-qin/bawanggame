@@ -28,7 +28,7 @@ if (!fs.existsSync(generatedSite)) {
 fs.rmSync(target, { recursive: true, force: true })
 fs.cpSync(generatedSite, target, { recursive: true })
 const revision = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim()
-fs.writeFileSync(path.join(target, '.mobile-resource-version'), `${revision}\n`, 'utf8')
+fs.writeFileSync(path.join(target, 'mobile-resource-version'), `${revision}\n`, 'utf8')
 const jarRoot = path.join(target, 'jar')
 const jarManifest = fs.readdirSync(jarRoot, { withFileTypes: true })
   .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.jar'))

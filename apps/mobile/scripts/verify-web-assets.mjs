@@ -7,7 +7,7 @@ const webRoot = path.join(mobileRoot, 'web')
 
 const requiredFiles = [
   'index.html',
-  '.mobile-resource-version',
+  'mobile-resource-version',
   'sw.js',
   'assets',
   'style/main.css',

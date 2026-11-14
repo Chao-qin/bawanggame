@@ -32,9 +32,9 @@ async function resolveWebRoot(): Promise<string> {
   }
 
   const root = `${RNFS.DocumentDirectoryPath}/web`
-  const marker = 'web/.mobile-resource-version'
+  const marker = 'web/mobile-resource-version'
   const expected = await RNFS.readFileAssets(marker, 'utf8').catch(() => '')
-  const installedMarker = await RNFS.readFile(`${root}/.mobile-resource-version`, 'utf8').catch(() => '')
+  const installedMarker = await RNFS.readFile(`${root}/mobile-resource-version`, 'utf8').catch(() => '')
   if (expected.trim() !== installedMarker.trim() || !(await RNFS.exists(`${root}/index.html`))) {
     await removeDirectory(root)
     await copyAssetDirectory('web', root)
