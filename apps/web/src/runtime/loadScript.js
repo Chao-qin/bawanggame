@@ -1,54 +1,109 @@
-const loaded = new Map()
-const loadedStyles = new Map()
-const RUNTIME_VERSION = '20261114-5'
+const entries = new Map()
+let nextSessionId = 1
+const RUNTIME_VERSION = '20261114-6'
+const DEFAULT_TIMEOUT_MS = 20_000
 
 function versioned(src) {
   return `${src}${src.includes('?') ? '&' : '?'}v=${RUNTIME_VERSION}`
 }
 
-export function loadClassic(src) {
+export function createRuntimeSession(timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const session = {
+    id: nextSessionId++,
+    active: true,
+    timeoutMs,
+    keys: new Set(),
+    invalidate() {
+      if (!session.active) return
+      session.active = false
+      for (const key of Array.from(session.keys)) {
+        const entry = entries.get(key)
+        if (entry?.session === session) entry.cancel()
+      }
+      session.keys.clear()
+    },
+  }
+  return session
+}
+
+const globalSession = createRuntimeSession(Number.POSITIVE_INFINITY)
+
+function sessionFor(value) {
+  return value || globalSession
+}
+
+function loadResource(kind, src, sessionValue, createElement) {
+  const session = sessionFor(sessionValue)
+  if (!session.active) return Promise.reject(new Error('运行时已退出'))
   const url = versioned(src)
-  if (loaded.has(url)) return loaded.get(url)
+  const key = `${session.id}:${kind}:${url}`
+  const previous = entries.get(key)
+  if (previous) return previous.promise
+
+  let element = null
+  let timer = null
+  let settled = false
+  let resolvePromise
+  let rejectPromise
   const promise = new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = url
-    script.async = false
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error(`加载运行时失败: ${src}`))
-    document.head.appendChild(script)
+    resolvePromise = resolve
+    rejectPromise = reject
   })
-  loaded.set(url, promise)
+  const settle = (error) => {
+    if (settled) return
+    settled = true
+    if (timer) clearTimeout(timer)
+    session.keys.delete(key)
+    if (entries.get(key) === entry) entries.delete(key)
+    if (error) rejectPromise(error)
+    else resolvePromise()
+  }
+  const entry = {
+    session,
+    promise,
+    cancel() {
+      settle(new Error('运行时已退出'))
+      element?.remove()
+    },
+  }
+
+  entries.set(key, entry)
+  session.keys.add(key)
+  element = createElement(url, () => {
+    if (!session.active) return settle(new Error('运行时已退出'))
+    settle()
+  }, () => settle(new Error(`加载运行时失败: ${src}`)))
+  element.dataset.runtimeSession = String(session.id)
+  timer = Number.isFinite(session.timeoutMs)
+    ? setTimeout(() => {
+      settle(new Error(`运行时资源加载超时: ${src}`))
+      element?.remove()
+    }, session.timeoutMs)
+    : null
+  document.head.appendChild(element)
   return promise
 }
 
-export function loadStyle(href) {
-  const url = versioned(href)
-  const existing = document.querySelector(`link[data-runtime-style="${url}"]`)
-  if (existing) {
-    if (loadedStyles.has(url)) return loadedStyles.get(url)
-    const promise = existing.sheet ? Promise.resolve() : new Promise((resolve, reject) => {
-      existing.addEventListener('load', resolve, { once: true })
-      existing.addEventListener('error', () => reject(new Error(`加载运行时样式失败: ${href}`)), { once: true })
-    })
-    loadedStyles.set(url, promise)
-    promise.catch(() => {
-      if (loadedStyles.get(url) === promise) loadedStyles.delete(url)
-    })
-    return promise
-  }
-  loadedStyles.delete(url)
-  const link = document.createElement('link')
-  link.rel = 'stylesheet'
-  link.href = url
-  link.dataset.runtimeStyle = url
-  const promise = new Promise((resolve, reject) => {
-    link.addEventListener('load', resolve, { once: true })
-    link.addEventListener('error', () => reject(new Error(`加载运行时样式失败: ${href}`)), { once: true })
+export function loadClassic(src, session) {
+  return loadResource('script', src, session, (url, onLoad, onError) => {
+    const script = document.createElement('script')
+    script.src = url
+    script.async = false
+    script.onload = onLoad
+    script.onerror = onError
+    script.dataset.runtimeScript = url
+    return script
   })
-  loadedStyles.set(url, promise)
-  document.head.appendChild(link)
-  promise.catch(() => {
-    if (loadedStyles.get(url) === promise) loadedStyles.delete(url)
+}
+
+export function loadStyle(href, session) {
+  return loadResource('style', href, session, (url, onLoad, onError) => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = url
+    link.dataset.runtimeStyle = url
+    link.onload = onLoad
+    link.onerror = onError
+    return link
   })
-  return promise
 }

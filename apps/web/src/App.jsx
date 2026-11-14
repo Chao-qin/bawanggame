@@ -636,14 +636,14 @@ function Player({ game, onBack, nativeBackSignal }) {
   return (
     <div ref={playerRef} className="player" onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
       <div ref={toolbarRef} className="runtimeToolbar" role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
-        <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅">‹</button>
+        <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅"><span aria-hidden="true">←</span></button>
         <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
         <span className="runtimeToolbarSpacer" />
-        {game.kind === 'j2me' && <button className="runtimeToolbarButton" onClick={openSettings} title="游戏设置" disabled={!settingsReady}>设置</button>}
-        <button className="runtimeToolbarButton runtimeFullscreenButton" onClick={toggleFullscreen} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? '退出全屏' : '全屏'}</button>
+        {game.kind === 'j2me' && <button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={openSettings} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><span aria-hidden="true">⚙</span></button>}
+        <button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}><span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span></button>
       </div>
       <div ref={stageRef} className="playerStage">
-        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : <MrpPlayer game={game} onExit={requestBack} />}
+        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
       {confirming && (

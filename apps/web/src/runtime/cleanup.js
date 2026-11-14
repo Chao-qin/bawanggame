@@ -16,6 +16,7 @@ export function cleanupRuntimeArtifacts() {
   document.getElementById('fb-toast')?.setAttribute('hidden', '')
 
   document.querySelectorAll('link[data-runtime-style]').forEach((node) => node.remove())
+  document.querySelectorAll('script[data-runtime-session], link[data-runtime-session]').forEach((node) => node.remove())
   const body = document.body
   ;['runtime-active', 'fullscreen-active', 'settings-open', 'fixed-screen'].forEach((name) => body.classList.remove(name))
   ;['theme', 'orientation', 'dpadLayout', 'sideLayout'].forEach((name) => delete body.dataset[name])

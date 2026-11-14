@@ -554,6 +554,11 @@ body.runtime-active #numpad {
   box-shadow: 0 1px 0 #0d1015 !important;
 }
 
+#keypad .key:focus-visible {
+  outline: 2px solid var(--phone-key-active);
+  outline-offset: 2px;
+}
+
 .dir.down {
   background: rgba(74, 120, 194, 0.55) !important;
   transform: none;
