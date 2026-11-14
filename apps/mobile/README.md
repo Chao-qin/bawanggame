@@ -31,6 +31,14 @@ pnpm mobile:verify-web
 这个包内置 React Native bundle 和 `assets/web`，安装后不需要启动 Metro。
 开发调试仍使用 `pnpm --filter @xiaochao/mobile android`，该命令依赖 Metro。
 
+需要让 APK 使用 52java 商城时，构建前设置 Node 服务的可访问地址：
+
+```bash
+MOBILE_52JAVA_API_BASE=http://192.168.0.100:8080 pnpm mobile:build-android
+```
+
+手机和 Node 服务必须在同一局域网；正式环境应使用 HTTPS 公网地址。未设置该变量时，APK 仍可离线运行内置游戏，商城会显示未配置提示。
+
 发布包的 J2ME 游戏清单由构建时生成的 `web/jar-manifest.json` 提供，内置 JAR 不需要桌面 Node 服务。
 52java 商城是在线目录，安装包中会明确显示离线提示；“大宋豪侠 · 本地复活”仍需要单独运行 `dasong-server`。
 

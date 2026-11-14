@@ -18,6 +18,12 @@ function isEmbeddedHost() {
   return new URLSearchParams(window.location.search).get('host') === 'rn'
 }
 
+const mobileApiBase = String(import.meta.env.VITE_52JAVA_API_BASE || '').replace(/\/+$/, '')
+
+function apiPath(path) {
+  return isEmbeddedHost() && mobileApiBase ? mobileApiBase + path : path
+}
+
 function decodeRoutePart(value, fallback = '') {
   try { return decodeURIComponent(value || fallback) } catch (_) { return fallback }
 }
@@ -152,11 +158,12 @@ function useServerJars() {
 
 function useJavaStore(query, category, page) {
   const embedded = isEmbeddedHost()
-  const [state, setState] = useState({ loading: !embedded, error: null, offline: embedded, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
+  const online = !embedded || Boolean(mobileApiBase)
+  const [state, setState] = useState({ loading: online, error: null, offline: !online, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
   const [tick, setTick] = useState(0)
   useEffect(() => {
     let alive = true
-    if (embedded) {
+    if (!online) {
       setState({ loading: false, error: null, offline: true, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
       return () => { alive = false }
     }
@@ -165,12 +172,12 @@ function useJavaStore(query, category, page) {
     if (query) params.set('query', query)
     if (category) params.set('category', category)
     if (tick) params.set('refresh', '1')
-    fetch('/__52java/catalog?' + params)
+    fetch(apiPath('/__52java/catalog?' + params))
       .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json() })
       .then((data) => { if (alive) setState({ loading: false, error: null, offline: false, games: data.games || [], siteUrl: data.siteUrl || 'https://java.52emu.cn', pages: data.pages || 1, total: data.total || 0 }) })
       .catch((e) => { if (alive) setState((current) => ({ ...current, loading: false, error: String(e.message || e) })) })
     return () => { alive = false }
-  }, [embedded, tick, query, category, page])
+  }, [online, tick, query, category, page])
   return { ...state, refresh: () => setTick((value) => value + 1) }
 }
 
@@ -443,7 +450,7 @@ function Store({ onRefreshLibrary }) {
     setBusy(game.id); setDone('')
     try {
       if (!hasLocalJars()) throw new Error('浏览器本机存储不可用')
-      const response = await fetch('/__52java/download?id=' + encodeURIComponent(game.id))
+      const response = await fetch(apiPath('/__52java/download?id=' + encodeURIComponent(game.id)))
       if (!response.ok) {
         let message = '下载失败'
         try { message = (await response.json()).error || message } catch (_) {}
@@ -460,8 +467,8 @@ function Store({ onRefreshLibrary }) {
   if (store.offline) {
     return <section className="storePage">
       <div className="emptyPanel">
-        <strong>安装包模式只提供本地游戏</strong>
-        <span>52java 商城需要联网服务，请在桌面 Web 服务中使用。</span>
+        <strong>在线商城服务未配置</strong>
+        <span>打包时设置 MOBILE_52JAVA_API_BASE 后重新构建，即可在安装包中使用 52java 商城。</span>
       </div>
     </section>
   }

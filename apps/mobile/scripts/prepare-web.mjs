@@ -15,7 +15,9 @@ if (!fs.existsSync(path.join(mrpVendor, 'vmrp_v1.0/fs')) || !fs.existsSync(path.
 }
 
 console.log('构建 React Web 应用...')
-execFileSync('pnpm', ['build'], { cwd: repoRoot, stdio: 'inherit' })
+const buildEnv = { ...process.env }
+if (process.env.MOBILE_52JAVA_API_BASE) buildEnv.VITE_52JAVA_API_BASE = process.env.MOBILE_52JAVA_API_BASE
+execFileSync('pnpm', ['build'], { cwd: repoRoot, env: buildEnv, stdio: 'inherit' })
 console.log('打包模拟器运行时和游戏资源...')
 execFileSync('pnpm', ['run', 'pack'], { cwd: repoRoot, stdio: 'inherit' })
 
