@@ -290,20 +290,20 @@ var ScreenSetup = (function () {
     listeners.forEach(function (fn) { fn(result); });
   }
 
-  function orientation() {
+  function resolvedOrientation() {
     var requested = ["auto", "portrait", "landscape"].indexOf(config.orientation) >= 0 ? config.orientation : "auto";
     if (requested !== "auto") return requested;
     return innerWidth >= innerHeight ? "landscape" : "portrait";
   }
 
   function syncOrientation() {
-    var value = orientation();
+    var value = resolvedOrientation();
     document.body.dataset.orientation = value;
     return value;
   }
 
   function lockOrientation() {
-    var value = orientation();
+    var value = resolvedOrientation();
     if (config.orientation === "auto" || !screen.orientation || typeof screen.orientation.lock !== "function") return Promise.resolve(false);
     return screen.orientation.lock(value).then(function () { return true; }, function () { return false; });
   }
@@ -456,7 +456,7 @@ var ScreenSetup = (function () {
     apply: apply,
     current: current,
     refit: refit,
-    orientation: orientation,
+    orientation: resolvedOrientation,
     setOrientation: setOrientation,
     lockOrientation: lockOrientation,
     unlockOrientation: unlockOrientation,
