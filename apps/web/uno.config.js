@@ -79,8 +79,11 @@ export default defineConfig({
     emptyPanel: 'grid place-items-center gap-2 rounded-xl border border-dashed border-line py-14 text-sm text-dim',
     storePagination: 'my-5 flex items-center justify-between gap-3 border-t border-line py-4 text-xs text-dim',
     runtimeToolbar: 'absolute left-1/2 top-[max(8px,env(safe-area-inset-top))] z-200 flex w-[calc(100%-16px)] max-w-[720px] -translate-x-1/2 items-center gap-1.5 rounded-xl border border-white/15 bg-[#10151dcc] px-2 py-1.5 text-xs text-white shadow-lg backdrop-blur sm:top-[max(12px,env(safe-area-inset-top))] sm:gap-2 sm:px-3 sm:py-2',
-    runtimeToolbarButton: 'min-h-10 min-w-10 shrink-0 appearance-none rounded-lg border border-transparent bg-transparent px-2 text-xs font-medium text-white/80 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:bg-white/20 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 sm:px-2.5',
-    runtimeToolbarBack: 'w-10 px-0 text-xl leading-none',
+    runtimeToolbarContent: 'flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2',
+    runtimeToolbarToggle: 'hidden h-9 w-9 shrink-0 place-items-center rounded-full border border-white/20 bg-[#10151dcc] p-0 text-[11px] font-bold tracking-[.12em] text-white/80 shadow-lg backdrop-blur transition hover:border-white/40 hover:text-white active:bg-white/20',
+    runtimeToolbarCollapsed: 'w-10 max-w-10 rounded-full p-0',
+    runtimeToolbarButton: 'min-h-8 shrink-0 appearance-none rounded-lg border border-transparent bg-transparent px-2 text-xs font-medium text-white/80 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:bg-white/20 sm:px-2.5',
+    runtimeToolbarBack: 'w-8 px-0 text-xl leading-none',
     runtimeToolbarIconButton: 'text-base leading-none',
     runtimeToolbarSpacer: 'min-w-0 flex-1',
     runtimeLive: 'flex items-center gap-1.5 text-[#b0f4dc]',
@@ -94,7 +97,7 @@ export default defineConfig({
     deviceStatusRight: 'flex items-center gap-1.5 text-white/70',
   },
   preflights: [{
-    getCSS: () => '@keyframes sheet-in{from{transform:translateY(100%);opacity:.5}to{transform:translateY(0);opacity:1}}@media(max-width:600px){.header{flex-wrap:wrap;align-items:center}.header>div:first-child{flex:1}.header .tabs{width:100%;justify-content:space-between}.header .tab{flex:1;padding:8px 7px;white-space:nowrap}.storeFilters .search{flex:1 1 150px}.categorySelect{flex:1}}',
+    getCSS: () => '@keyframes sheet-in{from{transform:translateY(100%);opacity:.5}to{transform:translateY(0);opacity:1}}@media(max-width:600px){.header{flex-wrap:wrap;align-items:center}.header>div:first-child{flex:1}.header .tabs{width:100%;justify-content:space-between}.header .tab{flex:1;padding:8px 7px;white-space:nowrap}.storeFilters .search{flex:1 1 150px}.categorySelect{flex:1}}@media (orientation:landscape){.player .runtimeToolbarToggle{display:grid}}.runtimeToolbar.runtimeToolbarCollapsed{border:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}.player.runtimePlayerToolbarCollapsed .playerStage{top:max(8px,env(safe-area-inset-top,0px))}.player:fullscreen.runtimePlayerToolbarCollapsed .playerStage,.player:-webkit-full-screen.runtimePlayerToolbarCollapsed .playerStage{inset:max(8px,env(safe-area-inset-top,0px)) 0 0}',
   }],
   rules: [[/^animate-sheet-in$/, () => ({ animation: 'sheet-in .2s ease-out' })]],
 })
