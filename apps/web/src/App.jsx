@@ -10,6 +10,51 @@ const TABS = [
   { id: 'store', label: '52java 商城' },
 ]
 
+const TAB_IDS = new Set(TABS.map((item) => item.id))
+const GAME_KINDS = new Set(['j2me', 'maopao', 'local-revival'])
+
+function decodeRoutePart(value, fallback = '') {
+  try { return decodeURIComponent(value || fallback) } catch (_) { return fallback }
+}
+
+function routeForLibrary(tab) {
+  return { type: 'library', tab: TAB_IDS.has(tab) ? tab : 'j2me' }
+}
+
+function routeForGame(game, tab) {
+  return { type: 'play', tab: TAB_IDS.has(tab) ? tab : 'j2me', game }
+}
+
+function routeHash(route) {
+  if (route.type === 'play') {
+    const params = new URLSearchParams()
+    params.set('tab', route.tab)
+    params.set('name', route.game.name || route.game.file)
+    if (route.game.local) params.set('local', '1')
+    const suffix = params.toString()
+    return '#/play/' + encodeURIComponent(route.game.kind) + '/' + encodeURIComponent(route.game.file) + (suffix ? '?' + suffix : '')
+  }
+  return '#/library/' + route.tab
+}
+
+function parseRoute(hash = '') {
+  const value = String(hash || '').replace(/^#\/?/, '')
+  const [path, queryString = ''] = value.split('?')
+  const parts = path.split('/')
+  if (parts[0] === 'play' && parts[1] && parts[2]) {
+    const kind = decodeRoutePart(parts[1])
+    const file = decodeRoutePart(parts[2])
+    const query = new URLSearchParams(queryString)
+    if (GAME_KINDS.has(kind) && file) {
+      const name = query.get('name') || file.split('/').pop() || file
+      return routeForGame({ kind, file, name, vendor: '', desc: '', size: 0, iconUrl: null, local: query.get('local') === '1' }, query.get('tab'))
+    }
+  }
+  if (parts[0] === 'library') return routeForLibrary(decodeRoutePart(parts[1], 'j2me'))
+  const requested = new URLSearchParams(window.location.search).get('tab')
+  return routeForLibrary(TAB_IDS.has(requested) ? requested : (localStorage.getItem('xiaochao-tab') || 'j2me'))
+}
+
 function hasLocalJars() {
   return typeof window !== 'undefined' && window.LocalJars && typeof window.LocalJars.list === 'function'
 }
@@ -282,10 +327,6 @@ function Library({ kind, onPlay }) {
   }, [])
 
   function handlePlay(g) {
-    // 在用户点击游戏卡片的手势链路里请求全屏，避免浏览器拦截自动全屏。
-    if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {})
-    }
     onPlay(g)
     recordPlay(g)
   }
@@ -418,38 +459,43 @@ function Store({ onRefreshLibrary }) {
   </section>
 }
 
-function Player({ game, onBack }) {
+function Player({ game, onBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
   const [fitMode, setFitMode] = useState(() => {
     try { return localStorage.getItem('xiaochao.fullscreen-fit.' + game.kind + ':' + game.file) === 'height' ? 'height' : 'width' } catch (_) { return 'width' }
   })
+  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement))
+  const playerRef = useRef(null)
   const stageRef = useRef(null)
+  const lastNativeBackSignal = useRef(nativeBackSignal)
+  const runtimeReady = game.kind === 'j2me'
   useEffect(() => {
     const stage = stageRef.current
     if (!stage) return
     stage.dataset.fullscreenFit = fitMode
+    if (playerRef.current) playerRef.current.dataset.fullscreenFit = fitMode
     document.body.dataset.fullscreenFit = fitMode
-    const syncFullscreen = () => document.body.classList.toggle('fullscreen-active', !!document.fullscreenElement)
+    const syncFullscreen = () => {
+      const active = !!document.fullscreenElement
+      document.body.classList.toggle('fullscreen-active', active)
+      setIsFullscreen(active)
+    }
     syncFullscreen()
     document.addEventListener('fullscreenchange', syncFullscreen)
     return () => {
       delete document.body.dataset.fullscreenFit
+      if (playerRef.current) delete playerRef.current.dataset.fullscreenFit
       document.body.classList.remove('fullscreen-active')
       document.removeEventListener('fullscreenchange', syncFullscreen)
     }
   }, [fitMode])
   useEffect(() => {
-    const stage = stageRef.current
-    if (!stage) return
-    const enter = async () => {
-      try {
-        if (!document.fullscreenElement && stage.requestFullscreen) await stage.requestFullscreen()
-      } catch (_) {}
-    }
-    enter()
-    return () => {
-      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
-    }
+    if (nativeBackSignal === lastNativeBackSignal.current) return
+    lastNativeBackSignal.current = nativeBackSignal
+    setConfirming(true)
+  }, [nativeBackSignal])
+  useEffect(() => () => {
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
   }, [])
   const requestBack = useCallback(() => setConfirming(true), [])
   const setFit = (mode) => {
@@ -463,8 +509,12 @@ function Player({ game, onBack }) {
   const toggleFullscreen = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen()
-      else if (stageRef.current?.requestFullscreen) await stageRef.current.requestFullscreen()
+      else if (playerRef.current?.requestFullscreen) await playerRef.current.requestFullscreen()
     } catch (_) {}
+  }
+  const openSettings = () => {
+    const gear = document.getElementById('gear')
+    if (gear) gear.click()
   }
   const blockRuntimeGesture = (event) => {
     const target = event.target
@@ -474,23 +524,25 @@ function Player({ game, onBack }) {
   const exit = () => {
     try { window.myflushAll && window.myflushAll() } catch (_) {}
     try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
-    const stage = stageRef.current
-    if (stage) stage.style.visibility = 'hidden'
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
-    // The legacy VM patches globals and installs document/window listeners;
-    // hard-navigate after unmount to give the next game a pristine JS realm.
-    window.location.reload()
+    setConfirming(false)
+    onBack()
   }
   return (
-    <div className="player" onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
-      <button className="playerExit" onClick={requestBack} aria-label="返回大厅">‹</button>
+    <div ref={playerRef} className="player" onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
+      <div className="runtimeToolbar" role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
+        <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅">‹</button>
+        <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
+        <span className="runtimeToolbarSpacer" />
+        {runtimeReady && <button className="runtimeToolbarButton" onClick={openSettings} title="游戏设置">设置</button>}
+        <span className="runtimeToolbarGroup" aria-label="全屏适配">
+          <button className={'runtimeToolbarButton' + (fitMode === 'width' ? ' runtimeToolbarButtonActive' : '')} onClick={() => setFit('width')} aria-pressed={fitMode === 'width'} title="固定宽度">宽</button>
+          <button className={'runtimeToolbarButton' + (fitMode === 'height' ? ' runtimeToolbarButtonActive' : '')} onClick={() => setFit('height')} aria-pressed={fitMode === 'height'} title="固定高度">高</button>
+        </span>
+        <button className="runtimeToolbarButton runtimeFullscreenButton" onClick={toggleFullscreen} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? '退出全屏' : '全屏'}</button>
+      </div>
       <div ref={stageRef} className="playerStage">
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} /> : <MrpPlayer game={game} onExit={requestBack} />}
-        <div className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-full border border-white/15 bg-black/55 p-1 text-xs text-white/80 backdrop-blur sm:right-4 sm:top-4" onClick={(event) => event.stopPropagation()}>
-          <button className={'rounded-full px-2.5 py-1 ' + (fitMode === 'width' ? 'bg-white/20 text-white' : '')} onClick={() => setFit('width')} title="固定宽度">宽</button>
-          <button className={'rounded-full px-2.5 py-1 ' + (fitMode === 'height' ? 'bg-white/20 text-white' : '')} onClick={() => setFit('height')} title="固定高度">高</button>
-          <button className="rounded-full px-2.5 py-1" onClick={toggleFullscreen} title="切换全屏">全屏</button>
-        </div>
       </div>
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true">
@@ -509,20 +561,70 @@ function Player({ game, onBack }) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState(() => {
-    const requested = new URLSearchParams(location.search).get('tab')
-    return TABS.some((item) => item.id === requested) ? requested : localStorage.getItem('xiaochao-tab') || 'j2me'
-  })
-  const [game, setGame] = useState(null)
+  const [route, setRoute] = useState(() => parseRoute(window.location.hash))
+  const [nativeBackSignal, setNativeBackSignal] = useState(0)
+  const routeRef = useRef(route)
+  const restoringHistory = useRef(false)
+
+  useEffect(() => { routeRef.current = route }, [route])
+
+  useEffect(() => {
+    const normalized = routeHash(route)
+    const historyState = window.history.state || {}
+    if (route.type === 'play' && !historyState.xiaochaoGameEntry) {
+      const library = routeForLibrary(route.tab)
+      window.history.replaceState({ xiaochaoRoute: routeHash(library), xiaochaoLibraryEntry: true }, '', routeHash(library))
+      window.history.pushState({ xiaochaoRoute: normalized, xiaochaoGameEntry: true }, '', normalized)
+    } else if (window.location.hash !== normalized) {
+      window.history.replaceState({ xiaochaoRoute: normalized }, '', normalized)
+    }
+    const handleLocation = () => {
+      const next = parseRoute(window.location.hash)
+      const current = routeRef.current
+      if (current.type === 'play' && next.type !== 'play') {
+        if (!restoringHistory.current) {
+          restoringHistory.current = true
+          window.history.forward()
+          setNativeBackSignal((value) => value + 1)
+        }
+        return
+      }
+      if (restoringHistory.current) restoringHistory.current = false
+      setRoute(next)
+      if (next.type === 'library') localStorage.setItem('xiaochao-tab', next.tab)
+    }
+    window.addEventListener('popstate', handleLocation)
+    window.addEventListener('hashchange', handleLocation)
+    return () => {
+      window.removeEventListener('popstate', handleLocation)
+      window.removeEventListener('hashchange', handleLocation)
+    }
+  }, [])
+
+  const tab = route.type === 'play' ? route.tab : route.tab
 
   function switchTab(id) {
-    setTab(id)
-    setGame(null)
+    const next = routeForLibrary(id)
+    window.history.pushState({ xiaochaoRoute: routeHash(next) }, '', routeHash(next))
+    setRoute(next)
     localStorage.setItem('xiaochao-tab', id)
   }
 
+  function startGame(game) {
+    const next = routeForGame(game, tab)
+    window.history.pushState({ xiaochaoRoute: routeHash(next), xiaochaoGameEntry: true }, '', routeHash(next))
+    setRoute(next)
+  }
+
+  function leaveGame() {
+    const next = routeForLibrary(route.type === 'play' ? route.tab : tab)
+    window.history.replaceState({ xiaochaoRoute: routeHash(next) }, '', routeHash(next))
+    setRoute(next)
+    localStorage.setItem('xiaochao-tab', next.tab)
+  }
+
   const [libraryTick, setLibraryTick] = useState(0)
-  if (game) return <Player game={game} onBack={() => setGame(null)} />
+  if (route.type === 'play') return <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />
 
   return (
     <div className="appShell app">
@@ -543,7 +645,7 @@ export default function App() {
       <main className="main">
         {TABS.map((t) => (
           <div key={t.id} className="pane">
-            {tab === t.id && (t.id === 'store' ? <Store key={t.id} onRefreshLibrary={() => setLibraryTick((value) => value + 1)} /> : <Library key={t.id + libraryTick} kind={t.id} onPlay={setGame} />)}
+            {tab === t.id && (t.id === 'store' ? <Store key={t.id} onRefreshLibrary={() => setLibraryTick((value) => value + 1)} /> : <Library key={t.id + libraryTick} kind={t.id} onPlay={startGame} />)}
           </div>
         ))}
       </main>
