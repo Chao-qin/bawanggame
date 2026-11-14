@@ -15,6 +15,11 @@ floating control in landscape, and make Android virtual-key vibration reliable.
 - `runtime/j2me/style/main.css`: make the landscape stage use equal side tracks
   around a centered display, reserve only the necessary toolbar space, and
   establish a stable navigation/d-pad stacking order.
+- `runtime/j2me/keypad-canvas.js` and `apps/web/src/runtime/PhoneMarkup.jsx`:
+  draw the shared keypad through a canvas while retaining transparent DOM
+  controls as the pointer and accessibility hit map.
+- `apps/server/src/index.ts` and `pack-site.sh`: serve and package the canvas
+  runtime alias for desktop and WebView hosts.
 - `apps/mobile/android/app/src/main/AndroidManifest.xml`: declare the normal
   Android vibration permission.
 - `runtime/j2me/touchpad.js`: route button feedback through a small haptic
@@ -25,9 +30,9 @@ floating control in landscape, and make Android virtual-key vibration reliable.
 
 - Portrait layout, full-screen entry/exit, game settings, back navigation, and
   existing J2ME/MRP key mappings remain unchanged.
-- The DOM keypad remains the input surface. Existing pointer capture,
-  long-press selection/context-menu prevention, repeat, and cleanup behavior
-  stay active.
+- The DOM keypad remains the input surface and accessibility map while the
+  canvas owns visible keypad pixels. Existing pointer capture, long-press
+  selection/context-menu prevention, repeat, and cleanup behavior stay active.
 - Native text editors retain their current editing behavior.
 
 ## Design
@@ -45,6 +50,13 @@ the toolbar space and keeps its intrinsic aspect ratio; it is not vertically
 offset by the side keypad dimensions. The navigation container gets a higher
 stacking context than the d-pad only for its corner soft/mini keys, while the
 d-pad keeps its circular center hit area.
+
+The keypad canvas observes runtime class and geometry changes, including the
+class reset performed when settings are applied. It redraws pressed states from
+the DOM edge classes, and cleanup destroys its observers and restores the DOM
+fallback state. Canvas mode also clears descendant text, pseudo-elements,
+borders, and shadows so the legacy DOM layer cannot paint a second copy over
+the canvas.
 
 Virtual-key feedback calls `navigator.vibrate` through a guarded helper. The
 existing `config.vibrate` value is the duration in milliseconds: `0` disables
@@ -84,6 +96,7 @@ and configured zero duration are silent. Android declares
 - `node --check runtime/j2me/touchpad.js`
 - `pnpm --filter @xiaochao/web build`
 - `pnpm --filter @xiaochao/mobile typecheck`
+- `pnpm --filter @xiaochao/server typecheck`
 - From the repository root, run `pnpm mobile:prepare-web`,
   `pnpm mobile:verify-web`, and `pnpm mobile:build-android`.
 - `test -s apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
@@ -107,6 +120,12 @@ and configured zero duration are silent. Android declares
   expanded height < collapsed height, navigation hit target IDs, and vibration
   call count with a stubbed `navigator.vibrate`; the supplied screenshot is
   visual reference evidence, not a pixel-identical baseline.
+- Canvas smoke probe at 1365x768: `window.KeypadCanvas` is present, the
+  keypad canvas has non-default dimensions and non-zero pixel data, the
+  `keypad-canvas-mode` class survives runtime settings application, and DOM
+  key backgrounds remain transparent. A successful MRP route was used for
+  the geometry probe; the repository has no built-in JAR, so a J2ME game
+  launch could not be exercised from the local catalog.
 - Re-enter fullscreen, exit fullscreen, and exercise fullscreen failure in a
   browser with the toolbar collapsed and expanded; verify portrait remains
   centered, fullscreen failure leaves the toolbar/stage usable, long-press on

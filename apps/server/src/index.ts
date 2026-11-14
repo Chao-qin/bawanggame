@@ -197,7 +197,7 @@ function mappedPath(urlPath: string) {
       return null
     }
   }
-  const runtimeFiles = new Set(['btroom.js', 'compat.html', 'debug-graphics.js', 'debug-native.js', 'files.js', 'keymap.js', 'layout.js', 'panel.js', 'runtime-extras.js', 'screen.js', 'touch-layout.js', 'touchpad.js', 'ui-feedback.js'])
+  const runtimeFiles = new Set(['btroom.js', 'compat.html', 'debug-graphics.js', 'debug-native.js', 'files.js', 'keymap.js', 'keypad-canvas.js', 'layout.js', 'panel.js', 'runtime-extras.js', 'screen.js', 'touch-layout.js', 'touchpad.js', 'ui-feedback.js'])
   if (runtimeFiles.has(path)) return join(J2ME, path)
   if (path === 'mrp-runtime.js') return join(MRPRUNTIME, path)
   return safeWebPath(urlPath)

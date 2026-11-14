@@ -49,6 +49,7 @@ export function PhoneMarkup({ mrp = false }) {
       </div>
     </div>
     <div id="keypad">
+      <canvas id="keypad-canvas" aria-hidden="true" />
       <div id="nav" data-runtime-control="nav">
         <button id="choice" className="key soft" title="左软键" />
         <div id="dpad"><button id="up" className="key dir" /><button id="left" className="key dir" /><button id="ok" className="key" /><button id="right" className="key dir" /><button id="down" className="key dir" /></div>
