@@ -42,7 +42,7 @@ export default defineConfig({
     status: 'py-10 text-center text-sm text-dim',
     statusError: 'text-red-300',
     player: 'fixed inset-0 z-20 bg-[#05070a]',
-    playerStage: 'absolute inset-0 bg-[#05070a]',
+    playerStage: 'absolute inset-x-0 bottom-0 top-[calc(max(8px,env(safe-area-inset-top,0px))+64px)] bg-[#05070a]',
     runtimeView: 'absolute inset-0 flex items-center justify-center overflow-hidden',
     runtimeError: 'absolute inset-5 z-100 grid place-items-center whitespace-pre-wrap text-red-300',
     'runtime-view': 'absolute inset-0 flex items-center justify-center overflow-hidden',

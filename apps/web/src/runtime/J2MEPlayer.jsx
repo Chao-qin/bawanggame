@@ -6,7 +6,7 @@ import { cleanupRuntimeArtifacts } from './cleanup.js'
 const styles = ['/style/main.css', '/style/lcdui.css', '/style/feedback.css']
 const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/panel.js', '/touchpad.js', '/keymap.js', '/layout.js']
 
-export function J2MEPlayer({ game, onExit }) {
+export function J2MEPlayer({ game, onExit, onReady }) {
   const [error, setError] = useState('')
   function applyRuntimeSettings() {
     const cfg = window.config
@@ -42,6 +42,7 @@ export function J2MEPlayer({ game, onExit }) {
         window.__XIAOCHAO_REQUEST_EXIT = onExit
         window.showExitScreen = onExit
         if (typeof window.onload === 'function') window.onload(new Event('load'))
+        onReady?.()
       } catch (e) { if (alive) setError(e.message || String(e)) }
     })()
     return () => {

@@ -639,6 +639,7 @@
   function toggle(open) {
     if (!open) page = "main";
     panel.hidden = !open;
+    document.body.classList.toggle("settings-open", open);
     gear.classList.toggle("on", open);
     if (open) render();
     else if (panel.contains(document.activeElement)) document.activeElement.blur();
