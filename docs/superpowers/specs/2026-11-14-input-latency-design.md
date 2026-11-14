@@ -22,10 +22,14 @@ events.
   `KeyTrace.edges()` entries with `sourceAt`, `deliveredAt`, and `latencyMs` for
   those edges. `deliveredAt` uses the same `performance.now()` clock and is
   sampled immediately after the corresponding `MIDP.sendKeyPress` call;
-  `latencyMs` is `deliveredAt - sourceAt`. Missing fields invalidate that tap
-  sample instead of being silently omitted. Existing `t`, `f`, `c`, and `k`
-  fields remain unchanged; keyboard-originated edges may omit the pointer-only
-  fields.
+  `latencyMs` is `deliveredAt - sourceAt`. Pointer traces also include
+  `timingValid`; it is `false` with null timing values if metadata is missing,
+  so the probe can invalidate the tap instead of silently omitting it. Existing
+  `t`, `f`, `c`, and `k` fields remain unchanged; keyboard-originated edges may
+  omit the pointer-only fields. Because `sourceAt` is the original pointerdown
+  time for the whole pointer lifecycle, release and slide-edge `latencyMs`
+  values include the hold duration; the p95 acceptance metric uses only valid
+  press (`k: "P"`) entries.
 
 ## Preserved Behavior
 

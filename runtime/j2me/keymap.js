@@ -62,8 +62,7 @@
   //   2) 每键只维护 want（用户想要）/ seen（游戏已经看到）两个状态，任一方变化时
   //      尝试立即结算 —— 所以**第一次按下是 0 延迟**的；
   //   3) 唯一的延迟发生在「同一帧内需要先松后按」时，等 1 帧（不满足条件才等 2 帧）；
-  //   4) 兜底窗口由实测帧间隔推导（默认 60ms 上限），只为「游戏卡住不重绘」时解卡，
-  //      不再是 250ms 那种长尾。
+  //   4) 只有 release 在帧计数停滞时才使用受限 watchdog，正常按下路径没有定时器等待。
   //
   // 手势识别（命中测试/滑动切向/滞回/中心确认/反馈动画/连发调度/防卡键）已抽到
   // touchpad.js 作为双运行时 SSOT；本文件只保留 j2me 平台层：帧同步交付、
@@ -142,17 +141,27 @@
       }
     }
     lastFrameAt = t;
-    if (!hasPending()) return;
+    if (!hasPending()) { cancelReleaseWatchdog(); return; }
     try { flush(false); } catch (e) {}
-    if (hasPending()) scheduleFallback();
+    if (hasPendingRelease()) scheduleReleaseWatchdog();
+    else cancelReleaseWatchdog();
   }
 
   var TRACE_MAX = 64;
   var traceBuf = [];
   var lastTap = { code: 0, gapMs: 0, gapFrames: 0, at: 0, quick: false };
 
-  function trace(code, kind) {
-    traceBuf.push({ t: Math.round(now()), f: frames(), c: code, k: kind });
+  function trace(code, kind, meta, deliveredAt) {
+    var item = { t: Math.round(now()), f: frames(), c: code, k: kind };
+    if (meta && meta.pointer) {
+      var valid = typeof meta.sourceAt === "number" && isFinite(meta.sourceAt) &&
+        typeof deliveredAt === "number" && isFinite(deliveredAt);
+      item.timingValid = valid;
+      item.sourceAt = valid ? meta.sourceAt : null;
+      item.deliveredAt = valid ? deliveredAt : null;
+      item.latencyMs = valid ? Math.max(0, deliveredAt - meta.sourceAt) : null;
+    }
+    traceBuf.push(item);
     if (traceBuf.length > TRACE_MAX) traceBuf.shift();
   }
 
@@ -167,20 +176,19 @@
 
   function minFrames() { return Math.max(1, Math.min(3, Math.round(num(config.tapFrames, 1)))); }
   function doubleTapMs() { return Math.max(120, Math.min(600, num(config.doubleTap, 320))); }
-  function holdCap() { return Math.max(60, Math.min(400, num(config.keyHold, 60))); }
-  function fallbackMs() {
-    var scale = holdCap() / 60;
-    return Math.max(60, Math.min(260, Math.round(estFrameMs * 1.6 * scale)));
+  function releaseWatchdogMs() {
+    var frameMs = frameGaps.length >= 2 ? median(frameGaps) : 34;
+    return Math.max(32, Math.min(120, Math.round(frameMs * 2)));
   }
 
   // 每次「用户想让这个键变成 pressed / released」都入队一个边沿。
   // 每帧只结算一个 —— 这样 press 和 release 永远落在不同的渲染帧里，
   // 游戏按帧采样时才既看得到下沿也看得到上沿（双击、连点都靠这个）。
-  function enqueue(code, v) {
+  function enqueue(code, v, meta) {
     var s = st(code);
-    var last = s.q.length ? s.q[s.q.length - 1] : s.seen;
+    var last = s.q.length ? s.q[s.q.length - 1].value : s.seen;
     if (last === v) return;
-    s.q.push(v);
+    s.q.push({ value: v, meta: meta || null });
     if (s.q.length > 6) s.q.splice(0, s.q.length - 6);
     kick();
   }
@@ -193,20 +201,22 @@
       if (!s.q.length) continue;
       // 「跨帧」必须用帧回调计数判断：直接比 MIDP.frames 的数值会被同一帧内的
       // 两次读写绕过，导致 press/release 落在同一帧 —— 游戏就看不到这次点按。
-      if (!force && frameSeq - s.changeSeq < need) continue;
-      var next = s.q.shift();
-      s.seen = next;
+      var next = s.q[0];
+      var firstPress = next.value && !s.seen && s.changeSeq < 0;
+      if (!force && !firstPress && frameSeq - s.changeSeq < need) continue;
+      next = s.q.shift();
+      s.seen = next.value;
       s.changeSeq = frameSeq;
-      if (next) {
+      if (next.value) {
         var gap = s.releasedAt ? now() - s.releasedAt : 0;
         MIDP.sendKeyPress(+k);
-        trace(+k, "P");
+        trace(+k, "P", next.meta, now());
         if (gap > 0 && gap < doubleTapMs()) {
           lastTap = { code: +k, gapMs: Math.round(gap), gapFrames: f - s.releaseFrame, at: now(), quick: true };
         }
       } else {
         MIDP.sendKeyRelease(+k);
-        trace(+k, "R");
+        trace(+k, "R", next.meta, now());
         s.releasedAt = now();
         s.releaseFrame = f;
       }
@@ -219,28 +229,39 @@
   }
 
   var fbTimer = 0;
-  function scheduleFallback() {
-    if (fbTimer) return;
+  function cancelReleaseWatchdog() {
+    if (fbTimer) { inputClear(fbTimer); fbTimer = 0; }
+  }
+  function hasPendingRelease() {
+    for (var k in S) {
+      if (S[k].q.length && !S[k].q[0].value) return true;
+    }
+    return false;
+  }
+  function scheduleReleaseWatchdog() {
+    if (fbTimer || !hasPendingRelease()) return;
     fbTimer = inputSet(function () {
       fbTimer = 0;
       try { flush(true); } catch (e) {}
-      if (hasPending()) scheduleFallback();
-    }, fallbackMs());
+      if (hasPendingRelease()) scheduleReleaseWatchdog();
+    }, releaseWatchdogMs());
   }
 
   // 用户操作后立刻尝试结算；只有「本帧已经变过一次」才会落到帧边界上
   function kick() {
     installFrameHook();
     flush(false);
-    if (hasPending()) scheduleFallback();
+    if (hasPendingRelease()) scheduleReleaseWatchdog();
+    else cancelReleaseWatchdog();
   }
 
   function releaseAll() {
     for (var pk in physical) inputClear(physical[pk].timer);
     physical = Object.create(null);
+    cancelReleaseWatchdog();
     for (var k in S) {
       S[k].q.length = 0;
-      if (S[k].seen) S[k].q.push(false);
+      if (S[k].seen) S[k].q.push({ value: false, meta: null });
     }
     flush(true);
   }
@@ -255,8 +276,8 @@
       buttons: buttons,
       dpadVisual: function (direction) { return window.TouchLayout ? TouchLayout.visualDpad(direction, config.touchLayout) : direction; },
       sink: {
-        press: function (code) { enqueue(mapped(code), true); kick(); },
-        release: function (code) { enqueue(mapped(code), false); kick(); },
+        press: function (code, meta) { enqueue(mapped(code), true, meta); kick(); },
+        release: function (code, meta) { enqueue(mapped(code), false, meta); kick(); },
         repeat: function (code) {
           var rc = mapped(code);
           var s = S[rc];
