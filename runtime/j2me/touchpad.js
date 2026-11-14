@@ -71,6 +71,7 @@
     var held = {};      // pointerId -> { ids: [], center, startCenter, okTimer, okDown }
     var reps = {};      // pointerId -> { keyId: timerId }
     var codeHolders = {}; // 平台码 -> {holderId: 1}（多指同键时只发一次边沿）
+    var captures = {};  // pointerId -> element used for pointer capture
 
     function keyEl(id) { return document.getElementById(id); }
 
@@ -84,22 +85,22 @@
     }
 
     // ---------- 边沿去重：同一键被多指按住时，只给 sink 一次 press/release ----------
-    function press(code, holder) {
+    function press(code, holder, sourceAt) {
       var h = codeHolders[code] || (codeHolders[code] = {});
       if (h[holder]) return;
       h[holder] = 1;
       if (fb.vibrate > 0 && navigator.vibrate) navigator.vibrate(fb.vibrate);
-      sink.press(code);
+      sink.press(code, { pointer: true, sourceAt: sourceAt == null ? null : sourceAt });
     }
-    function release(code, holder) {
+    function release(code, holder, sourceAt) {
       var h = codeHolders[code];
       if (!h || !h[holder]) return;
       delete h[holder];
       for (var k in h) return;  // 还有别的指头按着 → 不发 release
       delete codeHolders[code];
-      sink.release(code);
+      sink.release(code, { pointer: true, sourceAt: sourceAt == null ? null : sourceAt });
     }
-    function tapKey(code, holder) { press(code, holder); release(code, holder); }
+    function tapKey(code, holder, sourceAt) { press(code, holder, sourceAt); release(code, holder, sourceAt); }
 
     // ---------- 反馈动画 ----------
     function tap(node) {
@@ -187,10 +188,6 @@
         touchInfo.guard = Math.round(band);
         gap = dist - rad;
         inside = dist < rad;
-        if (inside && dist > rad - band) {
-          touchInfo.blocked++;
-          return { kind: null, ids: [], center: false };
-        }
         if (inside) {
           var nx = dx / rad, ny = dy / rad;
           var h = Math.abs(nx), v = Math.abs(ny);
@@ -200,17 +197,13 @@
       }
       var key = keyAtPoint(x, y);
       if (key) return { kind: "key", ids: [key.id], center: false };
-      if (pad && gap > 0 && gap < band) {
-        touchInfo.blocked++;
-        return { kind: null, ids: [], center: false };
-      }
       return { kind: null, ids: [], center: false };
     }
 
     // ---------- 指针状态机 ----------
     function okHoldMs() { return Math.max(120, Math.min(600, num(fb.okHold, 200))); }
 
-    function beginOk(id) {
+    function beginOk(id, sourceAt) {
       var cur = held[id];
       if (!cur || cur.okTimer || cur.okDown) return;
       // 只有起手就落在中心的触摸才算确认键；从方向滑进中心不算，避免误确认
@@ -223,7 +216,7 @@
           if (held[id] !== cur || !cur.center || cur.okDown) return;
           cur.okDown = true;
           tap(keyEl("ok"));
-          press(code, id);
+          press(code, id, sourceAt);
           if (!reps[id]) reps[id] = {};
           startRepeat(id, "ok");
         }, okHoldMs());
@@ -232,58 +225,70 @@
       // 默认：落指即确认，零延迟
       cur.okDown = true;
       tap(keyEl("ok"));
-      press(code, id);
+      press(code, id, sourceAt);
       if (!reps[id]) reps[id] = {};
       startRepeat(id, "ok");
     }
 
-    function endOk(id) {
+    function endOk(id, sourceAt) {
       var cur = held[id];
       if (!cur || !cur.center || !cur.startCenter) return;
+      sourceAt = cur.sourceAt == null ? sourceAt : cur.sourceAt;
       var code = buttons.ok;
       if (cur.okTimer) { tclr(cur.okTimer); cur.okTimer = 0; }
-      if (cur.okDown) { cur.okDown = false; release(code, id); return; }
+      if (cur.okDown) { cur.okDown = false; release(code, id, sourceAt); return; }
       // 松手确认模式下的短按：补一次完整点按
       if (fb.dpadOk === "tap") {
         tap(keyEl("ok"));
-        tapKey(code, id);
+        tapKey(code, id, sourceAt);
       }
     }
 
     // 把一个指针的按键状态迁移到目标集合（滑动切向的核心）
-    function move(id, next) {
+    function move(id, next, sourceAt) {
       var cur = held[id];
       if (!cur) return;
+      sourceAt = cur.sourceAt == null ? sourceAt : cur.sourceAt;
       var want = next.ids || [];
       if (cur.center && !next.center) {
         if (cur.okTimer) { tclr(cur.okTimer); cur.okTimer = 0; }
-        if (cur.okDown) { cur.okDown = false; release(buttons.ok, id); }
+        if (cur.okDown) { cur.okDown = false; release(buttons.ok, id, sourceAt); }
       }
       var prevIds = cur.ids;
       prevIds.forEach(function (keyId) {
         if (want.indexOf(keyId) >= 0) return;
         setDown(id, keyId, false);
-        release(buttons[keyId], id);
+        release(buttons[keyId], id, sourceAt);
       });
       want.forEach(function (keyId) {
         if (prevIds.indexOf(keyId) >= 0) return;
         setDown(id, keyId, true);
         tap(keyEl(keyId));
-        press(buttons[keyId], id);
+        press(buttons[keyId], id, sourceAt);
         if (!reps[id]) reps[id] = {};
         startRepeat(id, keyId);
       });
       cur.ids = want.slice();
       cur.center = !!next.center;
-      if (next.center) beginOk(id);
+      if (next.center) beginOk(id, sourceAt);
     }
 
-    function clearHold(id) {
+    function releaseCapture(id) {
+      var target = captures[id];
+      if (target && target.releasePointerCapture) {
+        try { target.releasePointerCapture(+id); } catch (_) {}
+      }
+      delete captures[id];
+    }
+
+    function clearHold(id, sourceAt) {
       var st0 = held[id];
+      releaseCapture(id);
       if (!st0) { delete held[id]; return; }
+      sourceAt = st0.sourceAt == null ? sourceAt : st0.sourceAt;
       if (st0.okTimer) { tclr(st0.okTimer); st0.okTimer = 0; }
-      (st0.ids || []).forEach(function (keyId) { setDown(id, keyId, false); release(buttons[keyId], id); });
-      if (st0.okDown) { release(buttons.ok, id); st0.okDown = false; }
+      (st0.ids || []).forEach(function (keyId) { setDown(id, keyId, false); release(buttons[keyId], id, sourceAt); });
+      if (st0.okDown) { release(buttons.ok, id, sourceAt); st0.okDown = false; }
       delete held[id];
       if (reps[id]) {
         Object.keys(reps[id]).forEach(function (k) { tclr(reps[id][k]); });
@@ -293,6 +298,7 @@
 
     function releaseAll() {
       Object.keys(held).forEach(function (id) { clearHold(id); });
+      Object.keys(captures).forEach(releaseCapture);
       codeHolders = {};
     }
 
@@ -302,6 +308,7 @@
     }
 
     listen(document, "pointerdown", function (e) {
+      var sourceAt = performance.now();
       if (excluded(e)) return;
       var prev = held[e.pointerId] && held[e.pointerId].ids || [];
       var h = hit(e.clientX, e.clientY, contactRadius(e), prev);
@@ -309,8 +316,12 @@
       e.preventDefault();
       clearSelection();
       if (onActivate) onActivate(e);
-      held[e.pointerId] = { ids: [], center: false, startCenter: !!h.center, okTimer: 0, okDown: false };
-      move(e.pointerId, h);
+      var captureTarget = e.target && e.target.setPointerCapture ? e.target : document.getElementById("keypad");
+      if (captureTarget && captureTarget.setPointerCapture) {
+        try { captureTarget.setPointerCapture(e.pointerId); captures[e.pointerId] = captureTarget; } catch (_) {}
+      }
+      held[e.pointerId] = { ids: [], center: false, startCenter: !!h.center, okTimer: 0, okDown: false, sourceAt: sourceAt };
+      move(e.pointerId, h, sourceAt);
     });
 
     listen(document, "pointermove", function (e) {
@@ -318,10 +329,10 @@
       if (!cur) return;
       var h = hit(e.clientX, e.clientY, contactRadius(e), cur.ids);
       if (h.kind === null) {
-        move(e.pointerId, { kind: null, ids: [], center: false });
+        move(e.pointerId, { kind: null, ids: [], center: false }, performance.now());
         return;
       }
-      move(e.pointerId, h);
+      move(e.pointerId, h, performance.now());
     });
 
     function up(e) {
