@@ -953,6 +953,19 @@ body.runtime-active.fullscreen-active[data-fullscreen-fit="height"] .runtime-sta
   height: min(100dvh, calc(100vw / 0.62));
 }
 
+/* Landscape runtime uses three columns, so fullscreen must expose the whole
+   viewport instead of applying the portrait phone aspect ratio. */
+@media (orientation: landscape) {
+  .player:fullscreen .runtime-stage,
+  .player:-webkit-full-screen .runtime-stage,
+  body.runtime-active.fullscreen-active .runtime-stage {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+  }
+}
+
 .panel-box h3 {
   margin: 0;
   font-size: 11px;

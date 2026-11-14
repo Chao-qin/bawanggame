@@ -474,6 +474,7 @@ function Player({ game, onBack, nativeBackSignal }) {
     const syncFullscreen = () => {
       const active = !!document.fullscreenElement
       document.body.classList.toggle('fullscreen-active', active)
+      window.ScreenSetup?.refit?.()
       setIsFullscreen(active)
     }
     syncFullscreen()
