@@ -27,6 +27,10 @@ let ws
 let id = 0
 const pending = new Map()
 const jsErrors = []
+const optionalShellAssets = /(?:^|\/)(?:manifest\.webmanifest|icon-(?:180|192)\.png)(?:$|\?)/
+function isOptionalShellAsset(url = '') {
+  return optionalShellAssets.test(url) || (!MRP_FILE && /\/maopao\/hall\/manifest\.json(?:\?|$)/.test(url))
+}
 
 function send(method, params = {}) {
   return new Promise((resolve, reject) => {
@@ -85,9 +89,23 @@ try {
       message.error ? request.reject(new Error(JSON.stringify(message.error))) : request.resolve(message.result)
     }
     if (message.method === 'Runtime.exceptionThrown') jsErrors.push(message.params.exceptionDetails?.text || 'runtime exception')
+    if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') {
+      const text = (message.params.args || []).map((arg) => arg.value ?? arg.description ?? '').join(' ') || 'console.error'
+      if (!/Failed to load resource|Manifest fetch .*manifest\.webmanifest/.test(text)) jsErrors.push(text)
+    }
+    if (message.method === 'Log.entryAdded' && message.params.entry?.level === 'error') {
+      const entry = message.params.entry
+      if (!isOptionalShellAsset(entry.url) && !/Failed to load resource|Manifest fetch .*manifest\.webmanifest/.test(entry.text || '')) jsErrors.push(entry.text || 'browser log error')
+    }
+    if (message.method === 'Network.responseReceived' && message.params.response.status >= 400) {
+      const response = message.params.response
+      if (!isOptionalShellAsset(response.url)) jsErrors.push(`HTTP ${response.status} ${response.url}`)
+    }
   })
   await send('Page.enable')
   await send('Runtime.enable')
+  await send('Log.enable')
+  await send('Network.enable')
   const runtimeStateObserver = `
     window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ = []
     new MutationObserver(() => {

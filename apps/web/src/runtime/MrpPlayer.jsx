@@ -27,6 +27,8 @@ export function MrpPlayer({ game, onExit, onReady }) {
         onReady?.()
       } catch (e) {
         if (alive && session.active) {
+          session.invalidate()
+          cleanupRuntimeArtifacts()
           setLoading(false)
           setError(e.message || String(e))
         }

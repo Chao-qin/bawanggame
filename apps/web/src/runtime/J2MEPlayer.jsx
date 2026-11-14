@@ -80,6 +80,8 @@ export function J2MEPlayer({ game, onExit, onReady }) {
         setLoading(false)
       } catch (e) {
         if (alive && session.active) {
+          session.invalidate()
+          cleanupRuntimeArtifacts()
           setLoading(false)
           setError(e.message || String(e))
         }
