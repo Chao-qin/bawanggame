@@ -133,6 +133,12 @@
     })(node);
   }
 
+  window.__XIAOCHAO_DEBUG_NATIVE_MOUNT__ = function () {
+    var button = document.getElementById("drawlog-btn");
+    if (button) mount(button);
+    else addButton();
+  };
+
   function addButton() {
     if (document.getElementById("drawlog-btn")) return;
     var b = document.createElement("button");
