@@ -8,7 +8,6 @@ export function PhoneMarkup({ mrp = false }) {
   }
   return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
     <div id="phone" className="runtime-phone">
-    <div className="deviceStatus"><span>小潮 OS</span><span className="deviceStatusRight"><b>●</b> 100%</span></div>
     <div id="editor-layer">
       <div id="textarea-editor" className="textEditor" contentEditable="true" />
       <input id="password-editor" className="textEditor" type="password" />

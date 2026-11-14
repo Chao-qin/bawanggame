@@ -681,6 +681,17 @@ body.runtime-active #numpad {
   transition: opacity 0.15s, transform 0.3s;
 }
 
+/* React owns the visible toolbar. Keep the legacy settings trigger available
+   for compatibility, but move its old floating button out of the hit area. */
+#gear {
+  position: fixed;
+  top: -10000px;
+  right: auto;
+  left: -10000px;
+  pointer-events: none;
+  opacity: 0;
+}
+
 #gear::before {
   content: "\2699";
 }
@@ -882,23 +893,40 @@ body.runtime-active #numpad {
 
 /* Fullscreen keeps the stage in the viewport and lets the user choose which
    dimension is authoritative for the virtual phone. */
-.playerStage:fullscreen,
-.playerStage:-webkit-full-screen {
+.player:fullscreen,
+.player:-webkit-full-screen {
+  position: relative;
   width: 100vw;
   height: 100vh;
   background: #05070a;
 }
 
-.playerStage:fullscreen[data-fullscreen-fit="width"] .runtime-stage,
-.playerStage:-webkit-full-screen[data-fullscreen-fit="width"] .runtime-stage {
+.player:fullscreen .playerStage,
+.player:-webkit-full-screen .playerStage {
+  position: absolute;
+  inset: 0;
+}
+
+.player:fullscreen .runtime-stage,
+.player:-webkit-full-screen .runtime-stage {
   width: min(100vw, calc(100vh * 0.62));
   height: 100vh;
 }
 
-.playerStage:fullscreen[data-fullscreen-fit="height"] .runtime-stage,
-.playerStage:-webkit-full-screen[data-fullscreen-fit="height"] .runtime-stage {
+.player:fullscreen[data-fullscreen-fit="height"] .runtime-stage,
+.player:-webkit-full-screen[data-fullscreen-fit="height"] .runtime-stage {
   width: 100vw;
   height: min(100vh, calc(100vw / 0.62));
+}
+
+.player:fullscreen .runtimeToolbar,
+.player:-webkit-full-screen .runtimeToolbar {
+  z-index: 220;
+}
+
+.runtimeToolbarButtonActive {
+  background: rgba(255, 255, 255, .2);
+  color: #fff;
 }
 
 body.runtime-active.fullscreen-active[data-fullscreen-fit="width"] .runtime-stage {
