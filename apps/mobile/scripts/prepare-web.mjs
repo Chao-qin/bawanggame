@@ -27,6 +27,20 @@ fs.rmSync(target, { recursive: true, force: true })
 fs.cpSync(generatedSite, target, { recursive: true })
 const revision = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim()
 fs.writeFileSync(path.join(target, '.mobile-resource-version'), `${revision}\n`, 'utf8')
+const jarRoot = path.join(target, 'jar')
+const jarManifest = fs.readdirSync(jarRoot, { withFileTypes: true })
+  .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.jar'))
+  .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+  .map((entry) => ({
+    kind: 'j2me',
+    file: entry.name,
+    name: entry.name.replace(/\.jar$/i, ''),
+    vendor: '',
+    desc: '本地内置游戏',
+    size: fs.statSync(path.join(jarRoot, entry.name)).size,
+    icon: false,
+  }))
+fs.writeFileSync(path.join(target, 'jar-manifest.json'), `${JSON.stringify(jarManifest)}\n`, 'utf8')
 fs.rmSync(androidAssetsTarget, { recursive: true, force: true })
 fs.cpSync(target, androidAssetsTarget, { recursive: true })
 execFileSync(process.execPath, [path.join(mobileRoot, 'scripts/verify-web-assets.mjs')], { stdio: 'inherit' })

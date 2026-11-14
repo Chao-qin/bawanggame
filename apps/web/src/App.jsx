@@ -14,6 +14,10 @@ const TABS = [
 const TAB_IDS = new Set(TABS.map((item) => item.id))
 const GAME_KINDS = new Set(['j2me', 'maopao', 'local-revival'])
 
+function isEmbeddedHost() {
+  return new URLSearchParams(window.location.search).get('host') === 'rn'
+}
+
 function decodeRoutePart(value, fallback = '') {
   try { return decodeURIComponent(value || fallback) } catch (_) { return fallback }
 }
@@ -102,7 +106,10 @@ function useServerJars() {
   const [state, setState] = useState({ loading: true, error: null, games: [] })
   useEffect(() => {
     let alive = true
-    fetch('/__jars')
+    // The RN package serves a static manifest from APK assets; desktop keeps
+    // the Node endpoint so its live catalog and icon extraction still work.
+    const endpoint = isEmbeddedHost() ? '/jar-manifest.json' : '/__jars'
+    fetch(endpoint)
       .then((r) => {
         if (!r.ok) throw new Error('HTTP ' + r.status)
         return r.json()
@@ -135,10 +142,15 @@ function useServerJars() {
 }
 
 function useJavaStore(query, category, page) {
-  const [state, setState] = useState({ loading: true, error: null, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
+  const embedded = isEmbeddedHost()
+  const [state, setState] = useState({ loading: !embedded, error: null, offline: embedded, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
   const [tick, setTick] = useState(0)
   useEffect(() => {
     let alive = true
+    if (embedded) {
+      setState({ loading: false, error: null, offline: true, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
+      return () => { alive = false }
+    }
     setState((current) => ({ ...current, loading: true, error: null }))
     const params = new URLSearchParams({ page: String(page) })
     if (query) params.set('query', query)
@@ -146,10 +158,10 @@ function useJavaStore(query, category, page) {
     if (tick) params.set('refresh', '1')
     fetch('/__52java/catalog?' + params)
       .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json() })
-      .then((data) => { if (alive) setState({ loading: false, error: null, games: data.games || [], siteUrl: data.siteUrl || 'https://java.52emu.cn', pages: data.pages || 1, total: data.total || 0 }) })
+      .then((data) => { if (alive) setState({ loading: false, error: null, offline: false, games: data.games || [], siteUrl: data.siteUrl || 'https://java.52emu.cn', pages: data.pages || 1, total: data.total || 0 }) })
       .catch((e) => { if (alive) setState((current) => ({ ...current, loading: false, error: String(e.message || e) })) })
     return () => { alive = false }
-  }, [tick, query, category, page])
+  }, [embedded, tick, query, category, page])
   return { ...state, refresh: () => setTick((value) => value + 1) }
 }
 
@@ -435,6 +447,14 @@ function Store({ onRefreshLibrary }) {
       onRefreshLibrary()
     } catch (error) { window.alert('下载失败：' + (error.message || error)) }
     finally { setBusy('') }
+  }
+  if (store.offline) {
+    return <section className="storePage">
+      <div className="emptyPanel">
+        <strong>安装包模式只提供本地游戏</strong>
+        <span>52java 商城需要联网服务，请在桌面 Web 服务中使用。</span>
+      </div>
+    </section>
   }
   return <section className="storePage">
     <div className="storeHero">
