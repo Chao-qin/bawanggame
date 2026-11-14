@@ -496,7 +496,15 @@ function Player({ game, onBack, nativeBackSignal }) {
   const toggleFullscreen = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen()
-      else if (playerRef.current?.requestFullscreen) await playerRef.current.requestFullscreen()
+      else if (playerRef.current?.requestFullscreen) {
+        try {
+          await playerRef.current.requestFullscreen({ navigationUI: 'hide' })
+        } catch (_) {
+          // Older Android WebViews reject the options object but still support
+          // the fullscreen request itself.
+          await playerRef.current.requestFullscreen()
+        }
+      }
     } catch (_) {}
   }
   const openSettings = () => {
