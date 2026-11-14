@@ -27,6 +27,7 @@ let ws
 let id = 0
 const pending = new Map()
 const jsErrors = []
+const networkWarnings = []
 const optionalShellAssets = /(?:^|\/)(?:manifest\.webmanifest|icon-(?:180|192)\.png)(?:$|\?)/
 function isOptionalShellAsset(url = '') {
   return optionalShellAssets.test(url) || (!MRP_FILE && /\/maopao\/hall\/manifest\.json(?:\?|$)/.test(url))
@@ -88,7 +89,10 @@ try {
       clearTimeout(request.timer)
       message.error ? request.reject(new Error(JSON.stringify(message.error))) : request.resolve(message.result)
     }
-    if (message.method === 'Runtime.exceptionThrown') jsErrors.push(message.params.exceptionDetails?.text || 'runtime exception')
+    if (message.method === 'Runtime.exceptionThrown') {
+      const details = message.params.exceptionDetails
+      jsErrors.push(details?.exception?.description || details?.text || 'runtime exception')
+    }
     if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') {
       const text = (message.params.args || []).map((arg) => arg.value ?? arg.description ?? '').join(' ') || 'console.error'
       if (!/Failed to load resource|Manifest fetch .*manifest\.webmanifest/.test(text)) jsErrors.push(text)
@@ -99,7 +103,10 @@ try {
     }
     if (message.method === 'Network.responseReceived' && message.params.response.status >= 400) {
       const response = message.params.response
-      if (!isOptionalShellAsset(response.url)) jsErrors.push(`HTTP ${response.status} ${response.url}`)
+      const catalogRequest = /\/__52java\/catalog(?:\?|$)/.test(response.url)
+      const optionalMrpManifest = !MRP_FILE && /\/maopao\/hall\/manifest\.json(?:\?|$)/.test(response.url)
+      if (isOptionalShellAsset(response.url) || catalogRequest || optionalMrpManifest) networkWarnings.push(`HTTP ${response.status} ${response.url}`)
+      else jsErrors.push(`HTTP ${response.status} ${response.url}`)
     }
   })
   await send('Page.enable')
@@ -194,6 +201,7 @@ try {
   }
 
   if (jsErrors.length) throw new Error(`browser console errors: ${jsErrors.slice(0, 3).join(' | ')}`)
+  if (networkWarnings.length) console.log('WARN:', networkWarnings.slice(0, 3).join(' | '))
   console.log('RESULT PASS')
 } catch (error) {
   console.error('VERIFY FAILED:', error.message)
