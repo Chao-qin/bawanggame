@@ -91,6 +91,22 @@ git fetch --prune origin
 
 不能把“构建成功”“代码看起来正确”或单个平台结果描述为“已完全修复”。未验证的场景必须列入残余风险。
 
+## Review Workflow
+
+每个包含代码、配置或运行时行为的 PR 都必须经过冷启动 review。reviewer 不继承实现者的聊天上下文，只接收任务摘要、`AGENTS.md`、spec、验收标准、`origin/main...HEAD` diff、改动文件的相关调用链和验证结果。
+
+默认使用少量动态上下文：
+
+1. 普通改动启动一个 `gpt-6-luna` reviewer，使用低 reasoning，单个上下文最多 300k tokens。
+2. 涉及 Android、WebView、网络、性能、全屏、旋转或跨模块生命周期时，再启动一个独立的 `gpt-6-luna` validation reviewer，执行真实命令或运行场景。
+3. 初始顺序固定为：先完成 diff review，再完成 feature audit；需要平台或外部系统验证时才执行 validation review。必须完成全部适用的 review pass 并先汇总 findings，才能启动 fixer；不能只完成 diff review 就启动 fixer。发现 P0/P1/P2 后启动 fixer；P0 也必须进入 fixer，若无法安全修复则立即升级并停止交付。fixer 修改任务 worktree，不能由 reviewer 直接改代码。
+
+reviewer 默认只读，必须按 `docs/review-matrix.md` 检查，并使用 `docs/review-report-template.md` 输出 findings。每条 finding 必须包含触发条件、调用路径、错误结果、影响场景和修复建议。没有证据的猜测不能作为阻塞项。
+
+修复后必须重新冷启动 diff review 和 feature audit；只有原流程需要 validation，或修复触及其覆盖范围时，才重新执行 validation。每次复审都由新的 reviewer 依据当前 diff 和验证证据判断，不能由原上下文自行确认修复。
+
+轮次从 `R1` 开始：`R1` 是初始 review，`R2` 和 `R3` 是修复后的复审；每轮都按上述顺序执行并记录 round。P0/P1 findings 在完成该轮全部适用 pass 后先触发 fixer。若 P0/P1 无法安全修复，必须立即升级并停止交付；若在允许的修复/复审周期后仍存在，则 `blocked` 并停止交付。P2：默认修复，`R3` 后仍存在只有在授权负责人以可追踪 artifact/issue ID 记录风险接受、后续负责人和到期或目标日期后才可 `pass`，否则 `blocked`；P3：记录后可 `pass`，无需继续轮次。`R3` 结束后不得开启第四轮。没有 findings 也必须报告未验证的平台和残余风险。
+
 ## Generated Artifacts
 
 构建生成的 `public/`、`site-deploy/`、`apps/mobile/web/`、Android assets staging、APK、临时浏览器 profile 和测试日志不应提交，除非任务明确要求提交它们。完成验证后回收临时资源；保留可复用的依赖缓存和仓库要求的外部运行时资源。
