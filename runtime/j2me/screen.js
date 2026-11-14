@@ -414,7 +414,7 @@ var ScreenSetup = (function () {
     no.className = "ghost";
     no.textContent = tr("Не надо", "No");
     bar.append(text, yes, no);
-    document.body.appendChild(bar);
+    (window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__ || function (node) { (document.querySelector(".runtime-overlay-root") || document.body).appendChild(node); })(bar);
     yes.addEventListener("click", function () {
       Settings.setGame(config.gameId, "screen", size);
       location.reload();

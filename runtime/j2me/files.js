@@ -233,9 +233,12 @@ var Files = (function () {
   });
   overlay.addEventListener("keyup", function (e) { e.stopPropagation(); });
 
-  document.addEventListener("DOMContentLoaded", function () {
-    document.body.appendChild(overlay);
-  });
+  function mount(root) {
+    var host = root || document.querySelector(".runtime-overlay-root") || document.body;
+    host.appendChild(overlay);
+  }
+  window.__XIAOCHAO_FILES_MOUNT__ = mount;
+  mount();
 
   return { open: open };
 })();

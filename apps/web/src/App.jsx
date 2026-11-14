@@ -469,20 +469,65 @@ function Player({ game, onBack, nativeBackSignal }) {
   const lastNativeBackSignal = useRef(nativeBackSignal)
   const settingsReady = game.kind === 'j2me' && runtimeReadyFor === game.file
   useEffect(() => {
+    const mountOverlay = (node) => {
+      if (!node) return node
+      const root = playerRef.current?.querySelector('.runtime-overlay-root')
+      if (root) root.append(node)
+      else if (!node.isConnected) document.body.append(node)
+      return node
+    }
+    window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__ = mountOverlay
+    return () => {
+      if (window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__ === mountOverlay) delete window.__XIAOCHAO_RUNTIME_MOUNT_OVERLAY__
+    }
+  }, [])
+  useEffect(() => {
     const stage = stageRef.current
     if (!stage) return
+    let refitFrame = 0
+    let refitting = false
+    let viewportKey = ''
+    const currentViewportKey = () => {
+      const viewport = window.visualViewport
+      return [window.innerWidth, window.innerHeight, viewport?.width || 0, viewport?.height || 0].join(':')
+    }
+    const requestRefit = (force = false) => {
+      const nextKey = currentViewportKey()
+      if (!force && nextKey === viewportKey) return
+      viewportKey = nextKey
+      if (refitFrame) return
+      const schedule = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 0))
+      refitFrame = schedule(() => {
+        refitFrame = 0
+        const refit = window.ScreenSetup?.refit
+        if (typeof refit !== 'function') return
+        refitting = true
+        try { refit.call(window.ScreenSetup) } finally { refitting = false }
+      })
+    }
     const syncFullscreen = () => {
       const active = !!document.fullscreenElement
       document.body.classList.toggle('fullscreen-active', active)
-      window.ScreenSetup?.refit?.()
+      requestRefit(true)
       setIsFullscreen(active)
     }
     syncFullscreen()
+    const onViewportResize = () => { if (!refitting) requestRefit() }
     document.addEventListener('fullscreenchange', syncFullscreen)
+    window.addEventListener('resize', onViewportResize)
+    window.addEventListener('orientationchange', onViewportResize)
+    window.visualViewport?.addEventListener('resize', onViewportResize)
     return () => {
+      if (refitFrame) {
+        const cancel = window.cancelAnimationFrame || window.clearTimeout
+        cancel(refitFrame)
+      }
       delete document.body.dataset.fullscreenFit
       document.body.classList.remove('fullscreen-active')
       document.removeEventListener('fullscreenchange', syncFullscreen)
+      window.removeEventListener('resize', onViewportResize)
+      window.removeEventListener('orientationchange', onViewportResize)
+      window.visualViewport?.removeEventListener('resize', onViewportResize)
     }
   }, [])
   useEffect(() => {
