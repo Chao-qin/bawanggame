@@ -255,6 +255,22 @@
       exclude: "#btroom, #panel"
     });
   }
+  function reset() {
+    if (pad) {
+      try { pad.destroy(); } catch (_) {}
+      pad = null;
+    }
+    releaseAll();
+    Object.keys(rafTasks).forEach(function (id) { delete rafTasks[id]; });
+    fbTimer = 0;
+    physical = Object.create(null);
+    S = Object.create(null);
+    frameGaps.length = 0;
+    lastFrameAt = 0;
+    frameSeq = 0;
+  }
+  window.__XIAOCHAO_KEYMAP_BOOT__ = boot;
+  window.__XIAOCHAO_KEYMAP_RESET__ = reset;
   if (typeof config !== "undefined" && typeof vmSetTimeout !== "undefined") boot();
   if (!pad) document.addEventListener("DOMContentLoaded", boot);
 
@@ -289,6 +305,7 @@
   }
 
   window.addEventListener("keydown", function (e) {
+    if (!window.__XIAOCHAO_RUNTIME__) return;
     var k = keyOf(e);
     if (k === null) return;
     if (!typing(e)) e.preventDefault();
@@ -301,6 +318,7 @@
   }, { passive: false });
 
   window.addEventListener("keyup", function (e) {
+    if (!window.__XIAOCHAO_RUNTIME__) return;
     var k = keyOf(e);
     if (k !== null) { enqueue(rotated(k), false); kick(); }
     var id = e.code || e.key;
