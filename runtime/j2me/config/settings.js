@@ -3,7 +3,7 @@ var Settings = (function () {
   var GAME = "j2me.game.";
   var phone = window.matchMedia && matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 800;
   var DEFAULTS = {
-    screen: "auto", scale: "2", keypad: "3", rotate: "0", fullscreenFit: "width", theme: "classic", layout: "fixed", fps: "0", jit: "1", platform: "se",
+    screen: "auto", scale: "2", keypad: "3", orientation: "auto", theme: "classic", fps: "0", jit: "1", platform: "se",
     keyHold: "60", tapFrames: "1", dpadOk: "press", keyRepeat: "1", repeatDelay: "450", repeatInterval: "100", vibrate: phone ? "10" : "0",
     wakeLock: "0", pixelated: "0", showFps: "0"
   };
@@ -21,21 +21,13 @@ var Settings = (function () {
       label: tr("Масштаб", "Scale", "缩放"),
       items: [["0.5", "×0.5"], ["0.75", "×0.75"], ["1", "×1"], ["1.5", "×1.5"], ["2", "×2"], ["3", "×3"], ["99", tr("Максимальный", "Maximum", "最大")]]
     },
-    rotate: {
-      label: tr("Поворот", "Rotation", "旋转"),
-      items: [["0", tr("Нет", "None", "不旋转")], ["45", "45°"], ["90", tr("90° по часовой", "90° clockwise", "顺时针 90°")], ["135", "135°"], ["180", "180°"], ["225", "225°"], ["270", tr("270° по часовой", "270° clockwise", "顺时针 270°")], ["315", "315°"]]
-    },
-    fullscreenFit: {
-      label: tr("全屏适配", "Fullscreen fit", "全屏适配"),
-      items: [["width", tr("固定宽度", "Fixed width", "固定宽度")], ["height", tr("固定高度", "Fixed height", "固定高度")]]
+    orientation: {
+      label: tr("屏幕方向", "Orientation", "屏幕方向"),
+      items: [["auto", tr("跟随设备", "Follow device", "跟随设备")], ["portrait", tr("竖屏", "Portrait", "竖屏")], ["landscape", tr("横屏", "Landscape", "横屏")]]
     },
     theme: {
       label: tr("Тема", "Theme", "主题"),
       items: [["classic", tr("Классика", "Classic", "经典")], ["glass", tr("Стекло", "Glass", "玻璃")], ["pixel", tr("Пиксель", "Pixel", "像素")], ["amoled", "AMOLED"]]
-    },
-    layout: {
-      label: tr("Раскладка", "Layout", "布局"),
-      items: [["fixed", tr("Фиксированная", "Fixed", "固定")], ["free", tr("Свободная", "Free", "自由")]]
     },
     keypad: {
       label: tr("Клавиатура", "Keypad", "虚拟键盘"),

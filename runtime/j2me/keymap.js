@@ -1,12 +1,6 @@
 (function () {
   var KEYS = { ArrowUp: -1, ArrowDown: -2, ArrowLeft: -3, ArrowRight: -4, Enter: -5, SoftLeft: -6, SoftRight: -7, Backspace: -8, Delete: -8, Escape: -11, "*": 42, "#": 35 };
   var BUTTONS = { up: -1, down: -2, left: -3, right: -4, ok: -5, choice: -6, back: -7, ret: -11, clear: -8, star: 42, pound: 35 };
-  var ROTATE = {
-    "90": { "-1": -3, "-4": -1, "-2": -4, "-3": -2, "50": 52, "54": 50, "56": 54, "52": 56 },
-    "270": { "-1": -4, "-3": -1, "-2": -3, "-4": -2, "50": 54, "52": 50, "56": 52, "54": 56 },
-    "-90": { "-1": -4, "-3": -1, "-2": -3, "-4": -2, "50": 54, "52": 50, "56": 52, "54": 56 },
-    "180": { "-1": -2, "-2": -1, "-3": -4, "-4": -3, "50": 56, "52": 54, "54": 52, "56": 50 }
-  };
 
   for (var d = 0; d <= 9; d++) {
     KEYS[d] = 48 + d;
@@ -15,9 +9,7 @@
 
   var NAMES = { "-1": "up", "-2": "down", "-3": "left", "-4": "right", "-5": "ok", "-6": "soft1", "-7": "soft2", "-8": "clear", "-11": "back" };
 
-  function rotated(code) {
-    var map = ROTATE[config.rotate];
-    if (map && map[code] !== undefined) code = map[code];
+  function mapped(code) {
     return NAMES[code] ? config.keys[NAMES[code]] : code;
   }
 
@@ -47,7 +39,7 @@
   //
   // 手势识别（命中测试/滑动切向/滞回/中心确认/反馈动画/连发调度/防卡键）已抽到
   // touchpad.js 作为双运行时 SSOT；本文件只保留 j2me 平台层：帧同步交付、
-  // 键位旋转、物理键盘、KeyTrace 诊断。
+  // 物理键盘、KeyTrace 诊断。
   // ---------------------------------------------------------------------------
   var frameGaps = [];
   var lastFrameAt = 0;
@@ -234,10 +226,10 @@
     pad = Touchpad.bind({
       buttons: BUTTONS,
       sink: {
-        press: function (code) { enqueue(rotated(code), true); kick(); },
-        release: function (code) { enqueue(rotated(code), false); kick(); },
+        press: function (code) { enqueue(mapped(code), true); kick(); },
+        release: function (code) { enqueue(mapped(code), false); kick(); },
         repeat: function (code) {
-          var rc = rotated(code);
+          var rc = mapped(code);
           var s = S[rc];
           if (s && s.seen) { MIDP.sendKeyRepeat(rc); trace(rc, "p"); }
         }
@@ -311,7 +303,7 @@
     if (!typing(e)) e.preventDefault();
     var id = e.code || e.key;
     if (physical[id]) return;
-    var code = rotated(k);
+    var code = mapped(k);
     physical[id] = { code: code, timer: inputSet(function () { physicalRepeat(id); }, Math.max(0, num(config.repeatDelay, 450))) };
     enqueue(code, true);
     kick();
@@ -320,7 +312,7 @@
   window.addEventListener("keyup", function (e) {
     if (!window.__XIAOCHAO_RUNTIME__) return;
     var k = keyOf(e);
-    if (k !== null) { enqueue(rotated(k), false); kick(); }
+    if (k !== null) { enqueue(mapped(k), false); kick(); }
     var id = e.code || e.key;
     if (physical[id]) { inputClear(physical[id].timer); delete physical[id]; }
   }, true);

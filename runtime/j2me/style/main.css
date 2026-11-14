@@ -16,7 +16,6 @@ body {
   --phone-key: #2a3442;
   --phone-key-active: #4da3ff;
   --phone-text: #e8ecf2;
-  --runtime-rotation: 0deg;
 }
 
 /* 模拟器是手机交互面，不是网页文档：全页面禁止文字选择和拖拽。 */
@@ -92,22 +91,7 @@ body {
   height: min(calc(100dvh - 20px), calc((100vw - 20px) / .6), 800px);
   min-width: 0;
   min-height: 0;
-  transform-origin: center center;
-  transform: rotate(var(--runtime-rotation)) scale(var(--rotation-scale, 1));
 }
-body.rotate-90 .runtime-stage,
-body.rotate--90 .runtime-stage,
-body[data-rotation="90"] .runtime-stage,
-body[data-rotation="270"] .runtime-stage {
-  width: min(calc(100dvh - 20px), calc((100vw - 20px) * .6), 480px);
-  height: min(calc(100vw - 20px), calc((100dvh - 20px) / .6), 800px);
-}
-body.rotate-90 .runtime-stage,
-body[data-rotation="90"] .runtime-stage { transform: rotate(90deg) scale(var(--rotation-scale, 1)); }
-body.rotate--90 .runtime-stage,
-body[data-rotation="270"] .runtime-stage { transform: rotate(270deg) scale(var(--rotation-scale, 1)); }
-body.rotate-180 .runtime-stage,
-body[data-rotation="180"] .runtime-stage { transform: rotate(180deg) scale(var(--rotation-scale, 1)); }
 body.runtime-active { display: flex !important; flex-direction: column !important; }
 body.fullscreen-active { background: #05070a !important; }
 body.runtime-active #display-container { grid-row: auto !important; grid-column: auto !important; height: auto !important; }
@@ -134,11 +118,6 @@ body.runtime-active.settings-open,
 body.runtime-active.settings-open * {
   touch-action: pan-y !important;
 }
-body[data-layout="free"] #phone { display: block; }
-body[data-layout="free"] #display-container,
-body[data-layout="free"] #keypad { position: absolute; }
-body[data-layout="free"] #display-container { inset: 12px 12px 42%; }
-body[data-layout="free"] #keypad { left: 50%; bottom: 12px; transform: translateX(-50%); }
 
 /* 手机模拟器交互层：禁止选中、拖拽、长按菜单和双击缩放。
    文本编辑控件单独恢复原生输入行为。 */
@@ -583,90 +562,19 @@ body.runtime-active #numpad {
   --pad-w: 600px;
 }
 
-@media (orientation: portrait) {
-  #keypad.keypad-1 { --u: min(30px, 7.7vw, 3.6vh); }
-  #keypad.keypad-2 { --u: min(38px, 9.8vw, 4.5vh); }
-  #keypad.keypad-3 { --u: min(46px, 11.8vw, 5.4vh); }
-  #keypad.keypad-4 { --u: min(55px, 14.1vw, 6.5vh); }
-}
+body[data-orientation="portrait"] #keypad.keypad-1 { --u: min(30px, 7.7vw, 3.6vh); }
+body[data-orientation="portrait"] #keypad.keypad-2 { --u: min(38px, 9.8vw, 4.5vh); }
+body[data-orientation="portrait"] #keypad.keypad-3 { --u: min(46px, 11.8vw, 5.4vh); }
+body[data-orientation="portrait"] #keypad.keypad-4 { --u: min(55px, 14.1vw, 6.5vh); }
 
-@media (orientation: landscape) {
-  #nav {
+body[data-orientation="landscape"] #nav {
     height: calc(var(--u) * 3.4);
     --mask-r: calc(var(--u) * 1.95);
-  }
-
-  #dpad {
-    width: calc(var(--u) * 3.4);
-    height: calc(var(--u) * 3.4);
-  }
 }
 
 @media (max-width: 320px) {
   body.fixed-screen #display-container {
     padding: 4px;
-  }
-}
-
-@media (orientation: landscape) {
-  body:has(#keypad:not(.keypad-0)) {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-  }
-
-  body:has(#keypad:not(.keypad-0)) #display-container {
-    grid-row: 1;
-    grid-column: 2;
-    height: 100%;
-  }
-
-  #keypad:not(.keypad-0) {
-    display: contents;
-  }
-
-  #numpad,
-  #nav {
-    grid-row: 1;
-    width: calc(var(--u) * 4.2);
-    padding: calc(var(--u) * 0.3);
-  }
-
-  #numpad {
-    grid-column: 1;
-    padding-left: calc(var(--u) * 0.3 + env(safe-area-inset-left, 0px));
-  }
-
-  #nav {
-    grid-column: 3;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto;
-    justify-items: stretch;
-    row-gap: calc(var(--u) * 0.4);
-    padding-right: calc(var(--u) * 0.3 + env(safe-area-inset-right, 0px));
-  }
-
-  #choice {
-    grid-area: 1 / 1;
-  }
-
-  #back {
-    grid-area: 1 / 2;
-  }
-
-  #ret {
-    grid-area: 2 / 1;
-  }
-
-  #clear {
-    grid-area: 2 / 2;
-  }
-
-  #dpad {
-    grid-area: 3 / 1 / 4 / 3;
-    justify-self: center;
-    width: calc(var(--u) * 3.4);
-    height: calc(var(--u) * 3.4);
   }
 }
 
@@ -842,68 +750,61 @@ body.runtime-active.settings-open .panel-box {
   border-top: 1px solid #2a303c;
 }
 
-/* Runtime landscape shell: keep both keyboard groups beside the game. The
-   phone wrapper becomes transparent to the grid so the two keypad groups can
-   occupy the outer columns without changing the portrait DOM. */
-@media (orientation: landscape) {
-  body.runtime-active .runtime-stage {
-    display: grid !important;
-    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content);
-    grid-template-rows: minmax(0, 1fr);
-    align-items: center;
-    justify-items: center;
-  }
+/* Runtime landscape shell: keep both keyboard groups beside the game. */
+body.runtime-active[data-orientation="landscape"] .runtime-stage {
+  display: grid !important;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+}
 
-  body.runtime-active .runtime-stage {
-    width: 100vw;
-    height: 100vh;
-    max-width: none;
-    max-height: none;
-    overflow: visible;
-  }
+body.runtime-active[data-orientation="landscape"] #phone {
+  display: contents;
+}
 
-  body.runtime-active #phone {
-    display: contents;
-  }
+body.runtime-active[data-orientation="landscape"] #display-container {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  width: 100%;
+  height: 100% !important;
+  min-width: 0;
+  min-height: 0;
+}
 
-  body.runtime-active #display-container {
-    grid-column: 2 !important;
-    grid-row: 1 !important;
-    width: 100%;
-    height: 100% !important;
-    min-width: 0;
-    min-height: 0;
-  }
+body.runtime-active[data-orientation="landscape"] #keypad {
+  display: contents !important;
+}
 
-  body.runtime-active #keypad {
-    display: contents !important;
-  }
+body.runtime-active[data-orientation="landscape"] #numpad,
+body.runtime-active[data-orientation="landscape"] #nav {
+  grid-row: 1;
+  width: min(21vw, 31vh) !important;
+  max-width: min(21vw, 31vh);
+  min-width: 0;
+  box-sizing: border-box;
+  align-self: center;
+}
 
-  body.runtime-active #numpad,
-  body.runtime-active #nav {
-    grid-row: 1;
-    width: min(21vw, 31vh) !important;
-    max-width: min(21vw, 31vh);
-    min-width: 0;
-    box-sizing: border-box;
-    align-self: center;
-  }
+body.runtime-active[data-orientation="landscape"] #numpad {
+  grid-column: 1;
+  padding-left: calc(var(--u) * 0.3 + env(safe-area-inset-left, 0px));
+}
 
-  body.runtime-active #numpad {
-    grid-column: 1;
-    padding-left: calc(var(--u) * 0.3 + env(safe-area-inset-left, 0px));
-  }
+body.runtime-active[data-orientation="landscape"] #nav {
+  grid-column: 3;
+  height: calc(var(--u) * 4.6);
+  padding-right: calc(var(--u) * 0.3 + env(safe-area-inset-right, 0px));
+}
 
-  body.runtime-active #nav {
-    grid-column: 3;
-    height: calc(var(--u) * 4.6);
-    padding-right: calc(var(--u) * 0.3 + env(safe-area-inset-right, 0px));
-  }
-
-  body.runtime-active #display {
-    max-width: 100%;
-    max-height: 100%;
-  }
+body.runtime-active[data-orientation="landscape"] #display {
+  max-width: 100%;
+  max-height: 100%;
 }
 
 /* Fullscreen keeps the stage in the viewport and lets the user choose which
@@ -936,40 +837,20 @@ body.runtime-active.settings-open .panel-box {
   max-height: 100%;
 }
 
-.player:fullscreen[data-fullscreen-fit="height"] .runtime-stage,
-.player:-webkit-full-screen[data-fullscreen-fit="height"] .runtime-stage {
-  width: 100vw;
-  height: 100%;
-  max-height: 100%;
-}
-
 .player:fullscreen .runtimeToolbar,
 .player:-webkit-full-screen .runtimeToolbar {
   position: absolute;
   z-index: 220;
 }
 
-body.runtime-active.fullscreen-active[data-fullscreen-fit="width"] .runtime-stage {
-  width: min(100vw, calc(100dvh * 0.62));
-}
-
-body.runtime-active.fullscreen-active[data-fullscreen-fit="height"] .runtime-stage {
-  width: 100vw;
-  height: 100%;
-  max-height: 100%;
-}
-
 /* Landscape runtime uses three columns, so fullscreen must expose the whole
    viewport instead of applying the portrait phone aspect ratio. */
-@media (orientation: landscape) {
-  .player:fullscreen .runtime-stage,
-  .player:-webkit-full-screen .runtime-stage,
-  body.runtime-active.fullscreen-active .runtime-stage {
-    width: 100%;
-    height: 100%;
-    max-width: none;
-    max-height: none;
-  }
+body.runtime-active[data-orientation="landscape"] .player:fullscreen .runtime-stage,
+body.runtime-active[data-orientation="landscape"] .player:-webkit-full-screen .runtime-stage {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
 }
 
 .panel-box h3 {

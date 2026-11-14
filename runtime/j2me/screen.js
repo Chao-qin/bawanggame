@@ -290,21 +290,40 @@ var ScreenSetup = (function () {
     listeners.forEach(function (fn) { fn(result); });
   }
 
+  function orientation() {
+    var requested = ["auto", "portrait", "landscape"].indexOf(config.orientation) >= 0 ? config.orientation : "auto";
+    if (requested !== "auto") return requested;
+    return innerWidth >= innerHeight ? "landscape" : "portrait";
+  }
+
+  function syncOrientation() {
+    var value = orientation();
+    document.body.dataset.orientation = value;
+    return value;
+  }
+
+  function lockOrientation() {
+    var value = orientation();
+    if (config.orientation === "auto" || !screen.orientation || typeof screen.orientation.lock !== "function") return Promise.resolve(false);
+    return screen.orientation.lock(value).then(function () { return true; }, function () { return false; });
+  }
+
+  function unlockOrientation() {
+    if (screen.orientation && typeof screen.orientation.unlock === "function") screen.orientation.unlock();
+  }
+
+  function setOrientation(value) {
+    config.orientation = ["auto", "portrait", "landscape"].indexOf(value) >= 0 ? value : "auto";
+    syncOrientation();
+    refit();
+    return lockOrientation();
+  }
+
   function refit() {
-    document.body.style.setProperty("--runtime-rotation", (config.rotate | 0) + "deg");
-    document.body.dataset.rotation = String(config.rotate | 0);
-    document.body.dataset.fullscreenFit = config.fullscreenFit === "height" ? "height" : "width";
+    syncOrientation();
     document.body.classList.toggle("fixed-screen", !!config.screen);
     MIDP.updatePhysicalScreenSize();
     MIDP.updateCanvas();
-    var stage = document.querySelector(".runtime-stage");
-    if (stage) {
-      var w = stage.offsetWidth || innerWidth, h = stage.offsetHeight || innerHeight;
-      var a = Math.abs((config.rotate | 0) % 180) * Math.PI / 180;
-      var bw = w * Math.cos(a) + h * Math.sin(a), bh = w * Math.sin(a) + h * Math.cos(a);
-      var fit = Math.min(1, innerWidth / Math.max(1, bw), innerHeight / Math.max(1, bh));
-      document.body.style.setProperty("--rotation-scale", fit.toFixed(4));
-    }
     window.dispatchEvent(new Event("resize"));
   }
 
@@ -437,6 +456,10 @@ var ScreenSetup = (function () {
     apply: apply,
     current: current,
     refit: refit,
+    orientation: orientation,
+    setOrientation: setOrientation,
+    lockOrientation: lockOrientation,
+    unlockOrientation: unlockOrientation,
     result: function () { return result; },
     onChange: function (fn) { listeners.push(fn); },
     running: false

@@ -56,25 +56,13 @@
       document.getElementById("keypad").className = "keypad-" + config.keypad;
       ScreenSetup.refit();
     },
-    rotate: function (v) {
-      config.rotate = [0, 45, 90, 135, 180, 225, 270, 315].indexOf(v | 0) >= 0 ? v | 0 : 0;
-      document.body.style.setProperty("--runtime-rotation", config.rotate + "deg");
-      document.body.dataset.rotation = String(config.rotate);
-      ScreenSetup.refit();
-    },
-    fullscreenFit: function (v) {
-      config.fullscreenFit = v === "height" ? "height" : "width";
-      document.body.dataset.fullscreenFit = config.fullscreenFit;
-      ScreenSetup.refit();
+    orientation: function (v) {
+      config.orientation = ["auto", "portrait", "landscape"].indexOf(v) >= 0 ? v : "auto";
+      ScreenSetup.setOrientation(config.orientation);
     },
     theme: function (v) {
       config.theme = v || "classic";
       document.body.dataset.theme = config.theme;
-    },
-    layout: function (v) {
-      config.layout = v === "free" ? "free" : "fixed";
-      document.body.dataset.layout = config.layout;
-      ScreenSetup.refit();
     },
     fps: function (v) {
       config.fps = v | 0;
@@ -328,7 +316,7 @@
     return bar;
   }
 
-  var BASE_KEYS = ["scale", "rotate", "fullscreenFit", "theme", "layout", "keypad", "fps", "jit", "platform"];
+  var BASE_KEYS = ["scale", "orientation", "theme", "keypad", "fps", "jit", "platform"];
   var FEEL_KEYS = ["keyHold", "tapFrames", "dpadOk", "keyRepeat", "repeatDelay", "repeatInterval", "vibrate"];
   var DEVICE_KEYS = ["wakeLock", "pixelated", "showFps"];
   var MANAGED = ["fps", "keyHold", "tapFrames", "dpadOk", "keyRepeat", "repeatDelay", "repeatInterval", "vibrate", "wakeLock", "pixelated", "showFps"];
@@ -587,7 +575,7 @@
       state = Settings.resolve(id);
       config.screenMode = state.values.screen === "fit" ? "fit" : Settings.parse(state.values.screen) ? "manual" : "auto";
       if (config.screenMode === "manual") config.screen = state.values.screen;
-       ["scale", "rotate", "fullscreenFit", "theme", "layout", "keypad", "fps", "keyHold", "repeatDelay", "repeatInterval", "vibrate", "wakeLock", "pixelated", "showFps"].forEach(function (k) { apply[k](state.values[k]); });
+       ["scale", "orientation", "theme", "keypad", "fps", "keyHold", "repeatDelay", "repeatInterval", "vibrate", "wakeLock", "pixelated", "showFps"].forEach(function (k) { apply[k](state.values[k]); });
       ScreenSetup.apply();
       render();
       Feedback.ok(tr("Настройки сброшены", "Settings reset", "已恢复默认设置"));

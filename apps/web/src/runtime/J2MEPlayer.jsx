@@ -4,7 +4,7 @@ import { loadClassic, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
 
 const styles = ['/style/main.css', '/style/lcdui.css', '/style/feedback.css']
-const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/panel.js', '/touchpad.js', '/keymap.js', '/layout.js']
+const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/panel.js', '/touchpad.js', '/keymap.js']
 
 export function J2MEPlayer({ game, onExit, onReady }) {
   const [error, setError] = useState('')
@@ -12,10 +12,7 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     const cfg = window.config
     if (!cfg) return
     document.body.dataset.theme = cfg.theme || 'classic'
-    document.body.dataset.layout = cfg.layout === 'free' ? 'free' : 'fixed'
-    document.body.dataset.rotation = String(cfg.rotate | 0)
-    document.body.dataset.fullscreenFit = cfg.fullscreenFit === 'height' ? 'height' : 'width'
-    document.body.style.setProperty('--runtime-rotation', (cfg.rotate | 0) + 'deg')
+    document.body.dataset.orientation = ['auto', 'portrait', 'landscape'].includes(cfg.orientation) ? cfg.orientation : 'auto'
     document.body.classList.toggle('fixed-screen', !!cfg.screen)
     const keypad = document.getElementById('keypad')
     if (keypad) keypad.className = 'keypad-' + (cfg.keypad | 0)
@@ -48,6 +45,7 @@ export function J2MEPlayer({ game, onExit, onReady }) {
           if (node && mountOverlay) mountOverlay(node)
         })
         applyRuntimeSettings()
+        window.ScreenSetup?.setOrientation?.(window.config?.orientation)
         window.ScreenSetup?.refit?.()
         window.__XIAOCHAO_RUNTIME_EXTRAS_INIT__?.()
         window.__XIAOCHAO_KEYMAP_BOOT__?.()
