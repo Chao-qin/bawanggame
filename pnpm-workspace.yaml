@@ -1,2 +1,5 @@
 packages:
   - apps/*
+
+patchedDependencies:
+  react-native-static-server@0.5.0: patches/react-native-static-server@0.5.0.patch
