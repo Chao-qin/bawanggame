@@ -78,7 +78,7 @@ export default defineConfig({
     downloadButton: 'shrink-0 rounded-lg border border-accent bg-accent px-3 py-2 text-sm font-semibold text-[#07111d] disabled:opacity-60',
     emptyPanel: 'grid place-items-center gap-2 rounded-xl border border-dashed border-line py-14 text-sm text-dim',
     storePagination: 'my-5 flex items-center justify-between gap-3 border-t border-line py-4 text-xs text-dim',
-    runtimeToolbar: 'fixed left-1/2 top-[max(8px,env(safe-area-inset-top))] z-200 flex w-[calc(100%-16px)] max-w-[720px] -translate-x-1/2 items-center gap-1.5 rounded-xl border border-white/15 bg-[#10151dcc] px-2 py-1.5 text-xs text-white shadow-lg backdrop-blur sm:top-[max(12px,env(safe-area-inset-top))] sm:gap-2 sm:px-3 sm:py-2',
+    runtimeToolbar: 'absolute left-1/2 top-[max(8px,env(safe-area-inset-top))] z-200 flex w-[calc(100%-16px)] max-w-[720px] -translate-x-1/2 items-center gap-1.5 rounded-xl border border-white/15 bg-[#10151dcc] px-2 py-1.5 text-xs text-white shadow-lg backdrop-blur sm:top-[max(12px,env(safe-area-inset-top))] sm:gap-2 sm:px-3 sm:py-2',
     runtimeToolbarButton: 'min-h-8 shrink-0 appearance-none rounded-lg border border-transparent bg-transparent px-2 text-xs font-medium text-white/80 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:bg-white/20 sm:px-2.5',
     runtimeToolbarBack: 'w-8 px-0 text-xl leading-none',
     runtimeToolbarSpacer: 'min-w-0 flex-1',

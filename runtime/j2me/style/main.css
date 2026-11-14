@@ -941,6 +941,7 @@ body.runtime-active.settings-open .panel-box {
 
 .player:fullscreen .runtimeToolbar,
 .player:-webkit-full-screen .runtimeToolbar {
+  position: absolute;
   z-index: 220;
 }
 
