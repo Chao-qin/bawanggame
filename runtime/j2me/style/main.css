@@ -780,7 +780,7 @@ body.runtime-active.settings-open .panel-box {
 body.runtime-active[data-orientation="landscape"] .runtime-stage {
   --control-unit: clamp(28px, min(14vh, 7vw), 64px);
   display: grid !important;
-  grid-template-columns: minmax(calc(var(--control-unit) * 4.6 + 10px), 1fr) minmax(0, 1.2fr) minmax(calc(var(--control-unit) * 4.6 + 10px), 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   align-items: center;
   justify-items: center;
@@ -798,6 +798,7 @@ body.runtime-active[data-orientation="landscape"] #phone {
 body.runtime-active[data-orientation="landscape"] #display-container {
   grid-column: 2 !important;
   grid-row: 1 !important;
+  justify-self: stretch;
   width: 100%;
   height: 100% !important;
   min-width: 0;
@@ -829,12 +830,35 @@ body.runtime-active[data-orientation="landscape"] #nav {
   --u: var(--control-unit);
   height: calc(var(--u) * 4.6);
   padding-right: calc(var(--u) * 0.3 + env(safe-area-inset-right, 0px));
+  z-index: 3;
+  isolation: isolate;
 }
 
 body.runtime-active[data-orientation="landscape"] #display {
   max-width: 100%;
   max-height: 100%;
 }
+
+/* Landscape has enough room for real corner controls. Keep them above the
+   circular d-pad instead of letting its mask swallow their hit targets. */
+body.runtime-active[data-orientation="landscape"] #choice,
+body.runtime-active[data-orientation="landscape"] #back,
+body.runtime-active[data-orientation="landscape"] #ret,
+body.runtime-active[data-orientation="landscape"] #clear {
+  z-index: 4;
+  width: calc(var(--u) * 1.35);
+  height: calc(var(--u) * 0.9);
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--u) * 0.2);
+  -webkit-mask: none;
+  mask: none;
+}
+
+body.runtime-active[data-orientation="landscape"] #choice { left: calc(var(--u) * 0.25); top: calc(var(--u) * 0.25); }
+body.runtime-active[data-orientation="landscape"] #back { right: calc(var(--u) * 0.25); top: calc(var(--u) * 0.25); }
+body.runtime-active[data-orientation="landscape"] #ret { left: calc(var(--u) * 0.25); bottom: calc(var(--u) * 0.25); }
+body.runtime-active[data-orientation="landscape"] #clear { right: calc(var(--u) * 0.25); bottom: calc(var(--u) * 0.25); }
 
 /* Fullscreen keeps the stage in the viewport and lets the user choose which
    dimension is authoritative for the virtual phone. */

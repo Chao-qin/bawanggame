@@ -500,6 +500,7 @@ function Player({ game, onBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(fullscreenElement()))
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
+  const [toolbarCollapsed, setToolbarCollapsed] = useState(() => window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
   const playerRef = useRef(null)
   const stageRef = useRef(null)
   const toolbarRef = useRef(null)
@@ -517,6 +518,17 @@ function Player({ game, onBack, nativeBackSignal }) {
     const observer = new ResizeObserver(updateToolbarSize)
     observer.observe(toolbar)
     return () => observer.disconnect()
+  }, [toolbarCollapsed])
+  useEffect(() => {
+    const syncToolbarMode = () => {
+      setToolbarCollapsed(window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
+    }
+    window.addEventListener('orientationchange', syncToolbarMode)
+    window.addEventListener('resize', syncToolbarMode)
+    return () => {
+      window.removeEventListener('orientationchange', syncToolbarMode)
+      window.removeEventListener('resize', syncToolbarMode)
+    }
   }, [])
   useEffect(() => {
     const mountOverlay = (node) => {
@@ -634,13 +646,16 @@ function Player({ game, onBack, nativeBackSignal }) {
     window.setTimeout(() => window.location.reload(), 0)
   }
   return (
-    <div ref={playerRef} className="player" onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
-      <div ref={toolbarRef} className="runtimeToolbar" role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
-        <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅"><span aria-hidden="true">←</span></button>
-        <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
-        <span className="runtimeToolbarSpacer" />
-        {game.kind === 'j2me' && <button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={openSettings} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><span aria-hidden="true">⚙</span></button>}
-        <button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}><span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span></button>
+    <div ref={playerRef} className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`} onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
+      <div ref={toolbarRef} className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
+        <button className="runtimeToolbarToggle" onClick={() => setToolbarCollapsed((value) => !value)} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}>•••</button>
+        {!toolbarCollapsed && <div className="runtimeToolbarContent">
+          <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅"><span aria-hidden="true">←</span></button>
+          <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
+          <span className="runtimeToolbarSpacer" />
+          {game.kind === 'j2me' && <button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={openSettings} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><span aria-hidden="true">⚙</span></button>}
+          <button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}><span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span></button>
+        </div>}
       </div>
       <div ref={stageRef} className="playerStage">
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
