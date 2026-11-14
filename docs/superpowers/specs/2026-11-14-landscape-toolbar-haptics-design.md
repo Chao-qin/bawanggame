@@ -2,7 +2,8 @@
 
 ## Goal
 
-Improve the landscape runtime shown in the supplied screenshot: keep the game
+Improve the landscape runtime shown in the user-provided screenshot (`Image #1`
+in the task message, approximately 3248x1400): keep the game
 surface horizontally centered, give it more usable height, keep navigation keys
 visible above the directional pad, collapse the React runtime toolbar into a
 floating control in landscape, and make Android virtual-key vibration reliable.
@@ -45,25 +46,31 @@ offset by the side keypad dimensions. The navigation container gets a higher
 stacking context than the d-pad only for its corner soft/mini keys, while the
 d-pad keeps its circular center hit area.
 
-Virtual-key feedback calls `navigator.vibrate` through a guarded helper. A
-press cancels any previous pattern and emits one clamped pulse (default 16ms
-on coarse-pointer devices). Unsupported APIs, denied calls, desktop pointers,
-and configured zero duration are silent. Android declares
-`android.permission.VIBRATE` so the WebView can deliver the pulse.
+Virtual-key feedback calls `navigator.vibrate` through a guarded helper. The
+existing `config.vibrate` value is the duration in milliseconds: `0` disables
+feedback, positive values are clamped to 8-40ms, and a missing value defaults
+to 16ms only on coarse-pointer devices. A press first cancels a stale pattern
+with `navigator.vibrate(0)`, then emits exactly one positive-duration pulse.
+Unsupported APIs, denied calls, desktop pointers, and configured zero duration
+are silent. Android declares `android.permission.VIBRATE` so the WebView can
+deliver the pulse.
 
 ## Acceptance
 
-1. At a landscape viewport, the game display's bounding-box center is within
-   2% of the viewport center and its height increases when the toolbar is
-   collapsed.
+1. At a 1365x768 CSS-pixel landscape viewport, the game display bounding box
+   center (`(left + right) / 2`, `(top + bottom) / 2`) is within 2% of the
+   player stage content box center, and its height is greater with the toolbar
+   collapsed than with the toolbar expanded.
 2. The landscape toolbar is a single floating control when collapsed and all
    three existing actions remain reachable after expansion.
 3. Navigation soft/mini keys are visible and receive pointer events without
    being covered by the d-pad; directional keys still receive their existing
    pointer mappings.
-4. A supported coarse-pointer press produces one vibration pulse within the
-   configured duration; a rapid second press does not leave an old vibration
-   pattern running. Desktop and unsupported WebView environments do not throw.
+4. With `config.vibrate=20`, a supported coarse-pointer press produces the
+   sequence `navigator.vibrate(0)` then one `navigator.vibrate(20)` call. A
+   rapid second press repeats that sequence without a stale pattern. With
+   `config.vibrate=0`, no vibration call is made. Desktop and unsupported
+   WebView environments do not throw.
 5. Portrait layout, settings, fullscreen, long-press prevention, and key
    lifecycle cleanup continue to work.
 
@@ -73,7 +80,20 @@ and configured zero duration are silent. Android declares
 - `node --check runtime/j2me/touchpad.js`
 - `pnpm --filter @xiaochao/web build`
 - `pnpm --filter @xiaochao/mobile typecheck`
-- Android manifest inspection for `android.permission.VIBRATE`
-- Browser layout smoke probe at portrait and landscape viewports, checking
-  display centering, toolbar toggle, navigation hit testing, and vibration API
-  call count with a stubbed `navigator.vibrate`.
+- `pnpm mobile:prepare-web`
+- `pnpm mobile:build-android`
+- `aapt dump permissions apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
+  contains `android.permission.VIBRATE`; when an Android device/emulator is
+  available, run `adb install -r .../app-release.apk` and
+  `adb shell monkey -p com.xiaochao.bawang 1`, then verify the bundled WebView
+  starts, the keypad is present, and vibration calls do not log errors. A real
+  device run is marked unverified when no device is available.
+- Browser layout smoke probe at fixed 1365x768 landscape and 390x844 portrait
+  viewports, capturing before/after screenshots against the supplied screenshot
+  as a visual reference. Check display centering, collapsed/expanded toolbar
+  height, navigation hit testing, and vibration call count with a stubbed
+  `navigator.vibrate`.
+- Re-enter fullscreen, exit fullscreen, and exercise fullscreen failure in a
+  browser with the toolbar collapsed and expanded; verify portrait remains
+  centered, long-press on canvas/keypad does not open a menu, active keys are
+  released on exit, and the console has no new runtime errors.
