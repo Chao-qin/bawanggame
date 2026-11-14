@@ -125,7 +125,7 @@
   }
 
   cv.addEventListener("canvasresize", fit);
-  window.addEventListener("resize", fit);
+  window.addEventListener("xiaochao:viewportchange", fit);
 
   function str(addr) {
     return J2ME.fromStringAddr(addr);

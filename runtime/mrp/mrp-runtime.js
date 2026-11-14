@@ -133,7 +133,7 @@
       display.style.height = height + 'px';
     }
   }
-  window.addEventListener('resize', fit);
+  window.addEventListener('xiaochao:viewportchange', fit);
   fit();
 
   /* ---------- 对话框 / 文本（vmrp js_* 回调所需） ---------- */

@@ -111,11 +111,14 @@ blur, visibility change, and pagehide release all active keys.
 
 The host uses the same generated Web resources as the browser. RN removes
 `SafeAreaView` edge consumption for the WebView and sends
-`host.insets.v1 = { top, right, bottom, left }` in CSS pixels from
-`useSafeAreaInsets()`. The injected bridge exposes
-`window.__XIAOCHAO_RESPONSIVE_HOST__.setInsets(payload)`; orientation changes
-send a replacement payload and unmount clears it. Browser builds use CSS
-`env()` instead. `visualViewport` remains the source for keyboard height:
+`host.insets.v1 = { version: 1, top, right, bottom, left }` in CSS pixels from
+`useSafeAreaInsets()` (RN logical dp maps to WebView CSS px; physical pixels
+are never sent). The injected bridge exposes
+`window.__XIAOCHAO_RESPONSIVE_HOST__.setInsets(payload)`; only version `1` is
+accepted, every inset is finite and clamped to `>= 0`, and invalid or older
+payloads leave the last valid inset unchanged. Orientation changes send a
+replacement payload and unmount clears it. Browser builds use CSS `env()`
+instead. `visualViewport` remains the source for keyboard height:
 `max(0, layoutHeight - visualHeight - offsetTop)`; negative/rotated values are
 clamped to zero. The host does not inject device-specific offsets into game
 components.

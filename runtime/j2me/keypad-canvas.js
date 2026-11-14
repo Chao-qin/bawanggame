@@ -194,7 +194,7 @@
       resizeObserver.observe(pad);
       resizeObserver.observe(phone);
     }
-    window.addEventListener("resize", schedule);
+    window.addEventListener("xiaochao:viewportchange", schedule);
     window.KeypadCanvas = {
       refresh: schedule,
       destroy: function () {
@@ -205,7 +205,7 @@
         }
         if (observer) observer.disconnect();
         if (resizeObserver) resizeObserver.disconnect();
-        window.removeEventListener("resize", schedule);
+        window.removeEventListener("xiaochao:viewportchange", schedule);
         pad.classList.remove("keypad-canvas-mode");
         if (window.KeypadCanvas && window.KeypadCanvas.destroy === this.destroy) delete window.KeypadCanvas;
       }

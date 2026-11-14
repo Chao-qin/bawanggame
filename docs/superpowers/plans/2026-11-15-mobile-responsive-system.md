@@ -17,7 +17,7 @@
 - Modify: `apps/web/src/runtime/PhoneMarkup.jsx`
 - Modify: `runtime/j2me/style/main.css`
 
-- [ ] **Step 1: Add a focused native gesture guard**
+- [x] **Step 1: Add a focused native gesture guard**
 
   In `Touchpad.bind`, add capture listeners for `touchstart`, `touchmove`,
   `gesturestart`, `contextmenu`, `selectstart`, and `dragstart`. The guard must
@@ -25,7 +25,7 @@
   `preventDefault()` before browser selection/callout handling, and must not
   affect the text editor or settings panel exceptions.
 
-- [ ] **Step 2: Preserve pointer delivery while guarding defaults**
+- [x] **Step 2: Preserve pointer delivery while guarding defaults**
 
   Keep the existing pointerdown hit test, pointer capture, slide transitions,
   repeat timers, and release cleanup unchanged. Add a direct keypad gesture
@@ -33,7 +33,7 @@
   `selectstart`/`contextmenu` consistently. Do not place handlers on the Canvas
   that would prevent the transparent DOM hit map from receiving pointer events.
 
-- [ ] **Step 3: Make the hit layer explicitly non-selectable**
+- [x] **Step 3: Make the hit layer explicitly non-selectable**
 
   Add `-webkit-user-select`, `user-select`, `-webkit-touch-callout`,
   `-webkit-user-drag`, `touch-action: none`, and `pointer-events` declarations
@@ -48,6 +48,9 @@
   or `dragstart` event for every keypad region; pointer press/release counts
   remain one edge each.
 
+  Status: JavaScript syntax checks pass. Browser long-press execution remains
+  pending because this environment has no Chrome/Chromium binary.
+
 ## Chunk 2: Shared responsive contract
 
 **Files:**
@@ -57,7 +60,7 @@
 - Modify: `apps/mobile/App.tsx`
 - Modify: `apps/mobile/src/host/protocol.ts`
 
-- [ ] **Step 1: Implement the document responsive controller**
+- [x] **Step 1: Implement the document responsive controller**
 
   Add `installResponsiveContract()` with one idempotent set of listeners for
   `resize`, `orientationchange`, `fullscreenchange`, and
@@ -71,20 +74,20 @@
   `setInsets({ version: 1, top, right, bottom, left })` in CSS pixels when
   present; browser builds keep `env(safe-area-inset-*)` as the fallback.
 
-- [ ] **Step 2: Mount the controller once at the app root**
+- [x] **Step 2: Mount the controller once at the app root**
 
   Install the controller from `App`, before library/player content is rendered.
   Keep the existing Player refit for legacy canvas internals, but make it call
   the responsive contract refresh instead of maintaining independent viewport
   state. Preserve fullscreen and route cleanup behavior.
 
-- [ ] **Step 3: Define WebView-safe defaults**
+- [x] **Step 3: Define WebView-safe defaults**
 
   Ensure the root contract works when `visualViewport` is missing and when the
   WebView reports zero safe-area environment values. Use `100dvh` with a
   `100vh` fallback and never depend on a named device or platform user agent.
 
-- [ ] **Step 4: Verify the contract in isolation**
+- [x] **Step 4: Verify the contract in isolation**
 
   Run a Node/browser probe that changes viewport metrics and asserts the mode
   classes, keyboard height, orientation, and cleanup behavior. Expected:
@@ -98,19 +101,19 @@
 - Modify: `apps/web/src/App.jsx` only where semantic wrappers or responsive
   class hooks are needed.
 
-- [ ] **Step 1: Normalize shell width and spacing tokens**
+- [x] **Step 1: Normalize shell width and spacing tokens**
 
   Replace scattered mobile-only preflight patches with contract-driven shell
   rules. Keep a readable max content width, use safe-area padding at the page
   edges, and prevent header/tabs from forcing horizontal overflow.
 
-- [ ] **Step 2: Make library and store controls wrap predictably**
+- [x] **Step 2: Make library and store controls wrap predictably**
 
   Keep search, upload, counts, filters, and pagination usable at 320px. Set
   `min-width: 0` on flexible children, allow action groups to wrap, and use
   `clamp()`/grid minimums for cards instead of device-specific overrides.
 
-- [ ] **Step 3: Make sheets and dialogs keyboard-aware**
+- [x] **Step 3: Make sheets and dialogs keyboard-aware**
 
   Use the visual viewport contract for maximum sheet height and bottom padding.
   Preserve scroll ownership inside option/settings sheets and keep primary
@@ -122,6 +125,9 @@
   overflow, visible tab labels, usable search/filter controls, and dialog
   buttons within the visual viewport.
 
+  Status: pending browser execution; the shell rules are implemented and the
+  production build passes.
+
 ## Chunk 4: Runtime responsive layout
 
 **Files:**
@@ -131,22 +137,23 @@
 - Modify: `runtime/j2me/keypad-canvas.js`
 - Modify: `runtime/j2me/panel.js`
 - Modify: `runtime/j2me/bld/lcdui.js`
+- Modify: `runtime/j2me/bld/main-all.js`
 - Modify: `runtime/mrp/mrp-runtime.js`
 
-- [ ] **Step 1: Replace fixed runtime sizing with contract dimensions**
+- [x] **Step 1: Replace fixed runtime sizing with contract dimensions**
 
   Use the responsive variables for stage padding, toolbar space, display
   container height, and keypad unit size. Keep the logical game canvas ratio
   authoritative and cap controls by available width/height.
 
-- [ ] **Step 2: Define compact, portrait, landscape, and short-height modes**
+- [x] **Step 2: Define compact, portrait, landscape, and short-height modes**
 
   Make portrait stack display then keypad without clipping at 320px. Make
   landscape allocate equal side tracks around the display, and reduce keypad
   units in short-height mode without reducing touch hit targets below the
   minimum. Use safe-area padding on the outermost stage only.
 
-- [ ] **Step 3: Refine Canvas and hit-map geometry**
+- [x] **Step 3: Refine Canvas and hit-map geometry**
 
   Have `keypad-canvas.js` observe the contract mode and one shared resize frame;
   redraw after orientation/fullscreen/keyboard changes; and keep DOM rects and
@@ -164,6 +171,9 @@
   `contextmenu`, and `dragstart` events; editor and MRP dialog text remain
   editable, and settings sheets retain vertical scrolling.
 
+  Status: pending browser execution; static geometry and Canvas subscriptions
+  are implemented.
+
 ## Chunk 5: WebView packaging and validation matrix
 
 **Files:**
@@ -173,22 +183,29 @@
 - Modify: `docs/superpowers/specs/2026-11-15-mobile-responsive-system-design.md`
 - Modify: this plan as each step completes.
 
-- [ ] **Step 1: Validate browser and WebView resource parity**
+- [x] **Step 1: Validate browser and WebView resource parity**
 
   Run the Web production build, `pnpm mobile:prepare-web`, and
   `pnpm mobile:verify-web`. Confirm the generated mobile Web root contains the
   responsive controller, runtime CSS, Canvas keypad, and touchpad scripts.
-  Save viewport JSON, screenshots, and long-press event logs under
-  `/tmp/mobile-responsive-system/`.
+  The static resource parity and exact file assertions pass. Browser viewport
+  JSON, screenshots, and long-press event logs under
+  `/tmp/mobile-responsive-system/` remain pending until a Chromium binary is
+  available.
 
 - [ ] **Step 2: Build and inspect Android packaging**
 
   Run `pnpm mobile:build-android`, inspect the bundle and Web assets inside the
   release APK, and check the existing vibration permission. Assert exact
-  entries for `apps/mobile/web/index.html`, `apps/mobile/web/style/main.css`,
-  `apps/mobile/web/keypad-canvas.js`, and `apps/mobile/web/touchpad.js`.
+  ZIP entries for `assets/web/index.html`, `assets/web/style/main.css`,
+  `assets/web/keypad-canvas.js`, `assets/web/touchpad.js`, and
+  `assets/index.android.bundle` with `unzip -l "$APK"`; check
+  `android.permission.VIBRATE` with `aapt dump permissions "$APK"`.
   Install/start only when an emulator/device is available; report the absence
   explicitly.
+
+  Status: Web assets and exact resource checks pass. Release APK generation is
+  blocked by the missing Java Runtime in this environment.
 
 - [ ] **Step 3: Complete cold-start reviews**
 

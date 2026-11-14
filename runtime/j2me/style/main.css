@@ -374,6 +374,40 @@ body.runtime-active #numpad {
   -webkit-user-drag: none !important;
 }
 
+/* Native text entry and settings scrolling are the only runtime surfaces that
+   intentionally keep browser selection/scroll gestures enabled. */
+#editor-layer,
+#editor-layer *,
+#mrp-dialog-text,
+#display #mrp-dialog-text {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+  -webkit-user-drag: auto !important;
+  touch-action: auto !important;
+}
+
+#panel,
+#panel * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+#panel,
+#panel .panel-box,
+#panel .panel-box * {
+  touch-action: pan-y !important;
+}
+
+#keypad,
+#keypad * {
+  pointer-events: auto;
+}
+
+#keypad-canvas {
+  pointer-events: none !important;
+}
+
 #keypad input,
 #keypad textarea,
 #display input,
@@ -600,8 +634,7 @@ body.runtime-active #numpad {
 }
 
 #keypad .key:focus-visible {
-  outline: 2px solid var(--phone-key-active);
-  outline-offset: 2px;
+  outline: 0;
 }
 
 .dir.down {
@@ -1621,4 +1654,54 @@ body.runtime-active[data-orientation="landscape"][data-side-layout="swapped"] #n
   grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
+}
+
+/* Shared responsive contract. Browser safe-area env values remain the
+   fallback; the RN WebView bridge replaces these custom properties with its
+   measured CSS-pixel insets when available. */
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --viewport-height: 100dvh;
+  --visual-viewport-height: var(--viewport-height);
+  --keyboard-height: 0px;
+}
+
+body.runtime-active {
+  min-height: var(--viewport-height, 100dvh);
+  height: var(--viewport-height, 100dvh);
+}
+
+body.runtime-active .runtime-stage {
+  box-sizing: border-box;
+  padding: 0 var(--safe-area-right, 0px) var(--safe-area-bottom, 0px) var(--safe-area-left, 0px);
+}
+
+body.runtime-active.viewport-short-height #keypad {
+  --u: min(var(--u), 34px);
+}
+
+body.runtime-active.viewport-compact #keypad {
+  --u: min(var(--u), 28px);
+  gap: calc(var(--u) * 0.18);
+}
+
+body.runtime-active.viewport-landscape #display-container {
+  min-width: 0;
+}
+
+body.runtime-active.viewport-landscape #keypad-canvas {
+  max-width: 100%;
+}
+
+body.runtime-active.keyboard-open .runtimeToolbar {
+  transform: translate(-50%, calc(-1 * var(--keyboard-height, 0px)));
+}
+
+@media (max-width: 359px) {
+  .runtime-stage { max-width: 100vw; }
+  body.runtime-active #nav,
+  body.runtime-active #numpad { max-width: 100vw; }
 }

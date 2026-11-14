@@ -4,6 +4,7 @@ import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
 import { MrpPlayer } from './runtime/MrpPlayer.jsx'
 import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
+import { installResponsiveContract } from './responsive.js'
 
 const TABS = [
   { id: 'j2me', label: 'J2ME' },
@@ -521,13 +522,11 @@ function Player({ game, onBack, nativeBackSignal }) {
   }, [toolbarCollapsed])
   useEffect(() => {
     const syncToolbarMode = () => {
-      setToolbarCollapsed(window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
+      setToolbarCollapsed(document.body.classList.contains('viewport-landscape') || (window.matchMedia?.('(orientation: landscape)')?.matches ?? false))
     }
-    window.addEventListener('orientationchange', syncToolbarMode)
-    window.addEventListener('resize', syncToolbarMode)
+    window.addEventListener('xiaochao:viewportchange', syncToolbarMode)
     return () => {
-      window.removeEventListener('orientationchange', syncToolbarMode)
-      window.removeEventListener('resize', syncToolbarMode)
+      window.removeEventListener('xiaochao:viewportchange', syncToolbarMode)
     }
   }, [])
   useEffect(() => {
@@ -579,9 +578,7 @@ function Player({ game, onBack, nativeBackSignal }) {
     const onViewportResize = () => { if (!refitting) requestRefit() }
     document.addEventListener('fullscreenchange', syncFullscreen)
     document.addEventListener('webkitfullscreenchange', syncFullscreen)
-    window.addEventListener('resize', onViewportResize)
-    window.addEventListener('orientationchange', onViewportResize)
-    window.visualViewport?.addEventListener('resize', onViewportResize)
+    window.addEventListener('xiaochao:viewportchange', onViewportResize)
     return () => {
       if (refitFrame) {
         const cancel = window.cancelAnimationFrame || window.clearTimeout
@@ -590,9 +587,7 @@ function Player({ game, onBack, nativeBackSignal }) {
       document.body.classList.remove('fullscreen-active')
       document.removeEventListener('fullscreenchange', syncFullscreen)
       document.removeEventListener('webkitfullscreenchange', syncFullscreen)
-      window.removeEventListener('resize', onViewportResize)
-      window.removeEventListener('orientationchange', onViewportResize)
-      window.visualViewport?.removeEventListener('resize', onViewportResize)
+      window.removeEventListener('xiaochao:viewportchange', onViewportResize)
     }
   }, [])
   useEffect(() => {
@@ -628,11 +623,6 @@ function Player({ game, onBack, nativeBackSignal }) {
     const gear = document.getElementById('gear')
     if (gear) gear.click()
   }
-  const blockRuntimeGesture = (event) => {
-    const target = event.target
-    if (target.closest?.('input, textarea, [contenteditable="true"]')) return
-    event.preventDefault()
-  }
   const exit = () => {
     try { window.myflushAll && window.myflushAll() } catch (_) {}
     try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
@@ -646,7 +636,7 @@ function Player({ game, onBack, nativeBackSignal }) {
     window.setTimeout(() => window.location.reload(), 0)
   }
   return (
-    <div ref={playerRef} className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`} onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
+    <div ref={playerRef} className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
       <div ref={toolbarRef} className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <button className="runtimeToolbarToggle" onClick={() => setToolbarCollapsed((value) => !value)} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}>•••</button>
         {!toolbarCollapsed && <div className="runtimeToolbarContent">
@@ -678,6 +668,7 @@ function Player({ game, onBack, nativeBackSignal }) {
 }
 
 export default function App() {
+  useEffect(() => installResponsiveContract(), [])
   const [route, setRoute] = useState(() => parseRoute(window.location.hash))
   const [nativeBackSignal, setNativeBackSignal] = useState(0)
   const routeRef = useRef(route)

@@ -11,6 +11,8 @@ const requiredFiles = [
   'sw.js',
   'assets',
   'style/main.css',
+  'keypad-canvas.js',
+  'touchpad.js',
   'config/settings.js',
   'bld/main-all.js',
   'mrp-runtime.js',
@@ -29,6 +31,14 @@ if (missing.length) {
 const index = fs.readFileSync(path.join(webRoot, 'index.html'), 'utf8')
 if (!index.includes('id="root"')) {
   console.error('移动端 Web 资源缺少 React root 节点')
+  process.exit(1)
+}
+
+const bundleFiles = fs.readdirSync(path.join(webRoot, 'assets'))
+  .filter((entry) => entry.endsWith('.js'))
+  .map((entry) => fs.readFileSync(path.join(webRoot, 'assets', entry), 'utf8'))
+if (!bundleFiles.some((content) => content.includes('viewportMode') && content.includes('keyboard-height'))) {
+  console.error('移动端 Web 资源缺少响应式控制器')
   process.exit(1)
 }
 

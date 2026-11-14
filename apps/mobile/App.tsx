@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState, BackHandler, Pressable, StatusBar, Text, View } from 'react-native'
 import { WebView } from 'react-native-webview'
 import type { WebViewErrorEvent, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview/lib/WebViewTypes'
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { startAssetServer, stopAssetServer } from './src/host/assetServer'
 import { injectedBridge, parseHostMessage } from './src/host/protocol'
 import { styles } from './src/host/styles'
@@ -10,8 +10,9 @@ import { styles } from './src/host/styles'
 const MAX_START_ATTEMPTS = 2
 const BrowserView = WebView as any
 
-export default function App() {
+function AppContent() {
   const webViewRef = useRef<any>(null)
+  const insets = useSafeAreaInsets()
   const [origin, setOrigin] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -38,6 +39,18 @@ export default function App() {
     })
     return () => subscription.remove()
   }, [origin])
+
+  useEffect(() => {
+    if (!origin || !webViewRef.current) return
+    const payload = JSON.stringify({
+      version: 1,
+      top: insets.top,
+      right: insets.right,
+      bottom: insets.bottom,
+      left: insets.left,
+    })
+    webViewRef.current.injectJavaScript(`window.__XIAOCHAO_RN_HOST__?.setInsets(${payload}); true;`)
+  }, [origin, insets.top, insets.right, insets.bottom, insets.left])
 
   const handleBack = useCallback(() => {
     if (!webViewRef.current) return false
@@ -72,8 +85,7 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={[]}>
         <StatusBar barStyle="light-content" />
         <View style={styles.root}>
           {origin && !error ? (
@@ -110,7 +122,14 @@ export default function App() {
             </View>
           )}
         </View>
-      </SafeAreaView>
+    </SafeAreaView>
+  )
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
     </SafeAreaProvider>
   )
 }

@@ -42,7 +42,7 @@ export default defineConfig({
     status: 'py-10 text-center text-sm text-dim',
     statusError: 'text-red-300',
     player: 'fixed inset-0 z-20 bg-[#05070a]',
-    playerStage: 'absolute inset-x-0 bottom-0 top-[calc(max(8px,env(safe-area-inset-top,0px))+64px)] bg-[#05070a]',
+    playerStage: 'absolute inset-x-0 bottom-0 top-[calc(max(8px,var(--safe-area-top,env(safe-area-inset-top,0px)))+64px)] bg-[#05070a]',
     runtimeView: 'absolute inset-0 flex items-center justify-center overflow-hidden',
     runtimeError: 'absolute inset-5 z-100 grid place-items-center whitespace-pre-wrap text-red-300',
     'runtime-view': 'absolute inset-0 flex items-center justify-center overflow-hidden',
@@ -78,7 +78,7 @@ export default defineConfig({
     downloadButton: 'shrink-0 rounded-lg border border-accent bg-accent px-3 py-2 text-sm font-semibold text-[#07111d] disabled:opacity-60',
     emptyPanel: 'grid place-items-center gap-2 rounded-xl border border-dashed border-line py-14 text-sm text-dim',
     storePagination: 'my-5 flex items-center justify-between gap-3 border-t border-line py-4 text-xs text-dim',
-    runtimeToolbar: 'absolute left-1/2 top-[max(8px,env(safe-area-inset-top))] z-200 flex w-[calc(100%-16px)] max-w-[720px] -translate-x-1/2 items-center gap-1.5 rounded-xl border border-white/15 bg-[#10151dcc] px-2 py-1.5 text-xs text-white shadow-lg backdrop-blur sm:top-[max(12px,env(safe-area-inset-top))] sm:gap-2 sm:px-3 sm:py-2',
+    runtimeToolbar: 'absolute left-1/2 top-[max(8px,var(--safe-area-top,env(safe-area-inset-top,0px)))] z-200 flex w-[calc(100%-16px)] max-w-[720px] -translate-x-1/2 items-center gap-1.5 rounded-xl border border-white/15 bg-[#10151dcc] px-2 py-1.5 text-xs text-white shadow-lg backdrop-blur sm:top-[max(12px,var(--safe-area-top,env(safe-area-inset-top,0px)))] sm:gap-2 sm:px-3 sm:py-2',
     runtimeToolbarContent: 'flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2',
     runtimeToolbarToggle: 'hidden h-9 w-9 shrink-0 place-items-center rounded-full border border-white/20 bg-[#10151dcc] p-0 text-[11px] font-bold tracking-[.12em] text-white/80 shadow-lg backdrop-blur transition hover:border-white/40 hover:text-white active:bg-white/20',
     runtimeToolbarCollapsed: 'w-10 max-w-10 rounded-full p-0',
@@ -97,7 +97,7 @@ export default defineConfig({
     deviceStatusRight: 'flex items-center gap-1.5 text-white/70',
   },
   preflights: [{
-    getCSS: () => '@keyframes sheet-in{from{transform:translateY(100%);opacity:.5}to{transform:translateY(0);opacity:1}}@media(max-width:600px){.header{flex-wrap:wrap;align-items:center}.header>div:first-child{flex:1}.header .tabs{width:100%;justify-content:space-between}.header .tab{flex:1;padding:8px 7px;white-space:nowrap}.storeFilters .search{flex:1 1 150px}.categorySelect{flex:1}}@media (orientation:landscape){.player .runtimeToolbarToggle{display:grid}}.runtimeToolbar.runtimeToolbarCollapsed{border:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}.player.runtimePlayerToolbarCollapsed .playerStage{top:max(8px,env(safe-area-inset-top,0px))}.player:fullscreen.runtimePlayerToolbarCollapsed .playerStage,.player:-webkit-full-screen.runtimePlayerToolbarCollapsed .playerStage{inset:max(8px,env(safe-area-inset-top,0px)) 0 0}',
+    getCSS: () => '@keyframes sheet-in{from{transform:translateY(100%);opacity:.5}to{transform:translateY(0);opacity:1}}:root{--safe-area-top:env(safe-area-inset-top,0px);--safe-area-right:env(safe-area-inset-right,0px);--safe-area-bottom:env(safe-area-inset-bottom,0px);--safe-area-left:env(safe-area-inset-left,0px)}.appShell{box-sizing:border-box;min-width:0;padding-left:max(1rem,var(--safe-area-left,0px));padding-right:max(1rem,var(--safe-area-right,0px))}.header{min-width:0}.header>div:first-child{min-width:0}.tabs{min-width:0;max-width:100%;overflow-x:auto}.tab{min-width:0}.main,.pane,.library,.storePage{min-width:0}.storeCard{min-width:0}.storeCard .downloadButton{max-width:38%;white-space:normal}.optionBackdrop{padding-bottom:var(--safe-area-bottom,env(safe-area-inset-bottom,0px))}.optionSheet{max-height:calc(var(--visual-viewport-height,100dvh) - var(--safe-area-top,0px) - var(--safe-area-bottom,0px));padding-bottom:var(--keyboard-height,0px)}.optionBody{max-height:calc(var(--visual-viewport-height,100dvh) - 9rem - var(--keyboard-height,0px))}@media(max-width:600px){.header{flex-wrap:wrap;align-items:center}.header>div:first-child{flex:1}.header .tabs{width:100%;justify-content:space-between}.header .tab{flex:1;padding:8px 7px;white-space:nowrap}.storeFilters .search{flex:1 1 150px}.categorySelect{flex:1}}@media (orientation:landscape){.player .runtimeToolbarToggle{display:grid}}.runtimeToolbar.runtimeToolbarCollapsed{border:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}.player.runtimePlayerToolbarCollapsed .playerStage{top:max(8px,var(--safe-area-top,env(safe-area-inset-top,0px)))}.player:fullscreen.runtimePlayerToolbarCollapsed .playerStage,.player:-webkit-full-screen.runtimePlayerToolbarCollapsed .playerStage{inset:max(8px,var(--safe-area-top,env(safe-area-inset-top,0px))) 0 0}',
   }],
   rules: [[/^animate-sheet-in$/, () => ({ animation: 'sheet-in .2s ease-out' })]],
 })
