@@ -3,6 +3,7 @@ import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
 import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
 import { MrpPlayer } from './runtime/MrpPlayer.jsx'
 import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
+import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
 
 const TABS = [
   { id: 'j2me', label: 'J2ME' },
@@ -461,9 +462,6 @@ function Store({ onRefreshLibrary }) {
 
 function Player({ game, onBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
-  const [fitMode, setFitMode] = useState(() => {
-    try { return localStorage.getItem('xiaochao.fullscreen-fit.' + game.kind + ':' + game.file) === 'height' ? 'height' : 'width' } catch (_) { return 'width' }
-  })
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement))
   const playerRef = useRef(null)
   const stageRef = useRef(null)
@@ -472,9 +470,6 @@ function Player({ game, onBack, nativeBackSignal }) {
   useEffect(() => {
     const stage = stageRef.current
     if (!stage) return
-    stage.dataset.fullscreenFit = fitMode
-    if (playerRef.current) playerRef.current.dataset.fullscreenFit = fitMode
-    document.body.dataset.fullscreenFit = fitMode
     const syncFullscreen = () => {
       const active = !!document.fullscreenElement
       document.body.classList.toggle('fullscreen-active', active)
@@ -484,11 +479,10 @@ function Player({ game, onBack, nativeBackSignal }) {
     document.addEventListener('fullscreenchange', syncFullscreen)
     return () => {
       delete document.body.dataset.fullscreenFit
-      if (playerRef.current) delete playerRef.current.dataset.fullscreenFit
       document.body.classList.remove('fullscreen-active')
       document.removeEventListener('fullscreenchange', syncFullscreen)
     }
-  }, [fitMode])
+  }, [])
   useEffect(() => {
     if (nativeBackSignal === lastNativeBackSignal.current) return
     lastNativeBackSignal.current = nativeBackSignal
@@ -496,16 +490,9 @@ function Player({ game, onBack, nativeBackSignal }) {
   }, [nativeBackSignal])
   useEffect(() => () => {
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
+    cleanupRuntimeArtifacts()
   }, [])
   const requestBack = useCallback(() => setConfirming(true), [])
-  const setFit = (mode) => {
-    setFitMode(mode)
-    try { localStorage.setItem('xiaochao.fullscreen-fit.' + game.kind + ':' + game.file, mode) } catch (_) {}
-    if (game.kind === 'j2me' && window.Settings && window.config?.gameId) {
-      window.config.fullscreenFit = mode
-      window.Settings.setGame(window.config.gameId, 'fullscreenFit', mode)
-    }
-  }
   const toggleFullscreen = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen()
@@ -525,8 +512,13 @@ function Player({ game, onBack, nativeBackSignal }) {
     try { window.myflushAll && window.myflushAll() } catch (_) {}
     try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
+    cleanupRuntimeArtifacts()
     setConfirming(false)
     onBack()
+    // The classic VM installs process-wide listeners and caches globals that
+    // cannot be safely reconstructed inside the SPA realm. Reload after the
+    // library hash is committed so the next game starts from a fresh realm.
+    window.setTimeout(() => window.location.reload(), 0)
   }
   return (
     <div ref={playerRef} className="player" onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
@@ -535,10 +527,6 @@ function Player({ game, onBack, nativeBackSignal }) {
         <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
         <span className="runtimeToolbarSpacer" />
         {runtimeReady && <button className="runtimeToolbarButton" onClick={openSettings} title="游戏设置">设置</button>}
-        <span className="runtimeToolbarGroup" aria-label="全屏适配">
-          <button className={'runtimeToolbarButton' + (fitMode === 'width' ? ' runtimeToolbarButtonActive' : '')} onClick={() => setFit('width')} aria-pressed={fitMode === 'width'} title="固定宽度">宽</button>
-          <button className={'runtimeToolbarButton' + (fitMode === 'height' ? ' runtimeToolbarButtonActive' : '')} onClick={() => setFit('height')} aria-pressed={fitMode === 'height'} title="固定高度">高</button>
-        </span>
         <button className="runtimeToolbarButton runtimeFullscreenButton" onClick={toggleFullscreen} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? '退出全屏' : '全屏'}</button>
       </div>
       <div ref={stageRef} className="playerStage">

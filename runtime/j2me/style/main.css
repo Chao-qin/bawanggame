@@ -96,13 +96,18 @@ body {
   transform: rotate(var(--runtime-rotation)) scale(var(--rotation-scale, 1));
 }
 body.rotate-90 .runtime-stage,
-body.rotate--90 .runtime-stage {
+body.rotate--90 .runtime-stage,
+body[data-rotation="90"] .runtime-stage,
+body[data-rotation="270"] .runtime-stage {
   width: min(calc(100dvh - 20px), calc((100vw - 20px) * .6), 480px);
   height: min(calc(100vw - 20px), calc((100dvh - 20px) / .6), 800px);
 }
-body.rotate-90 .runtime-stage { transform: rotate(90deg); }
-body.rotate--90 .runtime-stage { transform: rotate(-90deg); }
-body.rotate-180 .runtime-stage { transform: rotate(180deg); }
+body.rotate-90 .runtime-stage,
+body[data-rotation="90"] .runtime-stage { transform: rotate(90deg); }
+body.rotate--90 .runtime-stage,
+body[data-rotation="270"] .runtime-stage { transform: rotate(270deg); }
+body.rotate-180 .runtime-stage,
+body[data-rotation="180"] .runtime-stage { transform: rotate(180deg); }
 body.runtime-active { display: flex !important; flex-direction: column !important; }
 body.runtime-active #display-container { grid-row: auto !important; grid-column: auto !important; height: auto !important; }
 body.runtime-active #keypad { display: flex !important; }
@@ -922,11 +927,6 @@ body.runtime-active #numpad {
 .player:fullscreen .runtimeToolbar,
 .player:-webkit-full-screen .runtimeToolbar {
   z-index: 220;
-}
-
-.runtimeToolbarButtonActive {
-  background: rgba(255, 255, 255, .2);
-  color: #fff;
 }
 
 body.runtime-active.fullscreen-active[data-fullscreen-fit="width"] .runtime-stage {

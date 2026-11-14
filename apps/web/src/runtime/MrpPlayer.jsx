@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { PhoneMarkup } from './PhoneMarkup.jsx'
 import { loadClassic, loadStyle } from './loadScript.js'
+import { cleanupRuntimeArtifacts } from './cleanup.js'
 
 export function MrpPlayer({ game, onExit }) {
   const [error, setError] = useState('')
@@ -27,6 +28,7 @@ export function MrpPlayer({ game, onExit }) {
       document.body.classList.remove('runtime-active')
       window.__XIAOCHAO_RUNTIME_MRP = ''
       window.__XIAOCHAO_RUNTIME_MRP_URL = ''
+      cleanupRuntimeArtifacts()
     }
   }, [game, onExit])
   return <div className="runtime-view">{error ? <div className="runtime-error">{error}</div> : null}<PhoneMarkup mrp /></div>

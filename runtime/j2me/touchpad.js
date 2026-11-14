@@ -32,6 +32,11 @@
     var sink = opts.sink;
     var fb = opts.feedback || {};
     var timers = opts.timers || {};
+    var listeners = [];
+    function listen(target, type, fn, options) {
+      target.addEventListener(type, fn, options);
+      listeners.push([target, type, fn, options]);
+    }
     var rafId = 0, rafJobs = Object.create(null), rafQueued = false;
     function rafTick(ts) {
       rafQueued = false;
@@ -295,7 +300,7 @@
       return opts.exclude && e.target.closest && e.target.closest(opts.exclude);
     }
 
-    document.addEventListener("pointerdown", function (e) {
+    listen(document, "pointerdown", function (e) {
       if (excluded(e)) return;
       var prev = held[e.pointerId] && held[e.pointerId].ids || [];
       var h = hit(e.clientX, e.clientY, contactRadius(e), prev);
@@ -307,7 +312,7 @@
       move(e.pointerId, h);
     });
 
-    document.addEventListener("pointermove", function (e) {
+    listen(document, "pointermove", function (e) {
       var cur = held[e.pointerId];
       if (!cur) return;
       var h = hit(e.clientX, e.clientY, contactRadius(e), cur.ids);
@@ -324,30 +329,36 @@
       endOk(e.pointerId);
       clearHold(e.pointerId);
     }
-    document.addEventListener("pointerup", up);
-    document.addEventListener("pointercancel", up);
-    document.addEventListener("contextmenu", function (e) {
+    listen(document, "pointerup", up);
+    listen(document, "pointercancel", up);
+    listen(document, "contextmenu", function (e) {
       if (inKeypad(e.target)) e.preventDefault();
     });
-    document.addEventListener("selectstart", function (e) {
+    listen(document, "selectstart", function (e) {
       if (inKeypad(e.target)) {
         clearSelection();
         e.preventDefault();
       }
     }, true);
-    document.addEventListener("dragstart", function (e) {
+    listen(document, "dragstart", function (e) {
       if (inKeypad(e.target)) e.preventDefault();
     }, true);
 
     // ---------- 防卡键 ----------
-    window.addEventListener("blur", releaseAll);
-    document.addEventListener("visibilitychange", function () {
+    listen(window, "blur", releaseAll);
+    listen(document, "visibilitychange", function () {
       if (document.hidden) releaseAll();
     });
-    window.addEventListener("pagehide", releaseAll);
+    listen(window, "pagehide", releaseAll);
 
     return {
       releaseAll: releaseAll,
+      destroy: function () {
+        releaseAll();
+        Object.keys(rafJobs).forEach(function (id) { delete rafJobs[id]; });
+        listeners.forEach(function (item) { item[0].removeEventListener(item[1], item[2], item[3]); });
+        listeners.length = 0;
+      },
       info: function () { return { r: touchInfo.r, guard: touchInfo.guard, blocked: touchInfo.blocked }; },
       sizes: function () {
         var out = {};

@@ -1,12 +1,27 @@
 import { useEffect, useState } from 'react'
 import { PhoneMarkup } from './PhoneMarkup.jsx'
 import { loadClassic, loadStyle } from './loadScript.js'
+import { cleanupRuntimeArtifacts } from './cleanup.js'
 
 const styles = ['/style/main.css', '/style/lcdui.css', '/style/feedback.css']
 const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/panel.js', '/touchpad.js', '/keymap.js', '/layout.js']
 
 export function J2MEPlayer({ game, onExit }) {
   const [error, setError] = useState('')
+  function applyRuntimeSettings() {
+    const cfg = window.config
+    if (!cfg) return
+    document.body.dataset.theme = cfg.theme || 'classic'
+    document.body.dataset.layout = cfg.layout === 'free' ? 'free' : 'fixed'
+    document.body.dataset.rotation = String(cfg.rotate | 0)
+    document.body.dataset.fullscreenFit = cfg.fullscreenFit === 'height' ? 'height' : 'width'
+    document.body.style.setProperty('--runtime-rotation', (cfg.rotate | 0) + 'deg')
+    document.body.classList.toggle('fixed-screen', !!cfg.screen)
+    const keypad = document.getElementById('keypad')
+    if (keypad) keypad.className = 'keypad-' + (cfg.keypad | 0)
+    const gear = document.getElementById('gear')
+    if (gear) gear.style.removeProperty('display')
+  }
   useEffect(() => {
     document.body.classList.add('runtime-active')
     window.__XIAOCHAO_RUNTIME__ = true
@@ -21,6 +36,9 @@ export function J2MEPlayer({ game, onExit }) {
       try {
         for (const src of scripts) await loadClassic(src)
         if (!alive) return
+        applyRuntimeSettings()
+        window.__XIAOCHAO_RUNTIME_EXTRAS_INIT__?.()
+        window.__XIAOCHAO_KEYMAP_BOOT__?.()
         window.__XIAOCHAO_REQUEST_EXIT = onExit
         window.showExitScreen = onExit
         if (typeof window.onload === 'function') window.onload(new Event('load'))
@@ -35,6 +53,7 @@ export function J2MEPlayer({ game, onExit }) {
       window.__XIAOCHAO_RUNTIME_JAR = ''
       window.__XIAOCHAO_REQUEST_EXIT = null
       window.__XIAOCHAO_J2ME_CTX = null
+      cleanupRuntimeArtifacts()
     }
   }, [game, onExit])
   return <div className="runtime-view">{error ? <div className="runtime-error">{error}</div> : null}<PhoneMarkup /></div>

@@ -1,7 +1,9 @@
 (function () {
-  var canvas = document.getElementById("canvas");
+  var canvas = null;
   var hud = null;
   var sentinel = null;
+  var fpsTimer = 0;
+  var visibilityHandler = null;
 
   function pixelated() {
     canvas.style.imageRendering = config.pixelated ? "pixelated" : "";
@@ -41,7 +43,28 @@
     }).catch(function () {});
   }
 
+  function cleanup() {
+    if (fpsTimer) {
+      clearInterval(fpsTimer);
+      fpsTimer = 0;
+    }
+    if (visibilityHandler) {
+      document.removeEventListener("visibilitychange", visibilityHandler);
+      visibilityHandler = null;
+    }
+    if (sentinel) {
+      sentinel.release().catch(function () {});
+      sentinel = null;
+    }
+    if (hud) {
+      hud.remove();
+      hud = null;
+    }
+  }
+
   function init() {
+    cleanup();
+    canvas = document.getElementById("canvas");
     hud = document.createElement("div");
     hud.id = "fps-hud";
     hud.hidden = true;
@@ -49,7 +72,7 @@
 
     var last = MIDP.frames | 0;
     var prev = performance.now();
-    setInterval(function () {
+    fpsTimer = setInterval(function () {
       var now = performance.now();
       var frames = MIDP.frames | 0;
       if (config.showFps) {
@@ -59,7 +82,8 @@
       prev = now;
     }, 1000);
 
-    document.addEventListener("visibilitychange", wakeLock);
+    visibilityHandler = wakeLock;
+    document.addEventListener("visibilitychange", visibilityHandler);
     pixelated();
     showFps();
     wakeLock();
@@ -70,6 +94,8 @@
     showFps: showFps,
     wakeLock: wakeLock
   };
+  window.__XIAOCHAO_RUNTIME_EXTRAS_INIT__ = init;
+  window.__XIAOCHAO_RUNTIME_EXTRAS_CLEANUP__ = cleanup;
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
