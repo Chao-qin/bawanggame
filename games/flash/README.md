@@ -1,10 +1,23 @@
-# Flash Test Game
+# Flash Games
+
+## Fruit Madness
+
+`fruit-madness/FruitMadness.swf` is Vladimir Belyaev's complete ActionScript 3
+arcade game. The upstream project says it runs in Ruffle. It is distributed
+under the upstream MIT license in `fruit-madness/LICENSE`.
+
+- Source: https://github.com/leinstay/fruitmadness
+- Pinned commit: `6efc34bf77af8d461eab3262d01a468f0be7f5cb`
+- Controls: start from the title screen with click/touch; move with arrow keys
+  or WASD.
+
+## Star Catcher smoke fixture
 
 `sample-game.swf` is an original ActionScript 3 game used to verify Ruffle's
 AVM2 startup, vector drawing, text, and touch/mouse input. Tap the star to
 increase the score.
 
-The game source and compiled SWF are licensed under MIT; see `LICENSE`.
+The fixture source and compiled SWF are licensed under MIT; see `LICENSE`.
 
 ## Rebuild
 

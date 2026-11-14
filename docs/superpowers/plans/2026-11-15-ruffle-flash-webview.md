@@ -10,6 +10,52 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-15-ruffle-flash-webview-design.md`
 
+## Follow-up: Fix Web Root Assets and Add a Real Flash Game
+
+The standard desktop workflow serves `public/` directly, while the initial Ruffle integration only staged assets in `site-deploy/`. Stage Ruffle and both SWFs into `public/` as part of `pnpm build`. Add upstream MIT-licensed Fruit Madness (source commit `6efc34bf77af8d461eab3262d01a468f0be7f5cb`) as the primary Flash catalog entry; retain Star Catcher as a small input smoke fixture.
+
+### Task 5: Stage offline runtime assets in the normal web build
+
+**Files:**
+- Create: `apps/web/scripts/stage-flash-assets.mjs`
+- Modify: `apps/web/package.json`
+- Modify: `apps/mobile/scripts/verify-web-assets.mjs`
+
+- [x] **Step 1: Add a build staging script**
+
+Copy `ruffle.js`, the two `core.ruffle.*.js` files, both WASM files, both Ruffle license files, and both game SWFs to `public/ruffle` and `public/flash`. Fail with a clear error if expected package assets are missing.
+
+- [x] **Step 2: Invoke staging after the Vite build**
+
+Update the existing web build command to run the staging script after replacing `public/` with Vite output.
+
+- [x] **Step 3: Verify desktop and mobile resource roots**
+
+Run: `pnpm build && pnpm run pack && pnpm mobile:prepare-web && pnpm mobile:verify-web`
+Expected: `public/`, `site-deploy/`, and `apps/mobile/web/` each contain both SWFs, the Ruffle loader, core chunks, WASM modules, and licenses. Verified; mobile resources are 52.0 MiB.
+
+### Task 6: Add Fruit Madness as a redistributable Flash game
+
+**Files:**
+- Create: `games/flash/fruit-madness/FruitMadness.swf`
+- Create: `games/flash/fruit-madness/LICENSE`
+- Create: `games/flash/fruit-madness/README.md`
+- Modify: `apps/web/src/App.jsx`
+- Modify: `apps/mobile/scripts/verify-web-assets.mjs`
+- Modify: `docs/superpowers/specs/2026-11-15-ruffle-flash-webview-design.md`
+
+- [x] **Step 1: Pin and document the upstream game**
+
+Download the SWF and MIT license from `https://github.com/leinstay/fruitmadness` at commit `6efc34bf77af8d461eab3262d01a468f0be7f5cb`. Document the author, source commit, license, and the upstream statement that the compiled game runs in Ruffle.
+
+- [x] **Step 2: Make the actual game the primary catalog entry**
+
+Add Fruit Madness ahead of Star Catcher, preserving Star Catcher as an optional input smoke fixture.
+
+- [x] **Step 3: Verify runtime behavior and packaging**
+
+Run the game in a browser through the production server from `public/`, verify its title/menu and keyboard-controlled gameplay, then exit and re-enter. Verified through Chrome headless; Ruffle JS/core/WASM/SWF returned HTTP 200 and gameplay rendered. Android API 35 emulator loaded the game offline and reached active gameplay; the APK contains both SWFs, the Fruit Madness license, Ruffle loader, core files, and both WASM modules.
+
 ---
 
 ## Chunk 1: Test Game and Offline Assets

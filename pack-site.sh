@@ -39,6 +39,10 @@ if [[ ! -f "$ROOT/games/flash/sample-game.swf" ]]; then
   echo "缺少内置 Flash 测试游戏: games/flash/sample-game.swf" >&2
   exit 1
 fi
+if [[ ! -f "$DEST/flash/fruit-madness.swf" || ! -f "$DEST/flash/fruit-madness-LICENSE" ]]; then
+  echo "缺少 Fruit Madness 游戏或许可证，请先运行 pnpm build" >&2
+  exit 1
+fi
 cp "$ROOT/games/flash/sample-game.swf" "$DEST/flash/sample-game.swf"
 
 # JAR 游戏通过 /jar/* 提供
