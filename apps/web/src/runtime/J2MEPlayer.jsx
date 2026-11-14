@@ -4,7 +4,7 @@ import { loadClassic, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
 
 const styles = ['/style/main.css', '/style/lcdui.css', '/style/feedback.css']
-const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/panel.js', '/touchpad.js', '/keymap.js']
+const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/runtime/j2me/touch-layout.js', '/panel.js', '/touchpad.js', '/keymap.js']
 
 export function J2MEPlayer({ game, onExit, onReady }) {
   const [error, setError] = useState('')
@@ -16,6 +16,7 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     document.body.classList.toggle('fixed-screen', !!cfg.screen)
     const keypad = document.getElementById('keypad')
     if (keypad) keypad.className = 'keypad-' + (cfg.keypad | 0)
+    window.TouchLayout?.apply(cfg.touchLayout)
     const gear = document.getElementById('gear')
     if (gear) gear.style.removeProperty('display')
   }

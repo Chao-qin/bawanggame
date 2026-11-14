@@ -29,6 +29,7 @@
 
   function bind(opts) {
     var buttons = opts.buttons;
+    var dpadVisual = opts.dpadVisual || function (id) { return id; };
     var sink = opts.sink;
     var fb = opts.feedback || {};
     var timers = opts.timers || {};
@@ -136,7 +137,7 @@
     // ---------- 命中测试 ----------
     function dirIds(nx, ny, h, v, prev) {
       var ids = [];
-      function on(id) { return prev.indexOf(id) >= 0; }
+      function on(id) { return prev.indexOf(dpadVisual(id)) >= 0; }
       function threshold(id) { return on(id) ? DPAD_KEEP : DPAD_ON; }
       if (h >= threshold(nx < 0 ? "left" : "right")) ids.push(nx < 0 ? "left" : "right");
       if (v >= threshold(ny < 0 ? "up" : "down")) ids.push(ny < 0 ? "up" : "down");
@@ -194,7 +195,7 @@
           var nx = dx / rad, ny = dy / rad;
           var h = Math.abs(nx), v = Math.abs(ny);
           if (h < DPAD_OK && v < DPAD_OK) return { kind: "dpad", ids: [], center: true };
-          return { kind: "dpad", ids: dirIds(nx, ny, h, v, prev), center: false };
+          return { kind: "dpad", ids: dirIds(nx, ny, h, v, prev).map(dpadVisual), center: false };
         }
       }
       var key = keyAtPoint(x, y);

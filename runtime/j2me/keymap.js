@@ -9,6 +9,34 @@
 
   var NAMES = { "-1": "up", "-2": "down", "-3": "left", "-4": "right", "-5": "ok", "-6": "soft1", "-7": "soft2", "-8": "clear", "-11": "back" };
 
+  function touchActionCode(action) {
+    if (action === "num0") return 48;
+    if (action === "num1") return 49;
+    if (action === "num2") return 50;
+    if (action === "num3") return 51;
+    if (action === "num4") return 52;
+    if (action === "num5") return 53;
+    if (action === "num6") return 54;
+    if (action === "num7") return 55;
+    if (action === "num8") return 56;
+    if (action === "num9") return 57;
+    if (action === "0") return 48;
+    if (action === "star") return 42;
+    if (action === "pound") return 35;
+    return BUTTONS[action];
+  }
+
+  function touchButtons() {
+    var out = {};
+    Object.keys(BUTTONS).forEach(function (id) { out[id] = BUTTONS[id]; });
+    var actions = config.touchLayout && config.touchLayout.actions || {};
+    Object.keys(actions).forEach(function (slot) {
+      var code = touchActionCode(actions[slot]);
+      if (code != null && BUTTONS[slot] != null) out[slot] = code;
+    });
+    return out;
+  }
+
   function mapped(code) {
     return NAMES[code] ? config.keys[NAMES[code]] : code;
   }
@@ -221,10 +249,11 @@
   // keymap.js 是同步脚本，而 config/*.js 与 bld/main-all.js 是 defer —— 顶层直接
   // 引用 config/vmSetTimeout 会 ReferenceError。因此惰性 boot：defer 链就绪后再 bind。
   var pad = null;
-  function boot() {
-    if (pad || !window.Touchpad) return;
+  function bindTouchpad() {
+    var buttons = touchButtons();
     pad = Touchpad.bind({
-      buttons: BUTTONS,
+      buttons: buttons,
+      dpadVisual: function (direction) { return window.TouchLayout ? TouchLayout.visualDpad(direction, config.touchLayout) : direction; },
       sink: {
         press: function (code) { enqueue(mapped(code), true); kick(); },
         release: function (code) { enqueue(mapped(code), false); kick(); },
@@ -243,10 +272,20 @@
         okHold: config.okHold,
         tapMs: 240
       },
-       timers: { set: inputSet, clear: inputClear },
+      timers: { set: inputSet, clear: inputClear },
       exclude: "#btroom, #panel"
     });
   }
+  function boot() {
+    if (pad || !window.Touchpad) return;
+    bindTouchpad();
+  }
+  window.__XIAOCHAO_KEYMAP_REBIND__ = function () {
+    if (!pad) return;
+    try { pad.destroy(); } catch (_) {}
+    pad = null;
+    boot();
+  };
   function reset() {
     if (pad) {
       try { pad.destroy(); } catch (_) {}

@@ -1478,3 +1478,59 @@ body.runtime-active[data-orientation="landscape"] .player:-webkit-full-screen .r
 .keymap-row button { flex: 1; text-align: left; }
 #keypad .key { background: var(--phone-key); color: var(--phone-text); }
 #keypad .key.down { background: var(--phone-key-active); color: #081018; }
+
+/* Touch layout presets keep the hit targets in the same stable grid while
+   allowing the action slots to be mirrored or rotated. */
+body[data-dpad-layout="mirror"] #up { grid-area: 1 / 2; }
+body[data-dpad-layout="mirror"] #left { grid-area: 2 / 3; }
+body[data-dpad-layout="mirror"] #right { grid-area: 2 / 1; }
+body[data-dpad-layout="mirror"] #down { grid-area: 3 / 2; }
+body[data-dpad-layout="rotate-cw"] #up { grid-area: 2 / 3; }
+body[data-dpad-layout="rotate-cw"] #right { grid-area: 3 / 2; }
+body[data-dpad-layout="rotate-cw"] #down { grid-area: 2 / 1; }
+body[data-dpad-layout="rotate-cw"] #left { grid-area: 1 / 2; }
+body[data-dpad-layout="rotate-ccw"] #up { grid-area: 2 / 1; }
+body[data-dpad-layout="rotate-ccw"] #right { grid-area: 1 / 2; }
+body[data-dpad-layout="rotate-ccw"] #down { grid-area: 2 / 3; }
+body[data-dpad-layout="rotate-ccw"] #left { grid-area: 3 / 2; }
+
+body.runtime-active[data-orientation="landscape"][data-side-layout="swapped"] #numpad { grid-column: 3 !important; }
+body.runtime-active[data-orientation="landscape"][data-side-layout="swapped"] #nav { grid-column: 1 !important; }
+
+.layout-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #8e99ab;
+}
+
+.layout-order {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.layout-order select,
+.layout-actions select {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 5px;
+  border: 1px solid #39414f;
+  border-radius: 8px;
+  background: #13161d;
+  color: #e8ecf2;
+  font: inherit;
+}
+
+.layout-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.layout-action-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}

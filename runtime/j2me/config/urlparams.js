@@ -39,5 +39,6 @@
   config.platform = platform ? platform.ua : v.platform || Settings.platforms.se.ua;
   config.keys = (platform || Settings.platforms.se).keys;
   config.keymap = Settings.keymap(config.gameId);
+  config.touchLayout = Settings.touchLayout(config.gameId);
   config.props = Settings.props(config.gameId);
 })();

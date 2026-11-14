@@ -205,6 +205,18 @@ var Settings = (function () {
     write(GAME + id, own);
   }
 
+  function touchLayout(id) {
+    var own = game(id);
+    return own.touchLayout && typeof own.touchLayout === "object" ? own.touchLayout : {};
+  }
+
+  function setTouchLayout(id, value) {
+    var own = game(id);
+    if (value && typeof value === "object") own.touchLayout = value;
+    else delete own.touchLayout;
+    write(GAME + id, own);
+  }
+
   function makeGlobal(values) {
     write(GLOBAL, values);
   }
@@ -217,6 +229,7 @@ var Settings = (function () {
   return {
     keys: Object.keys(DEFAULTS), options: OPTIONS, platforms: PLATFORMS, defaults: DEFAULTS, presets: PRESETS, profiles: PROFILES, portrait: PORTRAIT,
     global: global, game: game, resolve: resolve, setGame: setGame, resetGame: resetGame, makeGlobal: makeGlobal, parse: parse,
-    props: props, setProp: setProp, resetProps: resetProps, keymap: keymap, setKeymap: setKeymap, sysprops: SYSPROPS
+    props: props, setProp: setProp, resetProps: resetProps, keymap: keymap, setKeymap: setKeymap,
+    touchLayout: touchLayout, setTouchLayout: setTouchLayout, sysprops: SYSPROPS
   };
 })();
