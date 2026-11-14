@@ -13,7 +13,7 @@
 ## Chunk 1: Landscape toolbar and stage layout
 
 **Files:**
-- Modify: `apps/web/src/App.jsx:500-660`
+- Modify: `apps/web/src/App.jsx:500-660` (toolbar markup around the `return` block near line 638)
 - Modify: `runtime/j2me/style/main.css:774-890`
 
 - [ ] **Step 1: Add toolbar state and compact landscape markup**
@@ -57,16 +57,21 @@
 
 - [ ] **Step 1: Add the guarded haptic helper**
 
-  Add a helper that reads `feedback.vibrate`, returns when disabled or the API
-  is unavailable, clamps positive durations to 8-40ms, calls
-  `navigator.vibrate(0)`, then calls one positive duration. Catch denied API
+  Add a helper that accepts the originating `pointerType`. Treat `touch` as
+  coarse, `mouse`/`pen` as silent, and use
+  `matchMedia('(pointer: coarse)')` only when the type is absent. Read
+  `feedback.vibrate`, use 16ms when it is missing on coarse pointers, return
+  for zero/desktop/unsupported APIs, clamp positive durations to 8-40ms, call
+  `navigator.vibrate(0)`, then call one positive duration. Catch denied API
   calls so desktop and unsupported WebViews remain quiet.
 
 - [ ] **Step 2: Route press feedback through the helper**
 
-  Replace the direct `navigator.vibrate(fb.vibrate)` call in `press` with the
-  helper. Keep multi-pointer edge de-duplication so only one pulse occurs for a
-  shared platform key edge; repeats do not vibrate.
+  Store `pointerType` in each held pointer and pass it through `move`,
+  `beginOk`, and `clearHold` to `press`. Replace the direct
+  `navigator.vibrate(fb.vibrate)` call in `press` with the helper. Keep
+  multi-pointer edge de-duplication so only one pulse occurs for a shared
+  platform key edge; repeats do not vibrate.
 
 - [ ] **Step 3: Declare Android capability**
 
@@ -90,14 +95,19 @@
   Start the app with `pnpm --filter @xiaochao/web dev --host 127.0.0.1`.
   At 1365x768 and 390x844, check the display center, collapsed/expanded
   toolbar height, navigation hit targets, and console errors. Stub
-  `navigator.vibrate` and assert `[0, 20]` for a 20ms coarse-pointer press and
-  no calls for duration 0. Capture screenshots for the visual record.
+  `navigator.vibrate` and assert `[0, 20]` for a 20ms coarse-pointer press,
+  `[0, 16]` for missing duration on touch, no calls for duration 0 or a mouse
+  pointer, no throw for missing/unsupported/denied APIs, and a fresh `[0, 20]`
+  sequence on a rapid second press. Capture screenshots for the visual record.
 
 - [ ] **Step 2: Verify Android packaging and startup**
 
-  Run `pnpm mobile:prepare-web` and `pnpm mobile:build-android`, then inspect
-  the APK with `aapt dump permissions`. If an emulator/device is available,
-  install with `adb install -r` and start with `adb shell monkey -p
+  Run `pnpm mobile:prepare-web` and
+  `pnpm mobile:build-android-release`, then inspect
+  `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` with
+  `aapt dump permissions`. If an emulator/device is available, install with
+  `adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
+  and start with `adb shell monkey -p
   com.xiaochao.bawang 1`; verify WebView assets, keypad presence, and no
   vibration errors. Record unavailable device validation explicitly.
 

@@ -49,11 +49,14 @@ d-pad keeps its circular center hit area.
 Virtual-key feedback calls `navigator.vibrate` through a guarded helper. The
 existing `config.vibrate` value is the duration in milliseconds: `0` disables
 feedback, positive values are clamped to 8-40ms, and a missing value defaults
-to 16ms only on coarse-pointer devices. A press first cancels a stale pattern
-with `navigator.vibrate(0)`, then emits exactly one positive-duration pulse.
-Unsupported APIs, denied calls, desktop pointers, and configured zero duration
-are silent. Android declares `android.permission.VIBRATE` so the WebView can
-deliver the pulse.
+to 16ms only on coarse-pointer devices. `touchpad.js` carries the original
+`PointerEvent.pointerType` into the press edge; `touch` is coarse, while
+`mouse` and `pen` are silent. If the type is missing, the helper uses
+`matchMedia('(pointer: coarse)')` as the coarse-pointer fallback. A press first
+cancels a stale pattern with `navigator.vibrate(0)`, then emits exactly one
+positive-duration pulse. Unsupported APIs, denied calls, desktop pointers,
+and configured zero duration are silent. Android declares
+`android.permission.VIBRATE` so the WebView can deliver the pulse.
 
 ## Acceptance
 
@@ -69,8 +72,9 @@ deliver the pulse.
 4. With `config.vibrate=20`, a supported coarse-pointer press produces the
    sequence `navigator.vibrate(0)` then one `navigator.vibrate(20)` call. A
    rapid second press repeats that sequence without a stale pattern. With
-   `config.vibrate=0`, no vibration call is made. Desktop and unsupported
-   WebView environments do not throw.
+   `config.vibrate=0`, no vibration call is made. Missing duration is tested as
+   16ms on a coarse pointer and silent on a mouse pointer. Desktop and
+   unsupported WebView environments do not throw.
 5. Portrait layout, settings, fullscreen, long-press prevention, and key
    lifecycle cleanup continue to work.
 
@@ -81,10 +85,10 @@ deliver the pulse.
 - `pnpm --filter @xiaochao/web build`
 - `pnpm --filter @xiaochao/mobile typecheck`
 - `pnpm mobile:prepare-web`
-- `pnpm mobile:build-android`
+- `pnpm mobile:build-android-release`
 - `aapt dump permissions apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
   contains `android.permission.VIBRATE`; when an Android device/emulator is
-  available, run `adb install -r .../app-release.apk` and
+  available, run `adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk` and
   `adb shell monkey -p com.xiaochao.bawang 1`, then verify the bundled WebView
   starts, the keypad is present, and vibration calls do not log errors. A real
   device run is marked unverified when no device is available.
