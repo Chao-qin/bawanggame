@@ -1,6 +1,7 @@
 const RUNTIME_NODE_IDS = ['fps-hud', 'screen-hint', 'text-diag', 'drawlog-btn']
 
 export function cleanupRuntimeArtifacts() {
+  try { window.KeypadCanvas?.destroy?.() } catch (_) {}
   try { window.__XIAOCHAO_RUNTIME_EXTRAS_CLEANUP__?.() } catch (_) {}
   try { window.__XIAOCHAO_KEYMAP_RESET__?.() } catch (_) {}
 

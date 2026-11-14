@@ -288,6 +288,7 @@ body.fixed-screen #display-container {
 }
 
 #keypad {
+  position: relative;
   --u: 40px;
   --pad-w: 380px;
   flex: none;
@@ -305,6 +306,50 @@ body.fixed-screen #display-container {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* The canvas owns the visible keypad. Keep the DOM controls transparent so
+   Touchpad can continue using their stable hit rectangles and accessibility
+   semantics while the renderer owns every painted pixel. */
+#keypad-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#keypad.keypad-canvas-mode .key {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  border-color: transparent !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+#keypad.keypad-canvas-mode .key * {
+  color: transparent !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+#keypad.keypad-canvas-mode .key::before,
+#keypad.keypad-canvas-mode #dpad {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#keypad.keypad-canvas-mode .key::before {
+  border-color: transparent !important;
+  opacity: 0 !important;
+}
+
+#keypad.keypad-canvas-mode #nav,
+#keypad.keypad-canvas-mode #numpad {
+  position: relative;
+  z-index: 1;
 }
 
 /* 手机壳内部：按键区始终填满可用宽度，不能被旧的桌面 max-width 限制。 */

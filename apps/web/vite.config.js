@@ -19,6 +19,7 @@ const proxyTargets = [
   '/index.js',
   '/files.js',
   '/touchpad.js',
+  '/keypad-canvas.js',
   '/touch-layout.js',
   '/keymap.js',
   '/layout.js',
