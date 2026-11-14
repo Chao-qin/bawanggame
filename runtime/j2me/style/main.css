@@ -69,6 +69,21 @@ body {
   z-index: 4;
   pointer-events: none;
 }
+
+/* MRP uses #mrp-dialog-text for text entry. The shared PhoneMarkup still
+   carries legacy J2ME editor bridges, so keep those bridges available without
+   letting the browser paint its default white inputs over the game. */
+.mrp-stage #editor-layer {
+  top: -10000px;
+  right: auto;
+  bottom: auto;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+}
 .runtime-stage {
   display: flex;
   align-items: center;
