@@ -175,12 +175,12 @@
 			files = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/../web/.mobile-resource-version",
+				"$(SRCROOT)/../web/mobile-resource-version",
 				"$(SRCROOT)/../web/index.html",
 			);
 			name = "Bundle bundled Web site";
 			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/web/.mobile-resource-version",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/web/mobile-resource-version",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

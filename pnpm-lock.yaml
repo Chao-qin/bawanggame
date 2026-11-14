@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   react-native-static-server@0.5.0:
-    hash: 82e98507af6845dc4a163141feea10ffa6a0d1700af34af40d701254eb8bf857
+    hash: 12eeb59ec8895a03360be78c1e2700646f3dd300431b0f2bca1cfdb455dc53d2
     path: patches/react-native-static-server@0.5.0.patch
 
 importers:
@@ -29,7 +29,7 @@ importers:
         version: 5.11.1(react-native@0.88.1(@babel/core@7.29.13)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       react-native-static-server:
         specifier: ^0.5.0
-        version: 0.5.0(patch_hash=82e98507af6845dc4a163141feea10ffa6a0d1700af34af40d701254eb8bf857)(react-native@0.88.1(@babel/core@7.29.13)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
+        version: 0.5.0(patch_hash=12eeb59ec8895a03360be78c1e2700646f3dd300431b0f2bca1cfdb455dc53d2)(react-native@0.88.1(@babel/core@7.29.13)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       react-native-webview:
         specifier: ^14.0.1
         version: 14.0.1(react-native@0.88.1(@babel/core@7.29.13)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
@@ -131,6 +131,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ruffle-rs/ruffle':
+        specifier: 0.7.1
+        version: 0.7.1
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -1689,6 +1692,9 @@ packages:
     resolution: {integrity: sha512-e/NRJFl48wL5DFNSzQrvm4kaB5dzNNmqWjIJ6And2Sjuw4klO3w3TXMvCAEF1tHTrQQgpOD4QVkBE/92/yBGrQ==}
     cpu: [x64]
     os: [win32]
+
+  '@ruffle-rs/ruffle@0.7.1':
+    resolution: {integrity: sha512-6ZWxx/cfX3RoNyQ1AVimECSae4gKqMxdPimOD+chiIcOFiJS0ATGKcjkretxNT03lqNUpiSyJjF55AuvvZ+QeA==}
 
   '@sideway/address@4.1.5':
     resolution: {integrity: sha512-IqO/DUQHUkPeixNQ8n0JA6102hT9CmaljNTPmQ1u8MEhBo/R4Q8eKLN/vGZxuebwOroDB4cbpjheD4+/sKFK4Q==}
@@ -6408,6 +6414,8 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.68.0':
     optional: true
 
+  '@ruffle-rs/ruffle@0.7.1': {}
+
   '@sideway/address@4.1.5':
     dependencies:
       '@hapi/hoek': 9.3.0
@@ -9213,7 +9221,7 @@ snapshots:
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.13)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0)
 
-  react-native-static-server@0.5.0(patch_hash=82e98507af6845dc4a163141feea10ffa6a0d1700af34af40d701254eb8bf857)(react-native@0.88.1(@babel/core@7.29.13)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0):
+  react-native-static-server@0.5.0(patch_hash=12eeb59ec8895a03360be78c1e2700646f3dd300431b0f2bca1cfdb455dc53d2)(react-native@0.88.1(@babel/core@7.29.13)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0):
     dependencies:
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.13)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.88.1(@babel/core@7.29.13))(@types/react@19.3.0)(react@19.3.0)

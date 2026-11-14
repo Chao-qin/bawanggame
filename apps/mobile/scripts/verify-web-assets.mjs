@@ -7,7 +7,7 @@ const webRoot = path.join(mobileRoot, 'web')
 
 const requiredFiles = [
   'index.html',
-  '.mobile-resource-version',
+  'mobile-resource-version',
   'sw.js',
   'assets',
   'style/main.css',
@@ -20,6 +20,14 @@ const requiredFiles = [
   'maopao/hall/manifest.json',
   'jar-manifest.json',
   'jar',
+  'ruffle/ruffle.js',
+  'ruffle/core.ruffle.16d61072ac7fdc4d5013.js',
+  'ruffle/core.ruffle.994eeef0a471a88cd0e3.js',
+  'ruffle/172de42e6619eac8f371.wasm',
+  'ruffle/878d548199cddef07035.wasm',
+  'ruffle/LICENSE_MIT',
+  'ruffle/LICENSE_APACHE',
+  'flash/sample-game.swf',
 ]
 
 const missing = requiredFiles.filter((entry) => !fs.existsSync(path.join(webRoot, entry)))

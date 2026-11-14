@@ -3,17 +3,20 @@ import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
 import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
 import { MrpPlayer } from './runtime/MrpPlayer.jsx'
 import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
+import { FlashPlayer } from './runtime/FlashPlayer.jsx'
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
 import { installResponsiveContract } from './responsive.js'
 
 const TABS = [
   { id: 'j2me', label: 'J2ME' },
   { id: 'maopao', label: '冒泡社区' },
+  { id: 'flash', label: 'Flash' },
   { id: 'store', label: '52java 商城' },
 ]
 
 const TAB_IDS = new Set(TABS.map((item) => item.id))
-const GAME_KINDS = new Set(['j2me', 'maopao', 'local-revival'])
+const GAME_KINDS = new Set(['j2me', 'maopao', 'local-revival', 'flash'])
+const FLASH_GAMES = [{ kind: 'flash', file: 'sample-game.swf', name: 'Star Catcher', vendor: '内置测试游戏', desc: '点击星星得分', size: 1767, iconUrl: null, local: false }]
 
 function isEmbeddedHost() {
   return new URLSearchParams(window.location.search).get('host') === 'rn'
@@ -118,9 +121,10 @@ function useServerGames(kind) {
   return kind === 'maopao' ? state : { loading: false, error: null, games: [] }
 }
 
-function useServerJars() {
+function useServerJars(enabled) {
   const [state, setState] = useState({ loading: true, error: null, games: [] })
   useEffect(() => {
+    if (!enabled) return
     let alive = true
     // The RN package serves a static manifest from APK assets; desktop keeps
     // the Node endpoint so its live catalog and icon extraction still work.
@@ -153,8 +157,8 @@ function useServerJars() {
     return () => {
       alive = false
     }
-  }, [])
-  return state
+  }, [enabled])
+  return enabled ? state : { loading: false, error: null, games: [] }
 }
 
 function useJavaStore(query, category, page) {
@@ -327,9 +331,9 @@ function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
 
 function Library({ kind, onPlay }) {
   // 两个 hook 无条件调用，保证 hooks 顺序稳定；未命中的运行时返回空列表
-  const serverJars = useServerJars()
-  const serverMrps = useServerGames('maopao')
-  const server = kind === 'j2me' ? serverJars : serverMrps
+  const serverJars = useServerJars(kind === 'j2me')
+  const serverMrps = useServerGames(kind)
+  const server = kind === 'j2me' ? serverJars : kind === 'maopao' ? serverMrps : { loading: false, error: null, games: [] }
   const local = useLocalJars(kind === 'j2me')
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
@@ -352,13 +356,14 @@ function Library({ kind, onPlay }) {
 
   // 本地榜单：Library 从 player 返回时会重挂载，重新读取 localStorage。
   useEffect(() => {
+    if (kind === 'flash') return
     fetchRecent().then(setRecent)
     fetchPopular().then(setPopular)
-  }, [])
+  }, [kind])
 
   function handlePlay(g) {
     onPlay(g)
-    recordPlay(g)
+    if (g.kind !== 'flash') recordPlay(g)
   }
 
   function openMenu(g) { setMenuGame(g) }
@@ -370,13 +375,13 @@ function Library({ kind, onPlay }) {
 
   const games = useMemo(() => {
     const revival = kind === 'j2me' ? [{kind: 'local-revival', file: 'local-revival', name: '大宋豪侠 · 本地复活', vendor: '本地服务端', desc: '可移动地图、NPC 和基础战斗', size: 0, local: false}] : []
-    const all = revival.concat(server.games, local.games)
+    const all = kind === 'flash' ? FLASH_GAMES : revival.concat(server.games, local.games)
     const q = query.trim().toLowerCase()
     if (!q) return all
     return all.filter(
       (g) => (g.name || '').toLowerCase().includes(q) || (g.vendor || '').toLowerCase().includes(q)
     )
-  }, [server.games, local.games, query])
+  }, [kind, server.games, local.games, query])
 
   function handleUpload(e) {
     const files = Array.from(e.target.files || [])
@@ -395,7 +400,7 @@ function Library({ kind, onPlay }) {
         <input
           className="search"
           type="search"
-          placeholder={'搜索' + (kind === 'j2me' ? ' J2ME' : ' 冒泡') + '游戏…'}
+          placeholder={'搜索' + (kind === 'j2me' ? ' J2ME' : kind === 'flash' ? ' Flash' : ' 冒泡') + '游戏…'}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -409,8 +414,8 @@ function Library({ kind, onPlay }) {
           {server.loading ? '加载中…' : server.error ? '加载失败' : games.length + ' 款'}
         </span>
       </div>
-      <GameRow title="🔥 大家都在玩" items={popular} onOpen={openMenu} />
-      <GameRow title="🕘 最近在玩" items={recent} onOpen={openMenu} />
+      {kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={popular} onOpen={openMenu} />}
+      {kind !== 'flash' && <GameRow title="🕘 最近在玩" items={recent} onOpen={openMenu} />}
       {server.error && (
         <div className="status statusError">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>
       )}
@@ -648,7 +653,7 @@ function Player({ game, onBack, nativeBackSignal }) {
         </div>}
       </div>
       <div ref={stageRef} className="playerStage">
-        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
+        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
       {confirming && (
