@@ -84,12 +84,15 @@ and configured zero duration are silent. Android declares
 - `node --check runtime/j2me/touchpad.js`
 - `pnpm --filter @xiaochao/web build`
 - `pnpm --filter @xiaochao/mobile typecheck`
-- `pnpm mobile:prepare-web`
-- `pnpm mobile:build-android`
+- From the repository root, run `pnpm mobile:prepare-web`,
+  `pnpm mobile:verify-web`, and `pnpm mobile:build-android`.
 - `test -s apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
   and `unzip -l apps/mobile/android/app/build/outputs/apk/release/app-release.apk
-  | grep -F 'assets/index.android.bundle'` pass; packaged web assets are
-  present under the expected `web/` path.
+  | grep -F 'assets/index.android.bundle'`,
+  `unzip -l apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+  | grep -F 'assets/web/index.html'`, and
+  `unzip -l apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+  | grep -E 'assets/web/(runtime/j2me/touchpad.js|jar/)'` pass.
 - `aapt dump permissions apps/mobile/android/app/build/outputs/apk/release/app-release.apk
   | grep -F 'android.permission.VIBRATE'` must return one line. When an Android
   device/emulator is available, run `adb install -r

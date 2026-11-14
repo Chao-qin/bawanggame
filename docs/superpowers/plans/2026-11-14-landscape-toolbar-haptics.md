@@ -107,10 +107,12 @@
 
 - [ ] **Step 2: Verify Android packaging and startup**
 
-  Run `pnpm mobile:prepare-web` and `pnpm mobile:build-android`, assert the APK
-  is non-empty, inspect `assets/index.android.bundle` and packaged `web/` assets
-  with `unzip -l`, and assert `android.permission.VIBRATE` with
-  `aapt dump permissions ... | grep -F`. If an emulator/device is available,
+  From the repository root, run `pnpm mobile:prepare-web`,
+  `pnpm mobile:verify-web`, and `pnpm mobile:build-android`; assert the APK is
+  non-empty, inspect `assets/index.android.bundle`,
+  `assets/web/index.html`, and `assets/web/runtime/j2me/touchpad.js` or
+  `assets/web/jar/` with exact `unzip -l ... | grep -F` checks, and assert
+  `android.permission.VIBRATE` with `aapt dump permissions ... | grep -F`. If an emulator/device is available,
   install with
   `adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
   and start with `adb shell monkey -p
