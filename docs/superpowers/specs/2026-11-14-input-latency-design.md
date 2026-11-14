@@ -16,11 +16,12 @@ events.
 - `runtime/j2me/touchpad.js`: make pointer capture explicit, keep active keys
   stable while a pointer is held, and stop rejecting valid touches in the
   outer d-pad guard band.
-- `runtime/j2me/keymap.js`: extend `KeyTrace.edges()` entries with optional
-  `sourceAt`, `deliveredAt`, and `latencyMs` fields. `sourceAt` is recorded by
-  the sink callback, while `deliveredAt` is recorded immediately around the
-  corresponding MIDP send call. This makes pointer delivery delay distinct
-  from game-frame waiting without changing existing `t`, `f`, `c`, or `k`
+- `runtime/j2me/touchpad.js` and `runtime/j2me/keymap.js`: carry an optional
+  `sourceAt` timestamp captured at the original `pointerdown` through the sink
+  edge. Extend `KeyTrace.edges()` entries with optional `sourceAt`,
+  `deliveredAt`, and `latencyMs` fields. `deliveredAt` is recorded immediately
+  around the corresponding MIDP send call. This measures the complete
+  pointerdown-to-delivery path without changing existing `t`, `f`, `c`, or `k`
   fields.
 
 ## Preserved Behavior
@@ -37,12 +38,14 @@ corresponding end event. The J2ME adapter calls `MIDP.sendKeyPress` directly
 for a new pressed state. A release that arrives before the game has had a
 chance to sample the press is deferred only until the next observed
 `MIDP.frames` change, using the existing frame setter hook in `keymap.js`; it
-is never delayed by a fixed 60ms fallback. If no frame arrives, the queued
-release is flushed by `releaseAll()` on `blur`, `visibilitychange` (when hidden),
-or `pagehide`, and by runtime teardown. This prevents an inactive runtime from
-holding a logical key forever while preserving a one-frame tap window during
-normal play. MRP continues to receive its native press/release pair
-immediately.
+is never delayed by a fixed 60ms fallback during normal play. If no frame
+arrives, the queued release is flushed by `releaseAll()` on `blur`,
+`visibilitychange` (when hidden), or `pagehide`, by runtime teardown, and by a
+release-only watchdog after the measured frame interval budget. The watchdog
+is a liveness escape for a stalled visible runtime and never runs for a normal
+press. This prevents an inactive runtime from holding a logical key forever
+while preserving a one-frame tap window during normal play. MRP continues to
+receive its native press/release pair immediately.
 
 Pointer capture keeps the original keypad pointer associated with its active
 key even when the finger leaves the element during a slide. D-pad hit testing
