@@ -7,7 +7,7 @@
   var ACTIONS = ["up", "down", "left", "right", "ok", "choice", "back", "ret", "clear", "star", "pound", "num0", "num1", "num2", "num3", "num4", "num5", "num6", "num7", "num8", "num9"];
   var ACTION_SLOTS = ["up", "right", "down", "left", "ok", "choice", "back", "ret", "clear", "star", "num0", "pound", "num1", "num2", "num3", "num4", "num5", "num6", "num7", "num8", "num9"];
   var DEFAULT_ACTIONS = { choice: "choice", back: "back", ret: "ret", clear: "clear", ok: "ok" };
-  var DEFAULT = { dpad: "standard", sides: "standard", numbers: NUMBERS.slice(), actions: {} };
+  var DEFAULT = { dpad: "standard", sides: "swapped", numbers: NUMBERS.slice(), actions: {} };
   var D_PAD_VISUAL = {
     standard: { up: "up", right: "right", down: "down", left: "left" },
     mirror: { up: "up", right: "left", down: "down", left: "right" },
@@ -20,7 +20,7 @@
   }
 
   function validDpad(value) { return D_PAD_VISUAL[value] ? value : DEFAULT.dpad; }
-  function validSides(value) { return value === "swapped" ? "swapped" : DEFAULT.sides; }
+  function validSides(value) { return value === "standard" || value === "swapped" ? value : DEFAULT.sides; }
   function keyId(value) { return value === "*" ? "star" : value === "#" ? "pound" : String(value); }
 
   function normalize(value) {

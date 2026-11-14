@@ -28,10 +28,10 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     let jarFile = game.file
     try { jarFile = decodeURIComponent(jarFile) } catch {}
     window.__XIAOCHAO_RUNTIME_JAR = game.local ? `local:${jarFile}` : `jar/${jarFile}`
-    styles.forEach(loadStyle)
     let alive = true
     ;(async () => {
       try {
+        await Promise.all(styles.map(loadStyle))
         for (const src of scripts) await loadClassic(src)
         if (!alive) return
         const overlayRoot = document.querySelector('.runtime-overlay-root')

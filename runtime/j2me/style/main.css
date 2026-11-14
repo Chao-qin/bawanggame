@@ -69,6 +69,21 @@ body {
   pointer-events: none;
 }
 
+/* React renders the bridge nodes before the legacy runtime styles arrive.
+   Keep that first paint outside the viewport; lcdui.js replaces this class
+   with .lc-editors once it owns the canvas-aligned editor overlay. */
+#editor-layer.runtime-editor-layer {
+  top: -10000px;
+  right: auto;
+  bottom: auto;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+}
+
 /* MRP uses #mrp-dialog-text for text entry. The shared PhoneMarkup still
    carries legacy J2ME editor bridges, so keep those bridges available without
    letting the browser paint its default white inputs over the game. */
@@ -105,8 +120,7 @@ body.runtime-active #display { max-width: 100%; min-width: 0; }
 body.runtime-active #display { flex: 0 1 auto; }
 body.runtime-active #canvas { max-width: 100%; max-height: 100%; }
 body.runtime-active #nav,
-body.runtime-active #numpad,
-body.runtime-active #nav { width: 100% !important; }
+body.runtime-active #numpad { width: 100% !important; }
 body.runtime-active #keypad.keypad-1 { --u: min(36px, 7vw, 5vh); }
 body.runtime-active #keypad.keypad-2 { --u: min(46px, 9vw, 6vh); }
 body.runtime-active #keypad.keypad-3 { --u: min(56px, 11vw, 7vh); }

@@ -9,10 +9,11 @@ export function MrpPlayer({ game, onExit }) {
     document.body.classList.add('runtime-active')
     window.__XIAOCHAO_RUNTIME_MRP = game.file
     window.__XIAOCHAO_RUNTIME_MRP_URL = `/maopao/public/mrps/${encodeURIComponent(game.file)}`
-    loadStyle('/style/main.css'); loadStyle('/style/feedback.css')
+    const styles = ['/style/main.css', '/style/feedback.css']
     let alive = true
     ;(async () => {
       try {
+        await Promise.all(styles.map(loadStyle))
         await loadClassic('/config/i18n.js')
         await loadClassic('/ui-feedback.js')
         await loadClassic('/touchpad.js')
