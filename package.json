@@ -9,6 +9,9 @@
     "start": "pnpm --filter @xiaochao/server start",
     "test": "pnpm --filter @xiaochao/server test",
     "typecheck": "pnpm --filter @xiaochao/server typecheck",
-    "pack": "./pack-site.sh"
+    "pack": "./pack-site.sh",
+    "mobile:prepare-web": "pnpm --filter @xiaochao/mobile prepare-web",
+    "mobile:typecheck": "pnpm --filter @xiaochao/mobile typecheck",
+    "mobile:verify-web": "pnpm --filter @xiaochao/mobile verify-web-assets"
   }
 }

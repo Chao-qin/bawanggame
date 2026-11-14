@@ -31,6 +31,18 @@ pnpm start
 
 Open http://localhost:8080. Put local JAR files into `games/jar/` or add them from the React lobby; browser-added games are stored locally.
 
+### React Native mobile host
+
+The repository also contains an Android/iOS React Native host in `apps/mobile`. It runs the Web build as a bundled local site: the build step prepares `site-deploy`, the native app serves it from a loopback HTTP server, and WebView displays the existing React simulator without a remote homepage dependency.
+
+```bash
+pnpm mobile:prepare-web
+pnpm --filter @xiaochao/mobile android  # Android Studio/device required
+pnpm --filter @xiaochao/mobile ios     # macOS/Xcode/CocoaPods required
+```
+
+See [`apps/mobile/README.md`](apps/mobile/README.md) for prerequisites, generated resources, local server behavior and native back handling.
+
 ## Deployment
 
 ### VPS (systemd)
