@@ -1,8 +1,12 @@
 import React from 'react'
 
 export function PhoneMarkup({ mrp = false }) {
-  const blockSelection = (event) => event.preventDefault()
-  return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} onSelectStart={blockSelection} onDragStart={blockSelection}>
+  const blockRuntimeGesture = (event) => {
+    const target = event.target
+    if (target.closest?.('input, textarea, [contenteditable="true"]')) return
+    event.preventDefault()
+  }
+  return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
     <div id="phone" className="runtime-phone">
     <div className="deviceStatus"><span>小潮 OS</span><span className="deviceStatusRight"><b>●</b> 100%</span></div>
     <div id="editor-layer">
