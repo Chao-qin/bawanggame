@@ -18,7 +18,7 @@ cp -R public/. "$DEST/"
 for dir in bld config java libs style; do
   cp -R "runtime/j2me/$dir" "$DEST/$dir"
 done
-for file in btroom.js compat.html debug-graphics.js debug-native.js files.js keymap.js layout.js panel.js runtime-extras.js screen.js touchpad.js ui-feedback.js; do
+for file in btroom.js compat.html debug-graphics.js debug-native.js files.js keymap.js panel.js runtime-extras.js screen.js touch-layout.js touchpad.js ui-feedback.js; do
   cp "runtime/j2me/$file" "$DEST/$file"
 done
 cp runtime/mrp/mrp-runtime.js "$DEST/mrp-runtime.js"
