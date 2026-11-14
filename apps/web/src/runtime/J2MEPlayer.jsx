@@ -36,6 +36,7 @@ export function J2MEPlayer({ game, onExit, onReady }) {
       try {
         for (const src of scripts) await loadClassic(src)
         if (!alive) return
+        window.__XIAOCHAO_PANEL_MOUNT__?.(document.querySelector('.runtime-overlay-root'))
         applyRuntimeSettings()
         window.__XIAOCHAO_RUNTIME_EXTRAS_INIT__?.()
         window.__XIAOCHAO_KEYMAP_BOOT__?.()

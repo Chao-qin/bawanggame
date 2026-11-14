@@ -4,8 +4,11 @@
   var panel = el("div", "", { id: "panel", hidden: true });
   var box = el("div", "panel-box", { tabIndex: -1 });
   panel.appendChild(box);
-  var overlayRoot = document.querySelector(".runtime-overlay-root") || document.body;
-  overlayRoot.append(gear, panel);
+  function mount(root) {
+    (root || document.querySelector(".runtime-overlay-root") || document.body).append(gear, panel);
+  }
+  mount();
+  window.__XIAOCHAO_PANEL_MOUNT__ = mount;
 
   var startSize = null, btKey = "", btStatus = null, page = "main";
   var state = Settings.resolve(id);
