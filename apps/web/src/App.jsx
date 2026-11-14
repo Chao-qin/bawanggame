@@ -531,6 +531,8 @@ function Player({ game, onBack, nativeBackSignal }) {
     const syncFullscreen = () => {
       const active = !!fullscreenElement()
       document.body.classList.toggle('fullscreen-active', active)
+      if (active) window.ScreenSetup?.lockOrientation?.()
+      else window.ScreenSetup?.unlockOrientation?.()
       requestRefit(true)
       setIsFullscreen(active)
     }
@@ -546,7 +548,6 @@ function Player({ game, onBack, nativeBackSignal }) {
         const cancel = window.cancelAnimationFrame || window.clearTimeout
         cancel(refitFrame)
       }
-      delete document.body.dataset.fullscreenFit
       document.body.classList.remove('fullscreen-active')
       document.removeEventListener('fullscreenchange', syncFullscreen)
       document.removeEventListener('webkitfullscreenchange', syncFullscreen)

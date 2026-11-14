@@ -56,25 +56,13 @@
       document.getElementById("keypad").className = "keypad-" + config.keypad;
       ScreenSetup.refit();
     },
-    rotate: function (v) {
-      config.rotate = [0, 45, 90, 135, 180, 225, 270, 315].indexOf(v | 0) >= 0 ? v | 0 : 0;
-      document.body.style.setProperty("--runtime-rotation", config.rotate + "deg");
-      document.body.dataset.rotation = String(config.rotate);
-      ScreenSetup.refit();
-    },
-    fullscreenFit: function (v) {
-      config.fullscreenFit = v === "height" ? "height" : "width";
-      document.body.dataset.fullscreenFit = config.fullscreenFit;
-      ScreenSetup.refit();
+    orientation: function (v) {
+      config.orientation = ["auto", "portrait", "landscape"].indexOf(v) >= 0 ? v : "auto";
+      ScreenSetup.setOrientation(config.orientation);
     },
     theme: function (v) {
       config.theme = v || "classic";
       document.body.dataset.theme = config.theme;
-    },
-    layout: function (v) {
-      config.layout = v === "free" ? "free" : "fixed";
-      document.body.dataset.layout = config.layout;
-      ScreenSetup.refit();
     },
     fps: function (v) {
       config.fps = v | 0;
@@ -328,7 +316,7 @@
     return bar;
   }
 
-  var BASE_KEYS = ["scale", "rotate", "fullscreenFit", "theme", "layout", "keypad", "fps", "jit", "platform"];
+  var BASE_KEYS = ["scale", "orientation", "theme", "keypad", "fps", "jit", "platform"];
   var FEEL_KEYS = ["keyHold", "tapFrames", "dpadOk", "keyRepeat", "repeatDelay", "repeatInterval", "vibrate"];
   var DEVICE_KEYS = ["wakeLock", "pixelated", "showFps"];
   var MANAGED = ["fps", "keyHold", "tapFrames", "dpadOk", "keyRepeat", "repeatDelay", "repeatInterval", "vibrate", "wakeLock", "pixelated", "showFps"];
@@ -526,6 +514,93 @@
     return sec;
   }
 
+  function touchLayoutView() {
+    var sec = el("section");
+    sec.appendChild(txt("h3", "", tr("Раскладка сенсорных клавиш", "Touch keypad layout", "触摸键盘布局")));
+    if (!window.TouchLayout) {
+      sec.appendChild(txt("p", "layout-note", tr("Модуль раскладки недоступен.", "Layout module unavailable.", "布局模块不可用。")));
+      return sec;
+    }
+    var current = TouchLayout.normalize(config.touchLayout);
+    function saveLayout(next) {
+      current = TouchLayout.normalize(next);
+      config.touchLayout = current;
+      Settings.setTouchLayout(id, current);
+      TouchLayout.apply(current);
+      render();
+    }
+    function row(label, options, value, onChange) {
+      var wrap = el("label", "opt");
+      wrap.appendChild(txt("span", "opt-name", label));
+      var select = el("select");
+      options.forEach(function (item) { select.appendChild(el("option", "", { value: item[0], textContent: item[1] })); });
+      select.value = value;
+      select.addEventListener("change", function () { onChange(select.value); });
+      wrap.appendChild(select);
+      return wrap;
+    }
+    sec.appendChild(row(tr("方向键", "D-pad", "方向键"), [
+      ["standard", tr("标准", "Standard", "标准")],
+      ["mirror", tr("左右镜像", "Mirror", "左右镜像")],
+      ["rotate-cw", tr("顺时针 90°", "Rotate 90° clockwise", "顺时针 90°")],
+      ["rotate-ccw", tr("逆时针 90°", "Rotate 90° counter-clockwise", "逆时针 90°")]
+    ], current.dpad, function (value) { saveLayout({ dpad: value, sides: current.sides, numbers: current.numbers, actions: current.actions }); }));
+    sec.appendChild(row(tr("横屏两侧", "Landscape sides", "横屏两侧"), [
+      ["standard", tr("数字键左 / 导航键右", "Numbers left / navigation right", "数字键左 / 导航键右")],
+      ["swapped", tr("导航键左 / 数字键右", "Navigation left / numbers right", "导航键左 / 数字键右")]
+    ], current.sides, function (value) { saveLayout({ dpad: current.dpad, sides: value, numbers: current.numbers, actions: current.actions }); }));
+    sec.appendChild(txt("p", "layout-note", tr("数字键保持 3×4 网格。选择某个槽位时，已占用的数字会自动交换。", "The numeric pad stays a 3×4 grid. Selecting an occupied slot swaps the two numbers.", "数字键保持 3×4 网格，选择已占用数字时会自动交换位置。")));
+    var order = el("div", "layout-order");
+    current.numbers.forEach(function (number, index) {
+      var select = el("select");
+      select.setAttribute("aria-label", tr("数字键槽位", "Number slot", "数字键槽位") + " " + (index + 1));
+      TouchLayout.numbers.forEach(function (item) {
+        var label = item === "star" ? "*" : item === "pound" ? "#" : item;
+        select.appendChild(el("option", "", { value: item, textContent: label }));
+      });
+      select.value = number;
+      select.addEventListener("change", function () {
+        var next = current.numbers.slice();
+        var other = next.indexOf(select.value);
+        if (other >= 0 && other !== index) next[other] = next[index];
+        next[index] = select.value;
+        saveLayout({ dpad: current.dpad, sides: current.sides, numbers: next, actions: current.actions });
+      });
+      order.appendChild(select);
+    });
+    sec.appendChild(order);
+    var actions = el("div", "layout-actions");
+    var actionLabels = { up: "↑", down: "↓", left: "←", right: "→", ok: tr("确认", "OK", "确认"), choice: tr("软键 1", "Soft 1", "软键 1"), back: tr("软键 2", "Soft 2", "软键 2"), ret: tr("返回", "Back", "返回"), clear: tr("清除", "Clear", "清除") };
+    ["up", "right", "down", "left", "ok", "choice", "back", "ret", "clear", "num1", "num2", "num3", "num4", "num5", "num6", "num7", "num8", "num9", "num0", "star", "pound"].forEach(function (slot) {
+      var r = el("label", "layout-action-row");
+      var slotLabel = actionLabels[slot] || (slot === "num0" ? "0" : slot === "star" ? "*" : slot === "pound" ? "#" : slot.replace(/^num/, ""));
+      r.appendChild(txt("span", "opt-name", slotLabel));
+      var select = el("select");
+      TouchLayout.actions.forEach(function (action) {
+        var label = actionLabels[action] || (action === "star" ? "*" : action === "pound" ? "#" : action.replace(/^num/, ""));
+        select.appendChild(el("option", "", { value: action, textContent: label }));
+      });
+      select.value = current.actions[slot] || slot;
+      select.addEventListener("change", function () {
+        var nextActions = Object.assign({}, current.actions);
+        nextActions[slot] = select.value;
+        saveLayout({ dpad: current.dpad, sides: current.sides, numbers: current.numbers, actions: nextActions });
+      });
+      r.appendChild(select);
+      actions.appendChild(r);
+    });
+    sec.appendChild(actions);
+    var reset = txt("button", "ghost", tr("恢复默认触摸布局", "Restore touch layout", "恢复默认触摸布局"));
+    reset.addEventListener("click", function () {
+      Settings.setTouchLayout(id, null);
+      config.touchLayout = TouchLayout.defaults();
+      TouchLayout.apply(config.touchLayout);
+      render();
+    });
+    sec.appendChild(reset);
+    return sec;
+  }
+
   function linkText(st) {
     var link = !st.peers ? tr("нет связи с сервером", "no server connection") : st.via === "P2P" ? tr("напрямую (P2P)", "direct (P2P)") : st.via === "TURN" ? tr("через TURN", "via TURN") : tr("через сервер", "via server");
     return tr("Игроков: ", "Players: ") + st.peers + " · " + link + (st.via && st.rtt ? " · " + st.rtt + tr(" мс", " ms") : "");
@@ -587,7 +662,9 @@
       state = Settings.resolve(id);
       config.screenMode = state.values.screen === "fit" ? "fit" : Settings.parse(state.values.screen) ? "manual" : "auto";
       if (config.screenMode === "manual") config.screen = state.values.screen;
-       ["scale", "rotate", "fullscreenFit", "theme", "layout", "keypad", "fps", "keyHold", "repeatDelay", "repeatInterval", "vibrate", "wakeLock", "pixelated", "showFps"].forEach(function (k) { apply[k](state.values[k]); });
+      config.touchLayout = Settings.touchLayout(id);
+      if (window.TouchLayout) TouchLayout.apply(config.touchLayout);
+       ["scale", "orientation", "theme", "keypad", "fps", "keyHold", "repeatDelay", "repeatInterval", "vibrate", "wakeLock", "pixelated", "showFps"].forEach(function (k) { apply[k](state.values[k]); });
       ScreenSetup.apply();
       render();
       Feedback.ok(tr("Настройки сброшены", "Settings reset", "已恢复默认设置"));
@@ -615,6 +692,7 @@
     var view = el("section");
     view.append(txt("h3", "", tr("Изображение и управление", "Display and controls", "显示与控制")), selects(BASE_KEYS));
     view.appendChild(keymapView());
+    view.appendChild(touchLayoutView());
     var feel = el("section");
     feel.append(txt("h3", "", tr("Отклик клавиш", "Key response", "按键手感")), selects(FEEL_KEYS));
     var deviceOpts = selects(DEVICE_KEYS);

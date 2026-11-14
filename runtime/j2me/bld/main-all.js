@@ -6424,11 +6424,6 @@ if (typeof module !== "undefined" && module.exports) {
     var cs = getComputedStyle(box);
     var aw = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     var ah = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-    if (config.rotate) {
-      var t = aw;
-      aw = ah;
-      ah = t;
-    }
     physicalScreenWidth = aw;
     physicalScreenHeight = ah - (window.MIDP && MIDP.softbarHeight ? MIDP.softbarHeight() : 0);
   }
@@ -6454,9 +6449,6 @@ if (typeof module !== "undefined" && module.exports) {
     deviceCanvas.style.width = Math.floor(w * s) + "px";
     deviceCanvas.style.height = Math.floor(h * s) + "px";
     deviceCanvas.style.imageRendering = s >= 2 && s % 1 === 0 ? "pixelated" : "";
-    if (deviceCanvas.parentNode.classList.contains("lc-host")) {
-      deviceCanvas.parentNode.style.transform = config.rotate ? "rotate(" + config.rotate + "deg)" : "";
-    }
     if (changed) {
       deviceCanvas.dispatchEvent(new Event("canvasresize"));
     }
@@ -6654,15 +6646,7 @@ if (typeof module !== "undefined" && module.exports) {
     var rect = deviceCanvas.getBoundingClientRect();
     var cw = deviceCanvas.clientWidth || deviceCanvas.width, ch = deviceCanvas.clientHeight || deviceCanvas.height;
     var dx = event.clientX - (rect.left + rect.width / 2), dy = event.clientY - (rect.top + rect.height / 2);
-    var lx = dx, ly = dy;
-    if (config.rotate === 90) {
-      lx = dy;
-      ly = -dx;
-    } else if (config.rotate === -90) {
-      lx = -dy;
-      ly = dx;
-    }
-    return {x:(lx + cw / 2) * deviceCanvas.width / cw | 0, y:(ly + ch / 2) * deviceCanvas.height / ch | 0};
+    return {x:(dx + cw / 2) * deviceCanvas.width / cw | 0, y:(dy + ch / 2) * deviceCanvas.height / ch | 0};
   }
   var LONG_PRESS_TIMEOUT = 1E3;
   var MIN_DRAG_DISTANCE_SQUARED = 5 * 5;

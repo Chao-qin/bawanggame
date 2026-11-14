@@ -21,10 +21,8 @@
   config.screen = config.screenMode === "manual" ? v.screen : config.screenMode === "fit" ? "" : "240x320";
   config.scale = parseFloat(v.scale) || 1;
   config.keypad = v.keypad | 0;
-  config.rotate = [0, 45, 90, 135, 180, 225, 270, 315].indexOf(v.rotate | 0) >= 0 ? v.rotate | 0 : 0;
-  config.fullscreenFit = v.fullscreenFit === "height" ? "height" : "width";
+  config.orientation = ["auto", "portrait", "landscape"].indexOf(v.orientation) >= 0 ? v.orientation : "auto";
   config.theme = v.theme || "classic";
-  config.layout = v.layout === "free" ? "free" : "fixed";
   config.jit = v.jit !== "0";
   config.fps = v.fps | 0;
   config.keyHold = Math.max(0, v.keyHold | 0);
@@ -41,5 +39,6 @@
   config.platform = platform ? platform.ua : v.platform || Settings.platforms.se.ua;
   config.keys = (platform || Settings.platforms.se).keys;
   config.keymap = Settings.keymap(config.gameId);
+  config.touchLayout = Settings.touchLayout(config.gameId);
   config.props = Settings.props(config.gameId);
 })();
