@@ -173,7 +173,6 @@
       var width = Math.round(canvasRect.width), height = Math.round(canvasRect.height);
       if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
         canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
-        canvas.style.width = width + "px"; canvas.style.height = height + "px";
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
