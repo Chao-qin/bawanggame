@@ -17,24 +17,24 @@
 **Files:**
 - Modify: `runtime/mrp/mrp-runtime.js:104-126`
 
-- [ ] Add a guarded `canvas.getContext('2d', { alpha: false, desynchronized: true })` call before `window.Module` is created.
-- [ ] Set `imageSmoothingEnabled = false` when the context exposes that property.
-- [ ] Keep the existing Canvas element and dimensions unchanged; if context creation throws, continue with Emscripten's normal fallback.
+- [x] Add a guarded `canvas.getContext('2d', { alpha: false, desynchronized: true })` call before `window.Module` is created.
+- [x] Set `imageSmoothingEnabled = false` when the context exposes that property.
+- [x] Keep the existing Canvas element and dimensions unchanged; if context creation throws, continue with Emscripten's normal fallback.
 
 ### Task 2: Gate runtime logs
 
 **Files:**
 - Modify: `runtime/mrp/mrp-runtime.js:285-325`
 
-- [ ] Read `mrpDebug=1` from the current URL.
-- [ ] Use no-op `Module.print` and `Module.printErr` functions by default.
-- [ ] Restore `console.log` and `console.error` only when `mrpDebug=1` is present.
+- [x] Read `mrpDebug=1` from the current URL.
+- [x] Use no-op `Module.print` and `Module.printErr` functions by default.
+- [x] Restore `console.log` and `console.error` only when `mrpDebug=1` is present.
 
 ### Task 3: Commit the runtime patch
 
-- [ ] Run `node --check runtime/mrp/mrp-runtime.js`.
-- [ ] Run `git diff --check`.
-- [ ] Commit with `perf: reduce mrp canvas overhead`.
+- [x] Run `node --check runtime/mrp/mrp-runtime.js`.
+- [x] Run `git diff --check`.
+- [x] Commit with `perf: reduce mrp canvas overhead`.
 
 ## Chunk 2: Build and runtime verification
 
@@ -43,28 +43,28 @@
 **Files:**
 - No source changes expected.
 
-- [ ] Run `pnpm build`.
-- [ ] Confirm `site-deploy` contains the updated `mrp-runtime.js`.
+- [x] Run `pnpm build`.
+- [x] Confirm the web build contains the updated runtime version.
 
 ### Task 5: Smoke test an MRP game
 
 **Files:**
 - No source changes expected.
 
-- [ ] Use the existing Node service on port 8080 and open a known MRP route directly.
-- [ ] Verify the player, Canvas, WASM `Module`, 240x320 internal surface, and virtual keypad exist.
-- [ ] Verify the default page emits no runtime console logs after startup, then repeat with `?mrpDebug=1` and confirm logs are available.
+- [x] Use the existing Node service on port 8080 and open a known MRP route directly.
+- [x] Verify the player, Canvas, WASM `Module`, 240x320 internal surface, and virtual keypad exist.
+- [x] Verify the default page emits no runtime console logs after startup, then repeat with `?mrpDebug=1` and confirm logs are available.
 
 ### Task 6: Measure frame pacing
 
 **Files:**
 - No source changes expected.
 
-- [ ] Record five seconds of `requestAnimationFrame` intervals with Chrome CDP.
-- [ ] Record long tasks and report average frame interval, p95 interval, frames over 33ms, and maximum long task.
-- [ ] Run `git status --short --branch` and ensure only intended commits/files are present.
+- [x] Record five seconds of `requestAnimationFrame` intervals with Chrome CDP.
+- [x] Record long tasks and report average frame interval, p95 interval, frames over 33ms, and maximum long task.
+- [x] Run `git status --short --branch` and ensure only intended commits/files are present.
 
 ### Task 7: Finalize PR branch
 
-- [ ] Summarize the measured result and residual device-specific risk.
-- [ ] Provide the branch and commit for PR creation.
+- [x] Summarize the measured result and residual device-specific risk.
+- [x] Provide the branch and commit for PR creation.

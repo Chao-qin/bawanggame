@@ -104,6 +104,17 @@
 
   /* ---------- 画布等比缩放 ---------- */
   var canvas = document.getElementById('canvas');
+  // Create the context before Emscripten starts. WebView can then reuse the
+  // low-latency context instead of negotiating a default one on first frame.
+  try {
+    var canvasContext = canvas && canvas.getContext('2d', {
+      alpha: false,
+      desynchronized: true
+    });
+    if (canvasContext && 'imageSmoothingEnabled' in canvasContext) {
+      canvasContext.imageSmoothingEnabled = false;
+    }
+  } catch (_) {}
   function fit() {
     var box = document.getElementById('display-container');
     var display = document.getElementById('display');
@@ -286,6 +297,7 @@
   var progress = document.getElementById('mrp-progress');
 
   /* ---------- Module 配置 + FS 预载 ---------- */
+  var mrpDebug = new URLSearchParams(window.location.search).get('mrpDebug') === '1';
   window.Module = {
     preRun: [],
     postRun: [
@@ -295,8 +307,8 @@
         fit();
       }
     ],
-    print: function (t) { console.log(t); },
-    printErr: function (t) { console.error(t); },
+    print: mrpDebug ? function (t) { console.log(t); } : function () {},
+    printErr: mrpDebug ? function (t) { console.error(t); } : function () {},
     canvas: canvas,
     setStatus: function (text) {
       if (!text) return;
