@@ -463,10 +463,11 @@ function Store({ onRefreshLibrary }) {
 function Player({ game, onBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement))
+  const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
   const playerRef = useRef(null)
   const stageRef = useRef(null)
   const lastNativeBackSignal = useRef(nativeBackSignal)
-  const runtimeReady = game.kind === 'j2me'
+  const settingsReady = game.kind === 'j2me' && runtimeReadyFor === game.file
   useEffect(() => {
     const stage = stageRef.current
     if (!stage) return
@@ -534,11 +535,11 @@ function Player({ game, onBack, nativeBackSignal }) {
         <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅">‹</button>
         <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
         <span className="runtimeToolbarSpacer" />
-        {runtimeReady && <button className="runtimeToolbarButton" onClick={openSettings} title="游戏设置">设置</button>}
+        {game.kind === 'j2me' && <button className="runtimeToolbarButton" onClick={openSettings} title="游戏设置" disabled={!settingsReady}>设置</button>}
         <button className="runtimeToolbarButton runtimeFullscreenButton" onClick={toggleFullscreen} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? '退出全屏' : '全屏'}</button>
       </div>
       <div ref={stageRef} className="playerStage">
-        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} /> : <MrpPlayer game={game} onExit={requestBack} />}
+        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : <MrpPlayer game={game} onExit={requestBack} />}
       </div>
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true">
