@@ -1,5 +1,19 @@
 import React from 'react'
 
+const initialEditorLayerStyle = {
+  position: 'absolute',
+  top: '-10000px',
+  right: 'auto',
+  bottom: 'auto',
+  left: '-10000px',
+  width: '1px',
+  height: '1px',
+  overflow: 'hidden',
+  opacity: 0,
+  visibility: 'hidden',
+  pointerEvents: 'none',
+}
+
 export function PhoneMarkup({ mrp = false }) {
   const blockRuntimeGesture = (event) => {
     const target = event.target
@@ -8,7 +22,7 @@ export function PhoneMarkup({ mrp = false }) {
   }
   return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} onContextMenu={blockRuntimeGesture} onSelectStart={blockRuntimeGesture} onDragStart={blockRuntimeGesture}>
     <div id="phone" className="runtime-phone">
-    <div id="editor-layer">
+    <div id="editor-layer" className="runtime-editor-layer" style={initialEditorLayerStyle}>
       <div id="textarea-editor" className="textEditor" contentEditable="true" />
       <input id="password-editor" className="textEditor" type="password" />
       <input id="email-editor" className="textEditor" type="email" />

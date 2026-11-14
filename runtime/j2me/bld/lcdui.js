@@ -41,6 +41,8 @@
   var barShown = false;
   var pageScroll = null;
   var editors = document.getElementById("editor-layer") || el("div");
+  // React hides the bridge inline until this legacy runtime owns its layout.
+  editors.removeAttribute("style");
   editors.className = "lc-editors";
   host.appendChild(editors);
   Array.prototype.forEach.call(editors.children, function (ed) {
