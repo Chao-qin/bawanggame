@@ -18,12 +18,18 @@
 pnpm mobile:prepare-web
 pnpm --filter @xiaochao/mobile start
 pnpm --filter @xiaochao/mobile android
+pnpm mobile:build-android
 pnpm --filter @xiaochao/mobile ios
 pnpm mobile:typecheck
 pnpm mobile:verify-web
 ```
 
 `mobile:prepare-web` 会执行根项目的 Web build 和 `pack-site.sh`，生成 `apps/mobile/web`。这个目录是生成物，不能手工编辑；下一次准备资源会完整覆盖它。
+
+`mobile:build-android` 会准备 Web 资源并生成可独立运行的 release APK：
+`apps/mobile/android/app/build/outputs/apk/release/app-release.apk`。
+这个包内置 React Native bundle 和 `assets/web`，安装后不需要启动 Metro。
+开发调试仍使用 `pnpm --filter @xiaochao/mobile android`，该命令依赖 Metro。
 
 ## 宿主行为
 

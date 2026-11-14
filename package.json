@@ -11,6 +11,7 @@
     "typecheck": "pnpm --filter @xiaochao/server typecheck",
     "pack": "./pack-site.sh",
     "mobile:prepare-web": "pnpm --filter @xiaochao/mobile prepare-web",
+    "mobile:build-android": "pnpm --filter @xiaochao/mobile build-android-release",
     "mobile:typecheck": "pnpm --filter @xiaochao/mobile typecheck",
     "mobile:verify-web": "pnpm --filter @xiaochao/mobile verify-web-assets"
   }

@@ -7,6 +7,11 @@ apply plugin: "com.facebook.react"
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
+    def hostOs = System.getProperty("os.name").toLowerCase(Locale.ROOT)
+    def hermesBinary = hostOs.contains("windows") ? "win64-bin/hermesc.exe" :
+            (hostOs.contains("mac") ? "osx-bin/hermesc" : "linux64-bin/hermesc")
+    hermesCommand = file("../../node_modules/hermes-compiler/hermesc/${hermesBinary}").absolutePath
+
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
     // root = file("../../")
@@ -76,12 +81,6 @@ android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
-
-    sourceSets {
-        main {
-            assets.srcDirs += [file("$rootDir/../web")]
-        }
-    }
 
     namespace "com.xiaochao.bawang"
     defaultConfig {
