@@ -68,7 +68,8 @@
 - [ ] **Step 2: Route press feedback through the helper**
 
   Store `pointerType` in each held pointer and pass it through `move`,
-  `beginOk`, and `clearHold` to `press`. Replace the direct
+  `beginOk`, `endOk`, and `tapKey` to `press`; the `dpadOk="tap"` short-center
+  path must use the same helper. Replace the direct
   `navigator.vibrate(fb.vibrate)` call in `press` with the helper. Keep
   multi-pointer edge de-duplication so only one pulse occurs for a shared
   platform key edge; repeats do not vibrate.
@@ -98,14 +99,19 @@
   `navigator.vibrate` and assert `[0, 20]` for a 20ms coarse-pointer press,
   `[0, 16]` for missing duration on touch, no calls for duration 0 or a mouse
   pointer, no throw for missing/unsupported/denied APIs, and a fresh `[0, 20]`
-  sequence on a rapid second press. Capture screenshots for the visual record.
+  sequence on a rapid second press. Save screenshots to
+  `/tmp/landscape-haptics/landscape-collapsed.png`,
+  `/tmp/landscape-haptics/landscape-expanded.png`, and
+  `/tmp/landscape-haptics/portrait.png`; record center delta, height comparison,
+  and target IDs.
 
 - [ ] **Step 2: Verify Android packaging and startup**
 
-  Run `pnpm mobile:prepare-web` and
-  `pnpm mobile:build-android-release`, then inspect
-  `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` with
-  `aapt dump permissions`. If an emulator/device is available, install with
+  Run `pnpm mobile:prepare-web` and `pnpm mobile:build-android`, assert the APK
+  is non-empty, inspect `assets/index.android.bundle` and packaged `web/` assets
+  with `unzip -l`, and assert `android.permission.VIBRATE` with
+  `aapt dump permissions ... | grep -F`. If an emulator/device is available,
+  install with
   `adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
   and start with `adb shell monkey -p
   com.xiaochao.bawang 1`; verify WebView assets, keypad presence, and no
@@ -114,8 +120,10 @@
 - [ ] **Step 3: Verify lifecycle regressions**
 
   Exercise portrait, landscape, fullscreen enter/exit/failure, toolbar toggle,
-  long-press on canvas/keypad, pointer cancellation, and exit cleanup. Confirm
-  no active key remains down and no new console errors occur.
+  long-press on canvas/keypad, pointer cancellation, and exit cleanup. Pass
+  only when fullscreen failure leaves the stage usable, contextmenu count stays
+  zero, every active key is released on exit/cancel, and no new console errors
+  occur.
 
 - [ ] **Step 4: Commit implementation**
 

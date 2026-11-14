@@ -85,19 +85,27 @@ and configured zero duration are silent. Android declares
 - `pnpm --filter @xiaochao/web build`
 - `pnpm --filter @xiaochao/mobile typecheck`
 - `pnpm mobile:prepare-web`
-- `pnpm mobile:build-android-release`
-- `aapt dump permissions apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
-  contains `android.permission.VIBRATE`; when an Android device/emulator is
-  available, run `adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk` and
+- `pnpm mobile:build-android`
+- `test -s apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
+  and `unzip -l apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+  | grep -F 'assets/index.android.bundle'` pass; packaged web assets are
+  present under the expected `web/` path.
+- `aapt dump permissions apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+  | grep -F 'android.permission.VIBRATE'` must return one line. When an Android
+  device/emulator is available, run `adb install -r
+  apps/mobile/android/app/build/outputs/apk/release/app-release.apk` and
   `adb shell monkey -p com.xiaochao.bawang 1`, then verify the bundled WebView
   starts, the keypad is present, and vibration calls do not log errors. A real
   device run is marked unverified when no device is available.
 - Browser layout smoke probe at fixed 1365x768 landscape and 390x844 portrait
-  viewports, capturing before/after screenshots against the supplied screenshot
-  as a visual reference. Check display centering, collapsed/expanded toolbar
-  height, navigation hit testing, and vibration call count with a stubbed
-  `navigator.vibrate`.
+  viewports, saving `/tmp/landscape-haptics/landscape-collapsed.png`,
+  `/tmp/landscape-haptics/landscape-expanded.png`, and
+  `/tmp/landscape-haptics/portrait.png`. Record display center delta <=2%,
+  expanded height < collapsed height, navigation hit target IDs, and vibration
+  call count with a stubbed `navigator.vibrate`; the supplied screenshot is
+  visual reference evidence, not a pixel-identical baseline.
 - Re-enter fullscreen, exit fullscreen, and exercise fullscreen failure in a
   browser with the toolbar collapsed and expanded; verify portrait remains
-  centered, long-press on canvas/keypad does not open a menu, active keys are
-  released on exit, and the console has no new runtime errors.
+  centered, fullscreen failure leaves the toolbar/stage usable, long-press on
+  canvas/keypad produces zero `contextmenu` events, exit releases every active
+  key, and the console has no new runtime errors.
