@@ -44,6 +44,8 @@
 **Files:**
 - Modify: `runtime/j2me/config/settings.js`
 - Inspect/modify: `runtime/j2me/touchpad.js`
+- Create: `apps/mobile/src/host/haptics.ts`
+- Create: `apps/mobile/src/host/haptics.test.ts`
 - Inspect/modify: `apps/mobile/App.tsx`
 - Reference: `apps/mobile/src/host/protocol.ts`
 
