@@ -32,7 +32,11 @@ one pull request.
   bounds, with no extra DOM outline. In fullscreen, the stage retains the same
   viewport bounds with toolbar expanded or collapsed. Browser bridge stubs
   verify a single default 24 ms request per new coarse-pointer press, no
-  repeats while held, and preservation/clamping of explicit values.
+  repeats while held, and preservation/clamping of explicit values. The 24 ms
+  default is for mobile coarse-pointer settings; desktop remains silent by
+  default. A given key emits once when its holder count changes from zero to
+  one, so an additional finger holding the same key does not emit another
+  pulse.
   Web build, JavaScript syntax, mobile typecheck, and mobile web asset staging
   checks pass. Android emulator and physical-device vibration results are
   reported separately; unavailable device checks remain explicit residual
