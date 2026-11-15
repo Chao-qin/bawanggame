@@ -116,8 +116,9 @@
     function press(code, holder, sourceAt, pointerType) {
       var h = codeHolders[code] || (codeHolders[code] = {});
       if (h[holder]) return;
+      var firstHolder = Object.keys(h).length === 0;
       h[holder] = 1;
-      haptic(pointerType);
+      if (firstHolder) haptic(pointerType);
       sink.press(code, { pointer: true, sourceAt: sourceAt == null ? null : sourceAt });
     }
     function release(code, holder, sourceAt) {
