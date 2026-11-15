@@ -71,6 +71,7 @@ try {
     throw new Error(`Flash Store catalog button missing: ${JSON.stringify(state)}`)
   }
   await sleep(900)
+  check(await evaluate(`document.querySelector('.storeCard button')?.textContent.includes('已加入')`), 'Flash Store did not mark the catalog item as added')
   const localState = await evaluate(`new Promise((resolve, reject) => { const request = indexedDB.open('flash-local'); request.onerror = () => reject(request.error); request.onsuccess = () => { const tx = request.result.transaction('games'); const get = tx.objectStore('games').getAll(); get.onsuccess = () => resolve(get.result.map((item) => ({ id: item.id, name: item.name, key: item.dedupeKey }))); get.onerror = () => reject(get.error) } })`)
   console.log('Local records:', JSON.stringify(localState))
   check(localState.length === 1 && localState[0].key === 'catalog:fruit-madness', 'Flash catalog item was not stored locally')

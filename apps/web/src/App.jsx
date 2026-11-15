@@ -571,7 +571,7 @@ function FlashStore({ onRefreshLibrary }) {
       </div>
     </form>
     <div className="storeGrid">{FLASH_GAMES.map((game) => {
-      const key = `catalog:${game.file}`
+      const key = `catalog:${game.catalogId}`
       const isAdded = added.has(key)
       return <article className="storeCard" key={game.file}>
         <div className="storeIcon">{game.name.charAt(0)}</div>
