@@ -43,6 +43,7 @@
 **Files:**
 - Modify: `apps/web/src/App.jsx:1-450`
 - Modify: `apps/web/src/runtime/FlashPlayer.jsx:1-70`
+- Modify: `apps/web/src/runtime/RuntimeStatus.jsx:1-40`
 
 - [ ] **Step 1: Add local Flash hook and route data**
 
@@ -54,7 +55,7 @@
 
 - [ ] **Step 3: Make FlashPlayer resolve local Blob data**
 
-  For local games call `LocalFlash.get(game.file)`, create an object URL, load it with Ruffle, and revoke it during cleanup. If the id is missing or malformed, show a player failure with a return-to-library action. Keep the current `/flash/<file>` path for bundled games.
+  For local games call `LocalFlash.get(game.file)`, create an object URL, load it with Ruffle, and revoke it during cleanup. If the id is missing or malformed, show a player failure with a return-to-library action wired through `onExit`; update `RuntimeFailure` to accept the existing exit callback without changing other runtimes. Keep the current `/flash/<file>` path for bundled games.
 
 - [ ] **Step 4: Preserve route and lifecycle behavior**
 
@@ -80,15 +81,15 @@
 
 - [ ] **Step 2: Add built-in catalog and import form**
 
-  Show metadata for the bundled SWFs as downloadable local entries using an explicit bundled source and catalog id. Add a form with required name, optional description, and mutually exclusive SWF URL or hidden `.swf` file input. The form submits through the same repository validation path and rejects both/neither source. Register `flash-store` in `TAB_IDS`, route it as `#/library/flash-store`, and keep direct-load fallback/history behavior explicit.
+  Show metadata for the bundled SWFs as downloadable local entries using an explicit bundled source and catalog id. The “加入本机” action calls `LocalFlash.addBundled(file, metadata)` so it fetches `/flash/<file>`, validates the bytes, and performs catalog-id dedupe. Add a form with required name, optional description, and mutually exclusive SWF URL or hidden `.swf` file input. The form submits through the same repository validation path and rejects both/neither source. Register `flash-store` in `TAB_IDS`, route it as `#/library/flash-store`, and keep direct-load fallback/history behavior explicit.
 
 - [ ] **Step 3: Add download states and errors**
 
-  Disable the active action during download/import, show “已加入” for records already present, and render errors for CORS, HTTP, size, invalid SWF, duplicate, quota, or IndexedDB failures without writing partial data.
+  Disable the active action during download/import, show “已加入” for records already present, and render errors for CORS, HTTP, size, invalid SWF, duplicate, quota, or IndexedDB failures without writing partial data. Wire hook state as `{loading, error, games}` so unavailable storage and skipped malformed records are visible with a retry action.
 
 - [ ] **Step 4: Add local store smoke flow**
 
-  Extend `apps/web/verify.mjs` or add a focused browser smoke script to import the bundled sample SWF through the Flash Store, verify the local card, reload the page, start it, exit, assert `URL.revokeObjectURL` and no `ruffle-player`, and delete it. Also navigate to a missing local id and verify the failure state can return to the Flash library.
+  Extend `apps/web/verify.mjs` or add a focused browser smoke script to add the bundled sample through the catalog action, verify the local card and reload persistence, start it, exit, assert `URL.revokeObjectURL` and no `ruffle-player`, and delete it. Use browser-evaluable repository calls or a deterministic mock response to assert both/neither source validation, non-http URL rejection, invalid signature, over-limit response, duplicate replacement, and no partial record. Also navigate to a missing local id and verify the failure state can return to the Flash library. Record IndexedDB-unavailable and Android WebView installation limits separately.
 
 - [ ] **Step 5: Run web checks**
 
@@ -117,3 +118,9 @@
 - [ ] **Step 4: Commit and push**
 
   Use focused commits with `feat: add local flash store` and `docs: record flash store verification`, push `feat/flash-local-store`, and create one GitHub PR from that branch.
+
+## Review Rounds Required By AGENTS.md
+
+- [ ] **R1:** Run a cold-start diff review and feature audit after the first implementation, then fix all P0-P2 findings.
+- [ ] **R2:** Re-run both reviews after fixes; run validation again if the fix touches packaging, WebView, or runtime lifecycle.
+- [ ] **R3:** Run the final required review round. Do not start a fourth round; document any remaining P3 or explicitly accepted P2 risk.
