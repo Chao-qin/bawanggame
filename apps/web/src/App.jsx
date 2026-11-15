@@ -519,7 +519,6 @@ function Player({ game, onBack, nativeBackSignal }) {
   const [toolbarCollapsed, setToolbarCollapsed] = useState(() => window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
   const playerRef = useRef(null)
   const stageRef = useRef(null)
-  const toolbarRef = useRef(null)
   const lastNativeBackSignal = useRef(nativeBackSignal)
   const runtimeCleanupRef = useRef(noopCleanup)
   const exitStartedRef = useRef(false)
@@ -527,19 +526,6 @@ function Player({ game, onBack, nativeBackSignal }) {
   const registerRuntimeCleanup = useCallback((cleanup) => {
     runtimeCleanupRef.current = typeof cleanup === 'function' ? cleanup : noopCleanup
   }, [])
-  useEffect(() => {
-    const player = playerRef.current
-    const toolbar = toolbarRef.current
-    if (!player || !toolbar) return
-    const updateToolbarSize = () => {
-      player.style.setProperty('--runtime-toolbar-height', `${Math.ceil(toolbar.getBoundingClientRect().height)}px`)
-    }
-    updateToolbarSize()
-    if (typeof ResizeObserver === 'undefined') return undefined
-    const observer = new ResizeObserver(updateToolbarSize)
-    observer.observe(toolbar)
-    return () => observer.disconnect()
-  }, [toolbarCollapsed])
   useEffect(() => {
     const syncToolbarMode = () => {
       setToolbarCollapsed(document.body.classList.contains('viewport-landscape') || (window.matchMedia?.('(orientation: landscape)')?.matches ?? false))
@@ -666,7 +652,7 @@ function Player({ game, onBack, nativeBackSignal }) {
   }
   return (
     <div ref={playerRef} className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
-      <div ref={toolbarRef} className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
+      <div className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <button className="runtimeToolbarToggle" onClick={() => setToolbarCollapsed((value) => !value)} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}>•••</button>
         {!toolbarCollapsed && <div className="runtimeToolbarContent">
           <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅"><span aria-hidden="true">←</span></button>

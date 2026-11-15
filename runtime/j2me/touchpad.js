@@ -98,7 +98,7 @@
 
     function haptic(pointerType) {
       if (!coarsePointer(pointerType)) return;
-      var requested = fb.vibrate == null ? 16 : Number(fb.vibrate);
+      var requested = fb.vibrate == null ? 24 : Number(fb.vibrate);
       if (!(requested > 0)) return;
       var duration = Math.max(8, Math.min(40, Math.round(requested)));
       var host = window.__XIAOCHAO_RN_HOST__;

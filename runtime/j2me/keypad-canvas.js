@@ -112,7 +112,7 @@
     function paintButton(item, color, radius, kind) {
       if (!item) return;
       var active = item.node.classList.contains("down") || item.node.classList.contains("tap");
-      var y = active && kind !== "dir" ? item.y + 1 : item.y;
+      var y = item.y;
       var activeDir = active && kind === "dir";
       var themed = color.theme !== "classic";
       var top = activeDir ? "rgba(74,120,194,.55)" : active ? (themed ? color.active : "#4a78c2") : (kind === "soft" ? "#3a4253" : kind === "dir" ? color.panel : themed ? color.key : "#353c4b");
@@ -138,17 +138,24 @@
       ctx.lineJoin = "miter";
       ctx.beginPath();
       if (id === "up" || id === "down") {
-        var dy = id === "up" ? -1 : 1;
+        var dy = id === "up" ? 1 : -1;
         ctx.moveTo(cx - size, cy + dy * size * 0.45);
         ctx.lineTo(cx, cy - dy * size * 0.45);
         ctx.lineTo(cx + size, cy + dy * size * 0.45);
       } else {
-        var dx = id === "left" ? -1 : 1;
+        var dx = id === "left" ? 1 : -1;
         ctx.moveTo(cx + dx * size * 0.45, cy - size);
         ctx.lineTo(cx - dx * size * 0.45, cy);
         ctx.lineTo(cx + dx * size * 0.45, cy + size);
       }
       ctx.stroke();
+    }
+
+    function visualDirection(id) {
+      if (window.TouchLayout && typeof window.TouchLayout.visualDpad === "function") {
+        return window.TouchLayout.visualDpad(id, typeof config !== "undefined" ? config.touchLayout : null);
+      }
+      return id;
     }
 
     function drawDpad(base, color, styles) {
@@ -176,7 +183,7 @@
       ["up", "left", "right", "down"].forEach(function (id) {
         var item = rectFor(id, base);
         paintButton(item, color, 0, "dir");
-        drawArrow(item, id, color, styles);
+        drawArrow(item, visualDirection(id), color, styles);
       });
       var ok = rectFor("ok", base);
       if (ok) {
