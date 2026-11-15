@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AppState, BackHandler, Pressable, StatusBar, Text, View } from 'react-native'
+import { AppState, BackHandler, Pressable, StatusBar, Text, View, Vibration } from 'react-native'
 import { WebView } from 'react-native-webview'
 import type { WebViewErrorEvent, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview/lib/WebViewTypes'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -66,6 +66,15 @@ function AppContent() {
   const handleMessage = (event: WebViewMessageEvent) => {
     const message = parseHostMessage(event.nativeEvent.data)
     if (!message) return
+    if (message.type === 'haptic') {
+      if (typeof message.payload !== 'object' || message.payload === null || !('duration' in message.payload)) return
+      const duration = message.payload.duration
+      if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) return
+      const bounded = Math.max(8, Math.min(40, Math.round(duration)))
+      Vibration.cancel()
+      Vibration.vibrate(bounded)
+      return
+    }
     if (message.type === 'navigation.back' && typeof message.payload === 'object' && message.payload !== null && 'handled' in message.payload && message.payload.handled === false) {
       BackHandler.exitApp()
     }

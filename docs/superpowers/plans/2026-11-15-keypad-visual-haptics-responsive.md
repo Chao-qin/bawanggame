@@ -17,30 +17,30 @@
 - Reference: `runtime/j2me/style/main.css`
 - Test: browser screenshots at 390x844 and 844x390
 
-- [ ] **Step 1: Map existing CSS tokens and historical geometry**
+- [x] **Step 1: Map existing CSS tokens and historical geometry**
   Confirm `--u`, `--phone-*` colors, the system font stack, and the `.mini`, numeric,
   `.dir`, `.key.down`, and `.dir.down` ratios in
   `runtime/j2me/style/main.css` at historical commit `2d8a251`. Keep the current
   DOM rectangles as the geometry source.
 
-- [ ] **Step 2: Add Canvas style helpers**
+- [x] **Step 2: Add Canvas style helpers**
   Read `--u` and representative computed styles from the live keypad. Add helpers
   that produce the CSS font family, weight, and proportional sizes for soft-key,
   numeric, auxiliary, and direction labels. Use the same fallback values when a
   representative node is unavailable.
 
-- [ ] **Step 3: Restore d-pad and pressed-state painting**
+- [x] **Step 3: Restore d-pad and pressed-state painting**
   Match the CSS d-pad radial background, inset/drop shadows, direction surface,
   arrow proportions, and active blue/alpha states. Ensure portrait draw order
   paints the d-pad and its arrows above the masked soft-key slots while keeping
   the soft-key labels readable.
 
-- [ ] **Step 4: Render all text from responsive helpers**
+- [x] **Step 4: Render all text from responsive helpers**
   Replace fixed `18px`, `item.h * 0.45`, and `item.h * 0.24` font calculations with
   the responsive values. Keep labels centered/left-aligned like the CSS layout and
   clamp only enough to prevent clipping on the smallest supported keypad.
 
-- [ ] **Step 5: Run syntax and visual smoke checks**
+- [x] **Step 5: Run syntax and visual smoke checks**
   Run `node --check runtime/j2me/keypad-canvas.js`. Start the existing web service,
   capture portrait and landscape screenshots, and verify no DOM text or duplicate
   active rectangles are visible over the Canvas.
@@ -54,28 +54,28 @@
 - Modify: `apps/mobile/App.tsx`
 - Reference: `apps/mobile/android/app/src/main/AndroidManifest.xml`
 
-- [ ] **Step 1: Add the versioned WebView haptic method**
+- [x] **Step 1: Add the versioned WebView haptic method**
   Extend `__XIAOCHAO_RN_HOST__` with `haptic(duration)` that sends a `haptic`
   message through the existing protocol without changing navigation or inset
   behavior.
 
-- [ ] **Step 2: Handle haptic messages in the native host**
+- [x] **Step 2: Handle haptic messages in the native host**
   Import React Native `Vibration`, validate an object payload, clamp duration to
   8..40 ms, cancel any prior vibration, and invoke `Vibration.vibrate(duration)`.
   Ignore malformed or non-positive values.
 
-- [ ] **Step 3: Route touch feedback through the bridge and fallback**
+- [x] **Step 3: Route touch feedback through the bridge and fallback**
   Keep coarse-pointer gating and deduplicated `press` behavior. Check that the
   bridge object and `haptic` member are functions before calling them; if the
   bridge is absent or throws, check that `navigator` exists and its `vibrate`
   member is a function before using the Web fallback. A successful bridge call
   suppresses the fallback, and absent APIs never throw.
 
-- [ ] **Step 4: Set the phone default to 16 ms**
+- [x] **Step 4: Set the phone default to 16 ms**
   Change the mobile default setting from 10 to 16 while preserving explicit user
   settings and desktop default silence.
 
-- [ ] **Step 5: Run haptic-focused checks**
+- [x] **Step 5: Run haptic-focused checks**
   Run `node --check runtime/j2me/touchpad.js`, `pnpm --filter @xiaochao/mobile typecheck`,
   and a browser stub that records bridge/fallback calls for mouse, touch, duplicate
   multi-touch, default 16 ms, explicit 8/40 ms, and out-of-range values. Exercise
@@ -89,14 +89,14 @@
 - Modify: `docs/superpowers/specs/2026-11-15-keypad-visual-haptics-responsive-design.md`
 - Modify: `docs/superpowers/plans/2026-11-15-keypad-visual-haptics-responsive.md`
 
-- [ ] **Step 1: Run the web build and repository checks**
+- [x] **Step 1: Run the web build and repository checks**
   Run `pnpm --filter @xiaochao/web build`, `node --check
   runtime/j2me/keypad-canvas.js`, `node --check runtime/j2me/touchpad.js`,
   `pnpm --filter @xiaochao/mobile typecheck`, `git diff --check`, and inspect the
   diff for generated artifacts. Record command output in the PR description; do
   not commit build output, screenshots, profiles, or logs.
 
-- [ ] **Step 2: Validate responsive states**
+- [x] **Step 2: Validate responsive states**
   Start the local web server used by the repository, then use browser automation
   to capture 390x844 portrait, 844x390 landscape, and a runtime rotation
   transition. Before each active-state capture, dispatch a pointer press or add

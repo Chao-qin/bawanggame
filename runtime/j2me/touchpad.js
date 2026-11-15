@@ -7,7 +7,7 @@
  *   - 方向判定：激活阈值 0.40 / 保持阈值 0.28 滞回（手指抖动不跳键），斜向可双键
  *   - 滑动切向：按住不抬手从一个方向滑到另一个方向，平滑释放/按下
  *   - 中心确认：dpadOk="press" 落指即确认；"tap" 松手确认；从方向滑进中心不算确认
- *   - 反馈：.down 按住高亮 + .tap 动画 + navigator.vibrate
+ *   - 反馈：.down 按住高亮 + .tap 动画 + native/Web Vibration haptic
  *   - 连发：长按 repeatDelay 后按 repeatInterval 重复（经 sink.repeat 下发）
  *   - 防卡键：blur / visibilitychange / pagehide 全量释放
  *
@@ -97,14 +97,19 @@
     }
 
     function haptic(pointerType) {
-      if (!coarsePointer(pointerType) || !navigator.vibrate) return;
+      if (!coarsePointer(pointerType)) return;
       var requested = fb.vibrate == null ? 16 : Number(fb.vibrate);
       if (!(requested > 0)) return;
       var duration = Math.max(8, Math.min(40, Math.round(requested)));
-      try {
-        navigator.vibrate(0);
-        navigator.vibrate(duration);
-      } catch (_) {}
+      var host = window.__XIAOCHAO_RN_HOST__;
+      if (host && typeof host.haptic === "function") {
+        try {
+          if (host.haptic(duration) !== false) return;
+        } catch (_) {}
+      }
+      var vibration = typeof navigator !== "undefined" && navigator && navigator.vibrate;
+      if (typeof vibration !== "function") return;
+      try { vibration.call(navigator, duration); } catch (_) {}
     }
 
     // ---------- 边沿去重：同一键被多指按住时，只给 sink 一次 press/release ----------
