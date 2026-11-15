@@ -2,14 +2,14 @@
 
 ## Goal
 
-Add offline Flash game playback to 小潮霸王 through Ruffle, with one bundled, original AS3 game that verifies the player in the shared web app and the React Native WebView host.
+Add offline Flash game playback to 小潮霸王 through Ruffle, with a redistributable, complete Flash game and a small original AS3 input smoke fixture for the shared web app and React Native WebView host.
 
 ## Task Contract
 
-- **Target behavior:** A Flash library entry launches the bundled SWF through Ruffle. Playback works from the packaged local site without downloading the player or game at runtime.
-- **Scope:** Shared React web app, static site packaging, mobile web asset preparation, `.wasm` MIME handling in the existing cross-platform static server, and an original test game's ActionScript source, compiled SWF, and license.
+- **Target behavior:** Flash library entries launch bundled SWFs through Ruffle. Playback works from both the normal `public/` web root and packaged mobile site without downloading the player or games at runtime.
+- **Scope:** Shared React web app, web-build asset staging, static site packaging, mobile web asset preparation, `.wasm` MIME handling in the existing cross-platform static server, an original input smoke fixture, and the MIT-licensed Fruit Madness game from its upstream repository.
 - **Preserve:** Existing J2ME, MRP, and local revival routes; current route history, exit confirmation, fullscreen controls, and offline mobile startup behavior.
-- **Acceptance:** Web build and static packaging include Ruffle and the SWF; browser smoke validation exercises load, interaction, exit, and re-entry; Android APK contains the player, WASM, SWF, and licenses and plays the game offline. iOS must at least package the same static resources; device validation will be reported separately if unavailable.
+- **Acceptance:** Web build copies Ruffle and both games into `public/`, and static packaging carries them into `site-deploy`; browser smoke validation exercises load, game interaction, exit, and re-entry; Android APK contains the player, WASM, both SWFs, and licenses and plays offline. iOS must at least package the same static resources; device validation will be reported separately if unavailable.
 
 ## Architecture
 
@@ -19,14 +19,16 @@ The npm tarball contains root-level `ruffle.js`, two hashed `core.ruffle.*.js` c
 
 Add a Flash tab with only the built-in test entry; do not show shared recent/popular rows containing games from other runtime kinds, and do not inherit J2ME/MRP catalog loading or errors. Add a dedicated `FlashPlayer` component. The component creates a Ruffle player for the SWF and reports load/runtime errors through the existing runtime status UI. Guard asynchronous script/player initialization with an active-route token: if the route exits before initialization completes, do not create or attach a player; if it exits after creation, detach and dispose of the player and remove route-owned listeners. Late failures must not update an inactive route. Re-entry creates a fresh player instance. Reuse the existing game route, exit confirmation, back handling, stage sizing, and fullscreen controls. Do not add a native Ruffle module.
 
-The test game will be a small original AS3 arcade game with vector-only visuals and no network, audio, font, or external asset dependencies. Keep its source, a short MIT license, and the Apache Flex compiler version/invocation in `games/flash/README.md` next to the compiled SWF so the binary has clear provenance and can be rebuilt. The primary interaction must have an observable result (score changes on a successful touch/click). It is a smoke-test fixture, not a claim of broad ActionScript compatibility.
+The Flash catalog contains Fruit Madness, a complete ActionScript 3 arcade game distributed under the upstream MIT license, and Star Catcher, a small original input smoke fixture. Keep the upstream game SWF and its license together under `games/flash/fruit-madness`; record its source URL and pinned commit. Keep the fixture source, its MIT license, and Apache Flex compiler version/invocation in `games/flash/README.md`. Star Catcher's primary interaction visibly increments its score; this fixture is not a claim of broad ActionScript compatibility.
+
+The regular web build is served directly from repository `public/` by the Node server. A dedicated build staging script must copy Ruffle, both game SWFs, and their licenses there; `pack-site.sh` then carries them into `site-deploy` for native mobile packaging. Vite development proxies `/ruffle/*` and `/flash/*` to that same local server, matching the existing runtime asset proxy pattern. This keeps those paths valid in desktop production, development, and WebView hosting.
 
 ## Data and Resource Flow
 
 1. `apps/web` loads Ruffle's self-hosted JavaScript from a local static path.
 2. The Ruffle script selects a WASM module and initializes a player within the Flash route.
 3. The player loads the bundled SWF from the same local origin.
-4. The existing `pack-site.sh` copies the SWF and Ruffle runtime into `site-deploy`.
+4. The web build stages the SWF files and Ruffle runtime into `public/`; the existing `pack-site.sh` copies that tree into `site-deploy`.
 5. `apps/mobile/scripts/prepare-web.mjs` copies that static site into WebView resources; Android serves it from the existing loopback HTTP server, and iOS bundles the same output.
 
 ## Failure and Lifecycle Behavior

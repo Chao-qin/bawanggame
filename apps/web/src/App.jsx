@@ -16,7 +16,10 @@ const TABS = [
 
 const TAB_IDS = new Set(TABS.map((item) => item.id))
 const GAME_KINDS = new Set(['j2me', 'maopao', 'local-revival', 'flash'])
-const FLASH_GAMES = [{ kind: 'flash', file: 'sample-game.swf', name: 'Star Catcher', vendor: '内置测试游戏', desc: '点击星星得分', size: 1767, iconUrl: null, local: false }]
+const FLASH_GAMES = [
+  { kind: 'flash', file: 'fruit-madness.swf', name: 'Fruit Madness', vendor: 'Vladimir Belyaev · MIT', desc: '躲避水果并收集松饼', size: 2236139, iconUrl: null, local: false },
+  { kind: 'flash', file: 'sample-game.swf', name: 'Star Catcher', vendor: '内置输入测试', desc: '点击星星得分', size: 1767, iconUrl: null, local: false },
+]
 
 function isEmbeddedHost() {
   return new URLSearchParams(window.location.search).get('host') === 'rn'

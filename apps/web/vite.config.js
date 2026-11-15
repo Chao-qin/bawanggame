@@ -7,6 +7,8 @@ import UnoCSS from 'unocss/vite'
 const proxyTargets = [
   '/__jars',
   '/__52java',
+  '/ruffle',
+  '/flash',
   '/dasong',
   '/jar',
   '/maopao',

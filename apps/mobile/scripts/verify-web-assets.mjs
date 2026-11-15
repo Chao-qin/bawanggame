@@ -27,7 +27,10 @@ const requiredFiles = [
   'ruffle/878d548199cddef07035.wasm',
   'ruffle/LICENSE_MIT',
   'ruffle/LICENSE_APACHE',
+  'flash/fruit-madness.swf',
+  'flash/fruit-madness-LICENSE',
   'flash/sample-game.swf',
+  'flash/sample-game-LICENSE',
 ]
 
 const missing = requiredFiles.filter((entry) => !fs.existsSync(path.join(webRoot, entry)))
