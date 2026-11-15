@@ -17,7 +17,9 @@
 - `runtime/j2me/keypad-canvas.js`: render arrows and pressed controls using live DOM rectangles and touch-layout semantics.
 - `runtime/j2me/touchpad.js`: preserve deduplication and use the mobile default haptic request.
 - `runtime/j2me/config/settings.js`: set the mobile default vibration duration.
-- `apps/mobile/App.tsx`: retain native bounded pulse behavior; change only if validation finds cancellation/dispatch causes missed rapid pulses.
+- `apps/mobile/src/host/haptics.ts`: validate/clamp native haptic requests and dispatch to an injected vibration adapter.
+- `apps/mobile/src/host/haptics.test.ts`: verify duration boundaries, invalid messages, and rapid consecutive dispatch.
+- `apps/mobile/App.tsx`: delegate the bridge message to the tested native haptic helper.
 - `docs/superpowers/specs/2026-11-15-mobile-keypad-feedback-design.md`: approved scope and acceptance contract.
 - `docs/superpowers/plans/2026-11-15-mobile-keypad-feedback.md`: implementation and verification record.
 
@@ -50,7 +52,7 @@
 - [ ] **Step 2: Verify holder-edge and bridge behavior**
   Confirm one haptic request when a key's holder count changes from zero to one, including rapid release/re-press, and no second request for an additional holder of the same key. Verify bridge posting returns false or throws before the browser fallback is attempted; a successful asynchronous post must not trigger a duplicate fallback pulse.
 - [ ] **Step 3: Verify native duration bounds and rapid requests**
-  Ensure the WebView host receives and clamps positive durations to 8..40 ms and preserves cancel-before-vibrate semantics where that does not cancel a still-active rapid press. If repeated `cancel()` calls cause perceived misses, replace cancellation with a bounded native pulse strategy that preserves distinct press edges.
+  Extract native payload validation/clamping and vibration dispatch into `apps/mobile/src/host/haptics.ts`, with `Vibration` passed as an adapter. Add Jest coverage asserting malformed/non-positive values are ignored; inputs `1`, `8`, `24`, `40`, and `41` produce bounded durations `8`, `8`, `24`, `40`, and `40`; and two accepted rapid messages each dispatch one pulse in order. Run `pnpm --filter @xiaochao/mobile test -- --runInBand`. Keep cancellation behavior only if the adapter test proves every accepted rapid request still dispatches; otherwise remove cancellation between presses and test the revised behavior.
 
 ## Chunk 3: Integrated Verification, Review, and PR
 
