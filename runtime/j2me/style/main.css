@@ -575,6 +575,14 @@ body.runtime-active #numpad {
   transform: translate(-50%, -25%) rotate(45deg);
 }
 
+/* Keep portrait soft-key hit targets outside the circular direction pad. */
+body.runtime-active:not([data-orientation="landscape"]) #choice,
+body.runtime-active:not([data-orientation="landscape"]) #back,
+body.runtime-active:not([data-orientation="landscape"]) #ret,
+body.runtime-active:not([data-orientation="landscape"]) #clear {
+  width: calc(50% - var(--u) * 2.5);
+}
+
 #down::before {
   transform: translate(-50%, -75%) rotate(225deg);
 }
@@ -631,6 +639,10 @@ body.runtime-active #numpad {
   transform: translateY(1px);
   background: linear-gradient(#4a78c2, #3a62a3) !important;
   box-shadow: 0 1px 0 #0d1015 !important;
+}
+
+#keypad.keypad-canvas-mode .key.down {
+  transform: none !important;
 }
 
 #keypad .key:focus-visible {
@@ -942,8 +954,6 @@ body.runtime-active[data-orientation="landscape"] #clear { right: calc(var(--u) 
    dimension is authoritative for the virtual phone. */
 .player:fullscreen,
 .player:-webkit-full-screen {
-  --runtime-toolbar-height: 48px;
-  --runtime-toolbar-space: calc(max(8px, env(safe-area-inset-top, 0px)) + var(--runtime-toolbar-height) + 8px);
   position: fixed;
   inset: 0;
   width: 100%;
@@ -958,7 +968,7 @@ body.runtime-active[data-orientation="landscape"] #clear { right: calc(var(--u) 
 .player:fullscreen .playerStage,
 .player:-webkit-full-screen .playerStage {
   position: absolute;
-  inset: var(--runtime-toolbar-space, 72px) 0 0;
+  inset: 0;
 }
 
 .player:fullscreen .runtime-stage,

@@ -5,6 +5,7 @@ import type { WebViewErrorEvent, WebViewMessageEvent, WebViewNavigation } from '
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { startAssetServer, stopAssetServer } from './src/host/assetServer'
 import { injectedBridge, parseHostMessage } from './src/host/protocol'
+import { dispatchHapticMessage } from './src/host/haptics'
 import { styles } from './src/host/styles'
 
 const MAX_START_ATTEMPTS = 2
@@ -67,12 +68,7 @@ function AppContent() {
     const message = parseHostMessage(event.nativeEvent.data)
     if (!message) return
     if (message.type === 'haptic') {
-      if (typeof message.payload !== 'object' || message.payload === null || !('duration' in message.payload)) return
-      const duration = message.payload.duration
-      if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) return
-      const bounded = Math.max(8, Math.min(40, Math.round(duration)))
-      Vibration.cancel()
-      Vibration.vibrate(bounded)
+      dispatchHapticMessage(message, Vibration)
       return
     }
     if (message.type === 'navigation.back' && typeof message.payload === 'object' && message.payload !== null && 'handled' in message.payload && message.payload.handled === false) {
