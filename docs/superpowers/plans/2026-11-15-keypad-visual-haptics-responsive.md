@@ -123,7 +123,7 @@
   design doc, implementation, and evidence, then verify the PR title, body,
   branch, and status through MCP.
 
-- [ ] **Step 5: Run cold-start review passes**
+- [x] **Step 5: Run cold-start review passes**
   Perform the required diff review, feature audit, and Android/WebView validation
   review with new `gpt-6-luna` reviewers at low reasoning and at most 300k tokens
   per context. They receive only the task summary,
