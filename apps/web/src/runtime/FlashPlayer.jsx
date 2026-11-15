@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createRuntimeSession, loadClassic } from './loadScript.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
 
-export function FlashPlayer({ game }) {
+export function FlashPlayer({ game, onCleanupReady }) {
   const hostRef = useRef(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -10,7 +10,17 @@ export function FlashPlayer({ game }) {
   useEffect(() => {
     let alive = true
     let player = null
+    let cleaned = false
     const session = createRuntimeSession()
+    const cleanup = () => {
+      if (cleaned) return
+      cleaned = true
+      alive = false
+      session.invalidate()
+      player?.remove()
+      player = null
+    }
+    onCleanupReady?.(cleanup)
     const ensureActive = () => {
       if (!alive || !session.active) throw new Error('运行时已退出')
     }
@@ -48,12 +58,9 @@ export function FlashPlayer({ game }) {
     })()
 
     return () => {
-      alive = false
-      session.invalidate()
-      player?.remove()
-      player = null
+      cleanup()
     }
-  }, [game.file])
+  }, [game.file, onCleanupReady])
 
   return <div className="runtime-view">
     {loading && !error ? <RuntimeLoading label="正在启动 Flash 播放器…" /> : null}

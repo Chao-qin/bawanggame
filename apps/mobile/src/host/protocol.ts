@@ -40,7 +40,9 @@ export const injectedBridge = `
   window.__XIAOCHAO_NATIVE_BACK__ = function () {
     var isGame = /^#\\/play\\//.test(window.location.hash);
     send('navigation.back', { handled: isGame });
-    if (isGame) window.history.back();
+    if (isGame && typeof window.__XIAOCHAO_NATIVE_BACK_REQUEST__ === 'function') {
+      window.__XIAOCHAO_NATIVE_BACK_REQUEST__();
+    }
     return isGame;
   };
   function haptic(duration) {

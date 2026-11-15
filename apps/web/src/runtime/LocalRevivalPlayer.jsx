@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 const API = '/dasong/v1/command'
+const noop = () => {}
 
 async function command(token, command, payload = {}) {
   const response = await fetch(API, {
@@ -13,9 +14,22 @@ async function command(token, command, payload = {}) {
   return body.data
 }
 
-export function LocalRevivalPlayer({ onExit }) {
+export function LocalRevivalPlayer({ onExit, onCleanupReady }) {
   const [state, setState] = useState({loading: true, error: '', token: '', world: null, character: null, message: '正在进入本地世界…'})
   const inputRef = useRef(null)
+  const stoppedRef = useRef(false)
+  const keyCleanupRef = useRef(noop)
+
+  useEffect(() => {
+    stoppedRef.current = false
+    const cleanup = () => {
+      if (stoppedRef.current) return
+      stoppedRef.current = true
+      keyCleanupRef.current()
+    }
+    onCleanupReady?.(cleanup)
+    return cleanup
+  }, [onCleanupReady])
 
   useEffect(() => {
     let alive = true
@@ -29,9 +43,9 @@ export function LocalRevivalPlayer({ onExit }) {
         const created = await command(token, 'characters.create', {name: '小侠'},)
         const character = await command(token, 'characters.select', {id: created.id})
         const world = await command(token, 'world.get')
-        if (alive) setState({loading: false, error: '', token, world, character, message: '方向键移动角色'})
+        if (alive && !stoppedRef.current) setState({loading: false, error: '', token, world, character, message: '方向键移动角色'})
       } catch (error) {
-        if (alive) setState((current) => ({...current, loading: false, error: error.message || String(error), message: '本地服务未启动'}))
+        if (alive && !stoppedRef.current) setState((current) => ({...current, loading: false, error: error.message || String(error), message: '本地服务未启动'}))
       }
     })()
     return () => { alive = false }
@@ -41,21 +55,26 @@ export function LocalRevivalPlayer({ onExit }) {
     const onKey = (event) => {
       const directions = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]}
       const direction = directions[event.key]
-      if (!direction || !state.token || !state.character) return
+      if (stoppedRef.current || !direction || !state.token || !state.character) return
       event.preventDefault()
       move(direction[0], direction[1])
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const cleanup = () => window.removeEventListener('keydown', onKey)
+    keyCleanupRef.current = cleanup
+    return () => {
+      cleanup()
+      if (keyCleanupRef.current === cleanup) keyCleanupRef.current = noop
+    }
   }, [state.token, state.character])
 
   async function move(dx, dy) {
     try {
       const result = await command(state.token, 'world.move', {dx, dy})
       const world = await command(state.token, 'world.get')
-      setState((current) => ({...current, world, character: {...current.character, x: result.x, y: result.y}, message: `已移动到 (${result.x}, ${result.y})`}))
+      if (!stoppedRef.current) setState((current) => ({...current, world, character: {...current.character, x: result.x, y: result.y}, message: `已移动到 (${result.x}, ${result.y})`}))
     } catch (error) {
-      setState((current) => ({...current, message: error.message || String(error)}))
+      if (!stoppedRef.current) setState((current) => ({...current, message: error.message || String(error)}))
     }
   }
 
