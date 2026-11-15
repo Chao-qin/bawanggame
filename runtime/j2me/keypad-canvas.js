@@ -126,6 +126,11 @@
     function drawTextButton(item, text, color, size, weight) {
       if (!item) return;
       paintButton(item, color, Math.min(item.w, item.h) * 0.18);
+      drawTextLabel(item, text, color, size, weight);
+    }
+
+    function drawTextLabel(item, text, color, size, weight) {
+      if (!item) return;
       ctx.fillStyle = color.text;
       ctx.font = (weight || 600) + " " + Math.max(11, size) + "px system-ui, sans-serif";
       ctx.textAlign = "center";
@@ -177,11 +182,25 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
       var color = colors();
-      drawDpad(canvasRect, color);
+      // MRP shares this renderer but can inherit a cached J2ME config global.
+      var requestedOrientation = window.__XIAOCHAO_RUNTIME__ === true && window.config && window.config.orientation;
+      var orientation = requestedOrientation === "portrait" || requestedOrientation === "landscape"
+        ? requestedOrientation
+        : document.body.dataset.viewportOrientation || document.body.dataset.orientation;
+      var portrait = orientation === "portrait";
+      if (!portrait) drawDpad(canvasRect, color);
       drawSoft(rectFor("choice", canvasRect), color);
       drawSoft(rectFor("back", canvasRect), color);
       drawTextButton(rectFor("ret", canvasRect), "↩", color, 18, 600);
       drawTextButton(rectFor("clear", canvasRect), "C", color, 18, 600);
+      if (portrait) {
+        // Paint the d-pad after portrait action slots so its arrows remain visible
+        // where the DOM mask would otherwise cut the soft-key backgrounds away.
+        drawDpad(canvasRect, color);
+        // Keep the action labels readable where the d-pad overlaps their slots.
+        drawTextLabel(rectFor("ret", canvasRect), "↩", color, 18, 600);
+        drawTextLabel(rectFor("clear", canvasRect), "C", color, 18, 600);
+      }
       drawNumbers(canvasRect, color);
     }
 
