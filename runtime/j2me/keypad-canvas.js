@@ -35,7 +35,7 @@
       num1: ["1", ".,?"], num2: ["2", "abc"], num3: ["3", "def"],
       num4: ["4", "ghi"], num5: ["5", "jkl"], num6: ["6", "mno"],
       num7: ["7", "pqrs"], num8: ["8", "tuv"], num9: ["9", "wxyz"],
-      star: ["*", "+"], num0: ["0", "_"], pound: ["#", "^"]
+      star: ["*", "+"], num0: ["0", "␣"], pound: ["#", "⇧"]
     };
 
     function schedule() {
@@ -99,7 +99,7 @@
 
     function font(styles, role, size) {
       var style = styles[role] || styles.mini;
-      return (style.weight || "400") + " " + Math.max(9, size || style.size) + "px " + styles.family;
+      return (style.weight || "400") + " " + Math.max(1, size || style.size) + "px " + styles.family;
     }
 
     function makeGradient(top, bottom, x, y, h) {
@@ -226,15 +226,19 @@
       Object.keys(labels).forEach(function (id) {
         var item = rectFor(id, base), label = labels[id];
         if (!item) return;
+        var primaryNode = item.node.querySelector("b");
+        var auxiliaryNode = item.node.querySelector("i");
+        var primary = primaryNode && primaryNode.textContent.trim() || label[0];
+        var auxiliary = auxiliaryNode && auxiliaryNode.textContent.trim() || label[1];
         paintButton(item, color, Math.min(item.w, item.h) * 0.28, "number");
         ctx.textBaseline = "middle";
         ctx.textAlign = "left";
         ctx.fillStyle = color.text;
         ctx.font = font(styles, "number");
-        ctx.fillText(label[0], item.x + item.w * 0.35, item.y + item.h / 2);
+        ctx.fillText(primary, item.x + item.w * 0.35, item.y + item.h / 2);
         ctx.fillStyle = color.dim;
         ctx.font = font(styles, "auxiliary");
-        ctx.fillText(label[1], item.x + item.w * 0.56, item.y + item.h / 2 + item.h * 0.03);
+        ctx.fillText(auxiliary, item.x + item.w * 0.56, item.y + item.h / 2 + item.h * 0.03);
       });
     }
 
