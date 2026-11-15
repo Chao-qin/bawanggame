@@ -29,13 +29,13 @@
 - Possibly modify: `apps/web/src/App.jsx`
 
 - [ ] **Step 1: Trace rendered and semantic D-pad mappings**
-  Compare the four `TouchLayout` presets, CSS slot placement, `Touchpad` geometric direction lookup, and Canvas arrow rendering. Record the expected screen-slot to game-action mapping for standard, mirror, rotate-cw, and rotate-ccw.
+  Compare the four `TouchLayout` presets, CSS slot placement, `Touchpad` geometric direction lookup, and Canvas arrow rendering. Use this screen-slot to game-action mapping as the verification oracle: `standard` = up→up, right→right, down→down, left→left; `mirror` = up→up, right→left, down→down, left→right; `rotate-cw` = up→left, right→up, down→right, left→down; `rotate-ccw` = up→right, right→down, down→left, left→up.
 - [ ] **Step 2: Correct only the mismatched rendering/layout rules**
   Keep rectangles from `getBoundingClientRect()` as the position source. Make Canvas glyphs correspond to the action assigned to each rendered slot. Add spacing so adjacent D-pad and soft-key hit bounds have at least `0.2 * --u` clearance at the narrow portrait layout. Remove duplicate active offset/outline artifacts while preserving active colors.
 - [ ] **Step 3: Make toolbar an overlay without shrinking the stage**
-  Inspect fullscreen and non-fullscreen player styles. Ensure expanding/collapsing the toolbar does not alter the fullscreen stage bounds, while safe-area positioning and pointer interaction remain correct.
+  Inspect fullscreen and non-fullscreen player styles. Ensure expanding/collapsing the toolbar does not change the stage's width or height in either mode, and floating controls do not reserve toolbar height in layout. Confirm safe-area positioning and pointer interaction remain correct.
 - [ ] **Step 4: Capture and inspect visual states**
-  Run the web app and capture narrow portrait, landscape, and rotation transition at idle and pressed states. Check arrow mapping, spacing, numeric key bounds, no content overlap, and toolbar toggle geometry. Correct issues before proceeding.
+  Run the web app and capture narrow portrait, landscape, and rotation transition at idle and pressed states. Compare D-pad screen slots to the mapping in Step 1; measure adjacent D-pad/soft-key bounding rectangles for at least `0.2 * --u` clearance; confirm numeric pressed pixels and DOM controls stay within their pre-press bounds; verify toolbar toggles preserve stage width/height in fullscreen and non-fullscreen; and inspect for overlap/clipping. Correct issues before proceeding.
 
 ## Chunk 2: Improve Mobile Haptic Feedback
 
