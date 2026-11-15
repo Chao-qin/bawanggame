@@ -16,6 +16,13 @@ const TABS = [
 
 const TAB_IDS = new Set(TABS.map((item) => item.id))
 const GAME_KINDS = new Set(['j2me', 'maopao', 'local-revival', 'flash'])
+const RUNTIME_EXIT_POLICIES = Object.freeze({
+  flash: 'dispose',
+  'local-revival': 'dispose',
+  j2me: 'reload',
+  maopao: 'reload',
+})
+const noopCleanup = () => {}
 const FLASH_GAMES = [
   { kind: 'flash', file: 'fruit-madness.swf', name: 'Fruit Madness', vendor: 'Vladimir Belyaev · MIT', desc: '躲避水果并收集松饼', size: 2236139, iconUrl: null, local: false },
   { kind: 'flash', file: 'sample-game.swf', name: 'Star Catcher', vendor: '内置输入测试', desc: '点击星星得分', size: 1767, iconUrl: null, local: false },
@@ -514,7 +521,12 @@ function Player({ game, onBack, nativeBackSignal }) {
   const stageRef = useRef(null)
   const toolbarRef = useRef(null)
   const lastNativeBackSignal = useRef(nativeBackSignal)
+  const runtimeCleanupRef = useRef(noopCleanup)
+  const exitStartedRef = useRef(false)
   const settingsReady = game.kind === 'j2me' && runtimeReadyFor === game.file
+  const registerRuntimeCleanup = useCallback((cleanup) => {
+    runtimeCleanupRef.current = typeof cleanup === 'function' ? cleanup : noopCleanup
+  }, [])
   useEffect(() => {
     const player = playerRef.current
     const toolbar = toolbarRef.current
@@ -604,10 +616,13 @@ function Player({ game, onBack, nativeBackSignal }) {
     setConfirming(true)
   }, [nativeBackSignal])
   useEffect(() => () => {
+    runtimeCleanupRef.current()
     if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
   }, [])
-  const requestBack = useCallback(() => setConfirming(true), [])
+  const requestBack = useCallback(() => {
+    if (!exitStartedRef.current) setConfirming(true)
+  }, [])
   const toggleFullscreen = async () => {
     try {
       if (fullscreenElement()) await exitFullscreen()
@@ -632,16 +647,22 @@ function Player({ game, onBack, nativeBackSignal }) {
     if (gear) gear.click()
   }
   const exit = () => {
+    if (exitStartedRef.current) return
+    exitStartedRef.current = true
     try { window.myflushAll && window.myflushAll() } catch (_) {}
     try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
+    try { runtimeCleanupRef.current() } catch (_) {}
     if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
     setConfirming(false)
     onBack()
-    // The classic VM installs process-wide listeners and caches globals that
-    // cannot be safely reconstructed inside the SPA realm. Reload after the
-    // library hash is committed so the next game starts from a fresh realm.
-    window.setTimeout(() => window.location.reload(), 0)
+    if (RUNTIME_EXIT_POLICIES[game.kind] === 'reload') {
+      // The classic VM installs process-wide listeners and caches globals that
+      // cannot be safely reconstructed inside the SPA realm. Reload after the
+      // library hash is committed so the next game starts from a fresh realm.
+      window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ = (window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0) + 1
+      window.setTimeout(() => window.location.reload(), 0)
+    }
   }
   return (
     <div ref={playerRef} className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
@@ -656,7 +677,7 @@ function Player({ game, onBack, nativeBackSignal }) {
         </div>}
       </div>
       <div ref={stageRef} className="playerStage">
-        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
+        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
       {confirming && (
@@ -681,6 +702,14 @@ export default function App() {
   const [nativeBackSignal, setNativeBackSignal] = useState(0)
   const routeRef = useRef(route)
   const restoringHistory = useRef(false)
+
+  useEffect(() => {
+    const requestNativeBack = () => setNativeBackSignal((value) => value + 1)
+    window.__XIAOCHAO_NATIVE_BACK_REQUEST__ = requestNativeBack
+    return () => {
+      if (window.__XIAOCHAO_NATIVE_BACK_REQUEST__ === requestNativeBack) delete window.__XIAOCHAO_NATIVE_BACK_REQUEST__
+    }
+  }, [])
 
   useEffect(() => { routeRef.current = route }, [route])
 

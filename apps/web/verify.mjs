@@ -148,6 +148,59 @@ try {
     await evaluate(`document.querySelector('.optionBackdrop')?.click(); true`)
   } else console.log('SKIP: no local-revival card for option sheet')
 
+  await navigate('#/play/flash/fruit-madness.swf?tab=flash&name=Fruit%20Madness', 2500)
+  const flash = await evaluate(`(() => ({ player: !!document.querySelector('.player'), stage: !!document.querySelector('.playerStage'), runtime: !!document.querySelector('ruffle-player'), reloads: window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0 }))()`)
+  console.log('Flash startup:', JSON.stringify(flash))
+  requireCheck(flash.player && flash.stage, 'Flash player did not mount')
+  for (const [width, height] of [[390, 844], [844, 390]]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+    await sleep(180)
+    const layout = await evaluate(`(() => {
+      const read = (selector) => { const node = document.querySelector(selector); if (!node) return null; const r = node.getBoundingClientRect(); return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height} }
+      const toolbar = read('.runtimeToolbar')
+      const stage = read('.playerStage')
+      const canvas = read('ruffle-player')
+      const collapsed = document.querySelector('.runtimeToolbar')?.classList.contains('runtimeToolbarCollapsed')
+      return {toolbar, stage, canvas, collapsed, scrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth}
+    })()`)
+    console.log(`Flash layout ${width}x${height}:`, JSON.stringify(layout))
+    requireCheck(layout.stage && layout.canvas && layout.stage.width > 0 && layout.stage.height > 0, `Flash stage is unstable at ${width}x${height}`)
+    requireCheck(layout.scrollWidth <= layout.viewportWidth + 1, `Flash layout overflows horizontally at ${width}x${height}`)
+    if (width > height && layout.collapsed) requireCheck(layout.toolbar.right <= layout.stage.left + 1, `Landscape toolbar overlaps Flash stage at ${width}x${height}`)
+    if (width <= height && !layout.collapsed) requireCheck(layout.toolbar.bottom <= layout.stage.top + 1, `Portrait toolbar overlaps Flash stage at ${width}x${height}`)
+  }
+  await send('Emulation.clearDeviceMetricsOverride')
+  await evaluate(`window.__XIAOCHAO_NATIVE_BACK_REQUEST__?.(); true`)
+  await sleep(150)
+  requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'Flash exit confirmation did not open')
+  await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
+  await sleep(500)
+  const flashExit = await evaluate(`(() => ({ hash: window.location.hash, tab: document.querySelector('.tabActive')?.textContent.trim() || '', reloads: window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0, player: !!document.querySelector('.player') }))()`)
+  console.log('Flash exit:', JSON.stringify(flashExit))
+  requireCheck(flashExit.hash === '#/library/flash' && flashExit.tab === 'Flash' && flashExit.reloads === 0 && !flashExit.player, 'Flash exit reloaded or lost the active library tab')
+  await navigate('#/play/flash/fruit-madness.swf?tab=flash&name=Fruit%20Madness', 1200)
+  requireCheck(await evaluate("!!document.querySelector('.playerStage')"), 'Flash re-entry did not mount')
+
+  await evaluate(`(() => {
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = (input, init) => {
+      if (!String(input).includes('/dasong/v1/command')) return originalFetch(input, init)
+      const command = JSON.parse(init?.body || '{}').command
+      const data = command === 'login' ? {token: 'verify-token'} : command === 'characters.create' ? {id: 1} : command === 'characters.select' ? {id: 1, name: '小侠', x: 0, y: 0, level: 1, hp: 100, max_hp: 100, experience: 0, gold: 0} : command === 'world.get' ? {map: {width: 2, height: 2, blocked: []}, npcs: []} : {}
+      return Promise.resolve(new Response(JSON.stringify({data}), {status: 200, headers: {'content-type': 'application/json'}}))
+    }
+    window.location.hash = '#/play/local-revival/local-revival?tab=j2me&name=Local%20Revival'
+    return true
+  })()`)
+  await sleep(500)
+  await evaluate(`window.__XIAOCHAO_NATIVE_BACK_REQUEST__?.(); true`)
+  await sleep(100)
+  await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
+  await sleep(400)
+  const localExit = await evaluate(`({ hash: window.location.hash, reloads: window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0 })`)
+  console.log('Local revival exit:', JSON.stringify(localExit))
+  requireCheck(localExit.hash === '#/library/j2me' && localExit.reloads === 0, 'Local revival exit reloaded or returned to the wrong tab')
+
   if (!J2ME_FILE) {
     console.log('SKIP: no J2ME fixture (set VERIFY_J2ME_FILE)')
   } else {
