@@ -3,6 +3,7 @@ export const MAX_FLASH_BYTES = 64 * 1024 * 1024
 const DB_NAME = 'flash-local'
 const DB_VERSION = 1
 const STORE_NAME = 'games'
+const MAX_REDIRECTS = 5
 const SWF_SIGNATURES = new Set(['FWS', 'CWS', 'ZWS'])
 let databasePromise
 
@@ -61,8 +62,19 @@ function flashError(code, message) {
 function database() {
   if (typeof indexedDB === 'undefined') return Promise.reject(flashError('storage_unavailable', '本机存储不可用'))
   if (databasePromise) return databasePromise
-  databasePromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
+  let openPromise
+  const promise = new Promise((resolve, reject) => {
+    let request
+    const failOpen = (error) => {
+      if (databasePromise === openPromise) databasePromise = undefined
+      reject(error)
+    }
+    try {
+      request = indexedDB.open(DB_NAME, DB_VERSION)
+    } catch (_) {
+      failOpen(flashError('storage_unavailable', '无法打开本机 Flash 存储'))
+      return
+    }
     request.onupgradeneeded = () => {
       const store = request.result.objectStoreNames.contains(STORE_NAME)
         ? request.result.transaction.objectStore(STORE_NAME)
@@ -71,15 +83,19 @@ function database() {
     }
     request.onsuccess = () => {
       const db = request.result
-      db.onversionchange = () => db.close()
+      db.onversionchange = () => {
+        db.close()
+        if (databasePromise === openPromise) databasePromise = undefined
+      }
       resolve(db)
-    }
-    const failOpen = (error) => {
-      databasePromise = undefined
-      reject(error)
     }
     request.onerror = () => failOpen(flashError('storage_unavailable', '无法打开本机 Flash 存储'))
     request.onblocked = () => failOpen(flashError('storage_blocked', '本机 Flash 存储正被其他页面占用'))
+  })
+  openPromise = promise
+  databasePromise = promise
+  promise.catch(() => {
+    if (databasePromise === promise) databasePromise = undefined
   })
   return databasePromise
 }
@@ -156,14 +172,23 @@ export async function validateSwf(blob) {
 }
 
 export async function fetchSwf(url, signal) {
-  const sourceUrl = normalizedUrl(url)
+  let sourceUrl = normalizedUrl(url)
   let response
-  try {
-    response = await fetch(sourceUrl, { credentials: 'omit', redirect: 'follow', signal })
-  } catch (cause) {
-    if (cause?.name === 'AbortError') throw flashError('cancelled', '下载已取消')
-    throw flashError('network_error', '无法下载 SWF，请检查网络或目标站点的 CORS 设置')
+  for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+    try {
+      response = await fetch(sourceUrl, { credentials: 'omit', redirect: 'manual', signal })
+    } catch (cause) {
+      if (cause?.name === 'AbortError') throw flashError('cancelled', '下载已取消')
+      throw flashError('network_error', '无法下载 SWF，请检查网络或目标站点的 CORS 设置')
+    }
+    if (response.status < 300 || response.status >= 400) break
+    if (redirects === MAX_REDIRECTS) throw flashError('redirect_error', 'SWF 重定向次数过多')
+    const location = response.headers.get('location')
+    if (!location) throw flashError('redirect_error', 'SWF 重定向地址不可用')
+    try { sourceUrl = normalizedUrl(new URL(location, sourceUrl).href) } catch (_) { throw flashError('redirect_error', 'SWF 重定向地址无效') }
   }
+  if (!response) throw flashError('network_error', '无法下载 SWF')
+  if (response.type === 'opaqueredirect') throw flashError('redirect_error', 'SWF 重定向需要目标站点允许跨域读取')
   if (!response.ok) throw flashError('http_error', `SWF 下载失败（HTTP ${response.status}）`)
   const length = Number(response.headers.get('content-length') || 0)
   if (length > MAX_FLASH_BYTES) throw flashError('too_large', 'SWF 文件不能超过 64 MiB')
