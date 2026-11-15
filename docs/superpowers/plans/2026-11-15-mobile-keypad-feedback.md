@@ -12,7 +12,7 @@
 
 ## Files and Responsibilities
 
-- `apps/web/src/App.jsx`: reports toolbar height and renders runtime controls; only adjust measurement if CSS overlay behavior needs it.
+- `apps/web/src/App.jsx`: renders runtime controls and the collapsed-toolbar state.
 - `runtime/j2me/style/main.css`: stage, toolbar, keypad spacing, and numeric pressed state.
 - `runtime/j2me/keypad-canvas.js`: render arrows and pressed controls using live DOM rectangles and touch-layout semantics.
 - `runtime/j2me/touchpad.js`: preserve deduplication and use the mobile default haptic request.
@@ -35,9 +35,9 @@
 - [x] **Step 2: Correct only the mismatched rendering/layout rules**
   Keep rectangles from `getBoundingClientRect()` as the position source. Make Canvas glyphs correspond to the action assigned to each rendered slot. Add spacing so adjacent D-pad and soft-key hit bounds have at least `0.2 * --u` clearance at the narrow portrait layout. Remove duplicate active offset/outline artifacts while preserving active colors.
 - [x] **Step 3: Make toolbar an overlay without shrinking the stage**
-  Inspect fullscreen and non-fullscreen player styles. Ensure expanding/collapsing the toolbar does not change the stage's width or height in either mode, and floating controls do not reserve toolbar height in layout. Confirm safe-area positioning and pointer interaction remain correct.
+  Inspect fullscreen and non-fullscreen player styles. Ensure the toolbar never reserves top height. Preserve the existing 56px safe-area column at the left while the toolbar is collapsed in landscape, including WebKit fullscreen. Confirm safe-area positioning and pointer interaction remain correct.
 - [x] **Step 4: Capture and inspect visual states**
-  Run the web app and capture narrow portrait, landscape, and rotation transition at idle and pressed states. Compare D-pad screen slots to the mapping in Step 1; measure adjacent D-pad/soft-key bounding rectangles for at least `0.2 * --u` clearance; confirm numeric pressed pixels and DOM controls stay within their pre-press bounds; verify toolbar toggles preserve stage width/height in fullscreen and non-fullscreen; and inspect for overlap/clipping. Correct issues before proceeding.
+  Run the web app and capture narrow portrait, landscape, and rotation transition at idle and pressed states. Compare D-pad screen slots to the mapping in Step 1; measure adjacent D-pad/soft-key bounding rectangles for at least `0.2 * --u` clearance; confirm numeric pressed pixels and DOM controls stay within their pre-press bounds; verify toolbar toggles preserve stage height in fullscreen and non-fullscreen and collapsed landscape preserves the 56px safe-area column at the left; and inspect for overlap/clipping. Correct issues before proceeding.
 
 ## Chunk 2: Improve Mobile Haptic Feedback
 
@@ -64,8 +64,10 @@
 
 - [x] **Step 1: Run required checks**
   Run `pnpm --filter @xiaochao/web build`, `node --check runtime/j2me/keypad-canvas.js`, `node --check runtime/j2me/touchpad.js`, `pnpm --filter @xiaochao/mobile typecheck`, `pnpm mobile:prepare-web`, `pnpm mobile:verify-web`, and `git diff --check`. Remove generated artifacts from the PR worktree after verification.
+  Re-run after the `origin/main` rebase: Web build, both runtime syntax checks, mobile typecheck, haptic Jest (13 tests), mobile resource preparation and verification (52.0 MiB), and `git diff --check` all pass.
 - [x] **Step 2: Record browser and haptic evidence**
-  At narrow portrait and landscape viewports, verify D-pad arrows for all presets, `0.2 * --u` gap, pressed-state bounds, toolbar toggle stage bounds, and rotation transition. Use a browser bridge stub to record 24 ms defaults, rapid re-presses, multi-holder deduplication, and explicit duration values. Keep screenshot output and temporary browser profiles out of Git.
+  At narrow portrait and landscape viewports, verify D-pad arrows for all presets, `0.2 * --u` gap, pressed-state bounds, toolbar toggle stage height, the 56px left safe-area column while collapsed in landscape, and rotation transition. Use a browser bridge stub to record 24 ms defaults, rapid re-presses, multi-holder deduplication, and explicit duration values. Keep screenshot output and temporary browser profiles out of Git.
+  Latest Chrome CDP runs pass: portrait gaps are 7.56px against a 7.55px minimum; all four D-pad maps match; numeric pressed bounds are unchanged; landscape collapsed stage is `left=56,width=788,height=390`; expanded stage is `844x390`; haptics are native `[24,24,40]`, fallback `[40]`, and desktop default `0`. Fullscreen request is denied by headless Chrome (`TypeError: not granted`), so only the failure path is recorded.
 - [x] **Step 3: Record Android/device limits**
   The Android release build was attempted but could not start because this environment has no Java runtime; `adb` is also unavailable. The manifest declares `android.permission.VIBRATE`, and the generated Android assets contain the staged 52 MiB WebView package. APK resource inspection, install/launch, emulator vibration, and physical-device vibration remain unverified.
 - [x] **Step 4: Complete cold-start review passes**

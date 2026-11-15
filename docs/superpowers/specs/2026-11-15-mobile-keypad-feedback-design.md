@@ -29,8 +29,10 @@ one pull request.
   mapping for all four `TouchLayout` presets; the direction-pad and soft-key
   hit rectangles do not overlap and keep at least `0.2 * --u` clearance where
   they are adjacent. Numeric pressed-state pixels remain inside the idle key
-  bounds, with no extra DOM outline. In fullscreen, the stage retains the same
-  viewport bounds with toolbar expanded or collapsed. Browser bridge stubs
+  bounds, with no extra DOM outline. The stage keeps full viewport height when
+  the toolbar expands or collapses. A collapsed landscape toolbar retains the
+  existing 56px safe-area column on the left so it cannot cover the direction
+  pad. Browser bridge stubs
   verify a single default 24 ms request per new coarse-pointer press, no
   repeats while held, and preservation/clamping of explicit values. The 24 ms
   default is for mobile coarse-pointer settings; desktop remains silent by
@@ -52,8 +54,9 @@ presets (`standard`, `mirror`, `rotate-cw`, `rotate-ccw`) must agree with
 `Touchpad`'s geometric hit direction mapping; Canvas must not independently
 rotate the layout. Make the smallest targeted spacing and pressed-state changes
 in the existing responsive layout. Keep runtime toolbar controls floating over
-the stage, and ensure the measured toolbar height does not reduce the fullscreen
-stage's viewport bounds when the toolbar expands or collapses.
+the stage so toolbar height never reduces the available game height. Preserve
+the existing 56px left safe-area column while the toolbar is collapsed in
+landscape, including standard and WebKit fullscreen.
 
 Continue to trigger haptics only on the deduplicated transition from no holders
 to the first holder for a key. Increase the phone default pulse to 24 ms while
@@ -80,8 +83,9 @@ separately.
   and landscape sizes, then rotate the viewport and re-check positions and
   pressed states. Verify the `0.2 * --u` clearance against live DOM rectangles,
   all four arrow presets against their expected action maps, the pressed-state
-  drawing stays within key rectangles, and fullscreen stage bounds do not
-  change when the toolbar toggles.
+  drawing stays within key rectangles, stage height remains the viewport height
+  when the toolbar toggles, and collapsed landscape keeps a 56px safe-area
+  column at the left without a top inset.
 - Touch feedback: dispatch rapid touch presses through the bridge stub and
   assert one request per newly pressed key, no repeated request while held, the
   24 ms default, and explicit duration handling.
