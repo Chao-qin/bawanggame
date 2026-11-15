@@ -73,5 +73,6 @@
 - [x] **Step 4: Complete cold-start review passes**
   Run R1 diff review, feature audit, and WebView/platform validation review in that order. Resolve P0/P1/P2 findings with a fixer after all applicable R1 passes complete. If a P0/P1 cannot be fixed safely, escalate and stop delivery. Re-run applicable cold-start reviews after fixes; stop by R3. A P2 remaining after R3 blocks delivery unless an authorized owner records risk acceptance, follow-up owner, and due/target date in a traceable artifact. Save reports under `docs/reviews/` using `docs/review-report-template.md`.
   R2 diff and feature audit identified and fixed the Canvas semantic arrow mapping for mirror/rotated layouts; R2 validation passed. R3 diff, feature audit, and validation all pass with no findings after the fix. Residual platform limits remain documented in the R3 reports.
-- [ ] **Step 5: Commit, push, and open one PR**
+- [x] **Step 5: Commit, push, and open one PR**
   Check `git diff --check`, commit only task files, push `fix/mobile-keypad-feedback`, search for duplicate PRs/templates with GitHub MCP, create one PR through GitHub MCP, then verify PR title/body/head/base/status through MCP. Finish the PR description or delivery report with branch, commit, PR URL/status, core files and behavior changes, verification commands/results, absolute build artifact paths if produced, and unverified scenarios/environment limits/residual risks.
+  Delivered as PR #32: https://github.com/Chao-qin/bawanggame/pull/32 (open, head `fix/mobile-keypad-feedback`, base `main`, mergeable clean).
