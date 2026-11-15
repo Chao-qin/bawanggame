@@ -117,7 +117,7 @@
   requested duration. Do not claim physical vibration without a physical-device
   run.
 
-- [ ] **Step 4: Update checkboxes and commit**
+- [x] **Step 4: Update checkboxes and commit**
   Mark completed plan items, commit the implementation, push the single branch,
   and use GitHub MCP to search for duplicates, create one PR containing the
   design doc, implementation, and evidence, then verify the PR title, body,
