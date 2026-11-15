@@ -73,7 +73,7 @@ try {
   await sleep(900)
   const localState = await evaluate(`new Promise((resolve, reject) => { const request = indexedDB.open('flash-local'); request.onerror = () => reject(request.error); request.onsuccess = () => { const tx = request.result.transaction('games'); const get = tx.objectStore('games').getAll(); get.onsuccess = () => resolve(get.result.map((item) => ({ id: item.id, name: item.name, key: item.dedupeKey }))); get.onerror = () => reject(get.error) } })`)
   console.log('Local records:', JSON.stringify(localState))
-  check(localState.length === 1 && localState[0].key === 'catalog:fruit-madness.swf', 'Flash catalog item was not stored locally')
+  check(localState.length === 1 && localState[0].key === 'catalog:fruit-madness', 'Flash catalog item was not stored locally')
   const id = localState[0].id
 
   await send('Page.reload')

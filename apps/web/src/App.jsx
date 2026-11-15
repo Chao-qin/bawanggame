@@ -516,7 +516,7 @@ function FlashStore({ onRefreshLibrary }) {
     setError('')
     setMessage('')
     try {
-      await addBundled(game.file, { name: game.name, description: game.desc })
+      await addBundled(game.file, { name: game.name, description: game.desc }, game.catalogId)
       setMessage(`已加入「${game.name}」，现在可以在 Flash 库中启动。`)
       local.refresh()
       onRefreshLibrary()
