@@ -34,6 +34,8 @@ const games = [
 
 const gameLicense = path.join(repoRoot, 'games/flash/fruit-madness/LICENSE')
 if (!fs.existsSync(gameLicense)) throw new Error('Missing MIT license for Fruit Madness: games/flash/fruit-madness/LICENSE')
+const sampleGameLicense = path.join(repoRoot, 'games/flash/LICENSE')
+if (!fs.existsSync(sampleGameLicense)) throw new Error('Missing MIT license for Star Catcher: games/flash/LICENSE')
 
 for (const game of games) {
   const source = path.join(repoRoot, game.source)
@@ -44,4 +46,8 @@ for (const game of games) {
 fs.copyFileSync(
   gameLicense,
   path.join(flashDest, 'fruit-madness-LICENSE'),
+)
+fs.copyFileSync(
+  sampleGameLicense,
+  path.join(flashDest, 'sample-game-LICENSE'),
 )

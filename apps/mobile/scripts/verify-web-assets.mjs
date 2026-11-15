@@ -30,6 +30,7 @@ const requiredFiles = [
   'flash/fruit-madness.swf',
   'flash/fruit-madness-LICENSE',
   'flash/sample-game.swf',
+  'flash/sample-game-LICENSE',
 ]
 
 const missing = requiredFiles.filter((entry) => !fs.existsSync(path.join(webRoot, entry)))
