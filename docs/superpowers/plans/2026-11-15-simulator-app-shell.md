@@ -30,9 +30,9 @@ Extend the existing browser verifier or add a focused browser test helper that i
 
 Run the focused verifier against a local production server. Expected: the assertion fails because `Player.exit()` currently schedules `window.location.reload()` for every runtime.
 
-- [ ] **Step 3: Add the policy table and idempotent exit state**
+- [ ] **Step 3: Add the policy table, cleanup handle, and idempotent exit state**
 
-Define a small policy map in `App.jsx` keyed by runtime kind. Keep `reload` for `j2me` and `maopao`, and set `dispose` for `flash` and `local-revival`. Add a ref guard so only the first confirmed exit performs cleanup and route commit.
+Define a small policy map in `App.jsx` keyed by runtime kind. Keep `reload` for `j2me` and `maopao`, and set `dispose` for `flash` and `local-revival`. Add a `runtimeCleanupRef` and pass `onCleanupReady(cleanup)` to the runtime. The callback must register an idempotent synchronous cleanup function. Add a ref guard so only the first confirmed exit performs cleanup and route commit.
 
 - [ ] **Step 4: Move cleanup before route commit and gate reload**
 
@@ -40,7 +40,7 @@ Update `Player.exit()` to clean runtime artifacts and fullscreen first, call `on
 
 - [ ] **Step 5: Make runtime cleanup safe on dispose**
 
-Ensure Flash and local revival unmount cleanup is idempotent and late async work cannot update state after route exit. Do not alter J2ME/MRP engine internals beyond the policy handoff.
+Ensure Flash and local revival register cleanup handles that invalidate async work and remove listeners/player nodes synchronously. React effect cleanup must call the same handle as a no-op safety net, and late async work cannot update state after route exit. Do not alter J2ME/MRP engine internals beyond the policy handoff.
 
 - [ ] **Step 6: Run the focused assertion**
 
@@ -63,15 +63,15 @@ git commit -m "fix: avoid webview reload when leaving disposable runtimes"
 
 - [ ] **Step 1: Add bridge tests for handled and unhandled back**
 
-Assert that the injected bridge reports `handled: true` exactly once for a play hash and `handled: false` for a library hash. Assert that only the play case calls `history.back()`.
+Assert that the injected bridge reports `handled: true` exactly once for a play hash and `handled: false` for a library hash. Assert that neither case mutates history; the play case invokes the page-level native-back callback and the library case leaves React Native responsible for exiting the host.
 
 - [ ] **Step 2: Route native back through the shell callback**
 
-Keep the native bridge as the single message source, but make the Web route handler call the same exit-confirmation callback as the toolbar. Prevent a `popstate` plus injected `history.back()` sequence from opening two confirmations.
+Keep the native bridge as the single message source, install a page-level callback from `App`, and make it call the same exit-confirmation callback as the toolbar. Remove the `history.back()` call from the injected native bridge. Keep browser `popstate` handling for real browser history events and prevent duplicate confirmations with the exit guard.
 
 - [ ] **Step 3: Run bridge and web checks**
 
-Run the bridge test and browser verifier. Expected: one confirmation per Android back press and no duplicate history transitions.
+Run the bridge test and browser verifier. Expected: one confirmation per Android back press, cancel leaves the game route intact, confirm returns to the same library tab, and library back exits the host.
 
 - [ ] **Step 4: Commit**
 
@@ -106,7 +106,7 @@ Keep the game stage full viewport in landscape, collapse the toolbar to its acce
 
 - [ ] **Step 4: Run visual smoke checks**
 
-Run the web build and the browser verifier at a narrow portrait viewport and a landscape viewport. Expected: no horizontal overflow, stable stage bounds across loading/running/error, and no toolbar overlap with the game canvas.
+Run the web build and the browser verifier at 390x844 and 844x390. Capture or query `.player`, `.playerStage`, `.runtimeToolbar`, runtime canvas, and error/confirmation rectangles in boot, running, error, and confirmation states. Expected: no horizontal overflow, stable stage bounds, fixed card heights, text fitting, and no toolbar overlap with the game canvas.
 
 - [ ] **Step 5: Commit**
 
@@ -124,7 +124,7 @@ git commit -m "style: define simulator app shell tokens"
 
 - [ ] **Step 1: Add the runtime policy table to mobile documentation**
 
-Document portrait-first behavior, landscape game mode, safe-area ownership, and which runtime kinds dispose versus reload on exit.
+Document portrait-first behavior, landscape game mode, safe-area ownership, the visual utility rules, and which runtime kinds dispose versus reload on exit.
 
 - [ ] **Step 2: Run documentation and diff checks**
 

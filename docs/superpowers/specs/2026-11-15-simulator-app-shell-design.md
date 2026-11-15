@@ -13,7 +13,7 @@ Define one visual and lifecycle contract for the simulator app, improve the crow
 
 ## Product and Visual Rules
 
-The app is a portrait-first mobile simulator library. The library prioritizes scanning: a compact app bar, one tab strip, one search/action row, and a dense game grid. Large marketing-style hero panels, unrelated status rows, and decorative gradients are not used in the main library. Repeated game entries use one restrained card treatment with a consistent icon box, title line, and metadata line.
+The app is a portrait-first mobile simulator library. The library prioritizes scanning: a compact app bar, one tab strip, one search/action row, and a dense game grid. Large marketing-style hero panels, unrelated status rows, decorative gradients, and oversized rounded containers are not used in the main library. Repeated game entries use one restrained card treatment with a consistent icon box, title line, and metadata line. The visual target is intentionally utilitarian: one accent color, neutral surfaces, 8px-or-less radii, no floating card inside card, and no decorative copy competing with the game list. Visual smoke evidence must check narrow portrait screenshots for overflow, clipped text, and inconsistent card heights.
 
 The simulator shell is a full-viewport surface with two modes:
 
@@ -32,6 +32,8 @@ Each runtime branch is treated as a shell-managed session with these responsibil
 - `cleanup`: stop runtime work, remove listeners and nodes, and release fullscreen/orientation ownership.
 - `exitPolicy`: either `dispose` for runtimes that can safely leave the SPA alive, or `reload` for runtimes whose global VM state cannot be reconstructed safely.
 
+The shell passes a synchronous `onCleanupReady(cleanup)` callback to the runtime component. The runtime registers an idempotent function that invalidates async work, removes runtime-owned DOM/listeners, and stops local work. The parent calls that function exactly once before committing the library route; React unmount calls the same function again as a no-op safety net. Cleanup is synchronous at the shell boundary; pending promises are invalidated and late completions are ignored rather than awaited.
+
 The current policies are:
 
 | Runtime | Exit policy | Reason |
@@ -41,11 +43,11 @@ The current policies are:
 | J2ME | `reload` | The classic VM installs process-wide globals/listeners. |
 | MRP | `reload` | Existing runtime cleanup still requires a fresh document realm. |
 
-The shell performs exit in this order: show confirmation, call runtime cleanup, release fullscreen/orientation, commit the library route, then apply the policy. For `dispose`, no document reload is scheduled. For `reload`, the library hash is committed first and a single deferred reload is scheduled. Repeated back signals during cleanup are ignored.
+The shell performs exit in this order: show confirmation, call the registered runtime cleanup, release fullscreen/orientation, commit the library route, then apply the policy. For `dispose`, no document reload is scheduled. For `reload`, the library hash is committed first and a single deferred reload is scheduled. Repeated back signals during cleanup are ignored. The shell exposes no asynchronous child cleanup contract, so route transition cannot be held in a half-mounted state.
 
 ## Navigation and WebView Behavior
 
-The web route remains hash-based. The shell owns the transition from `play` to `library`; child runtimes do not call `history.back()` themselves. Browser `popstate`, hash changes, Android injected back, and the toolbar button all enter the same shell callback. A native back request while a game is open reports `handled: true`, opens the existing exit confirmation, and does not navigate twice. A native back request on the library reports `handled: false` so React Native may exit the host.
+The web route remains hash-based. The shell owns the transition from `play` to `library`; child runtimes do not call `history.back()` themselves. Browser `popstate`, hash changes, Android injected back, and the toolbar button all enter the same shell callback. The Android bridge emits a `navigation.back` request and invokes a page callback; it does not mutate browser history. A native back request while a game is open reports `handled: true`, opens the existing exit confirmation, and does not navigate twice. A native back request on the library reports `handled: false` so React Native may exit the host. Browser history back remains a separate browser-owned event and is normalized by the App route handler into the same confirmation path.
 
 The WebView must keep the existing local origin and static-server behavior. No remote navigation or new native runtime module is introduced.
 
@@ -59,7 +61,9 @@ The WebView must keep the existing local origin and static-server behavior. No r
 ## Verification
 
 - Build the Web app and run the existing browser smoke verifier.
-- Add a focused route/lifecycle test or deterministic browser check that records reload calls, starts Flash, exits, and asserts the library returns without a reload while the active tab remains selected.
+- Add a focused route/lifecycle test or deterministic browser check that records reload calls, starts Flash and local revival, exits, and asserts the library returns without a reload while the active tab remains selected. Assert one deferred reload for MRP and the existing reload policy for J2ME.
+- At 390x844 and 844x390, record `.player`, `.playerStage`, toolbar, and runtime canvas rectangles for boot, running, error, and confirmation states. Assert no horizontal overflow and no toolbar/canvas overlap in landscape.
+- Exercise one Android back press in a game, cancel it, confirm it, and press back from the library. Assert one native message and one confirmation per press.
 - Run the Android build and launch the APK on an API 35 emulator when available; exercise Flash launch, Android back, cancel, confirm exit, and re-entry. Record physical-device and iOS coverage separately.
 - Verify J2ME and MRP still use their documented reload policy and that the WebView native back bridge sends exactly one navigation event per press.
 - Run `git diff --check`, Web build, mobile asset preparation/verifier, and relevant tests.
