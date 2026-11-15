@@ -42,6 +42,8 @@ MOBILE_52JAVA_API_BASE=http://192.168.0.100:8080 pnpm mobile:build-android
 发布包的 J2ME 游戏清单由构建时生成的 `web/jar-manifest.json` 提供，内置 JAR 不需要桌面 Node 服务。
 52java 商城是在线目录，安装包中会明确显示离线提示；“大宋豪侠 · 本地复活”仍需要单独运行 `dasong-server`。
 
+Flash 商城不把用户游戏上传到服务器。通过商城 URL 或本地文件加入的 SWF 保存在当前浏览器/WebView 的 IndexedDB 中，Flash 库可在离线时继续启动；远程 URL 需要目标站点允许浏览器 CORS 读取。
+
 ## 宿主行为
 
 - WebView 只加载应用内置的 `127.0.0.1` 本地资源服务，不依赖远程 Web 首页；这个地址是应用内回环桥接，不是远端服务器。

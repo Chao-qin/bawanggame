@@ -6,11 +6,13 @@ import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
 import { FlashPlayer } from './runtime/FlashPlayer.jsx'
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
 import { installResponsiveContract } from './responsive.js'
+import { addBundled, addFromFile, addFromUrl, list as listLocalFlash, remove as removeLocalFlash } from './localFlash.js'
 
 const TABS = [
   { id: 'j2me', label: 'J2ME' },
   { id: 'maopao', label: '冒泡社区' },
   { id: 'flash', label: 'Flash' },
+  { id: 'flash-store', label: 'Flash 商城' },
   { id: 'store', label: '52java 商城' },
 ]
 
@@ -24,8 +26,8 @@ const RUNTIME_EXIT_POLICIES = Object.freeze({
 })
 const noopCleanup = () => {}
 const FLASH_GAMES = [
-  { kind: 'flash', file: 'fruit-madness.swf', name: 'Fruit Madness', vendor: 'Vladimir Belyaev · MIT', desc: '躲避水果并收集松饼', size: 2236139, iconUrl: null, local: false },
-  { kind: 'flash', file: 'sample-game.swf', name: 'Star Catcher', vendor: '内置输入测试', desc: '点击星星得分', size: 1767, iconUrl: null, local: false },
+  { kind: 'flash', file: 'fruit-madness.swf', name: 'Fruit Madness', vendor: 'Vladimir Belyaev · MIT', desc: '躲避水果并收集松饼', size: 2236139, iconUrl: null, local: false, catalogId: 'fruit-madness' },
+  { kind: 'flash', file: 'sample-game.swf', name: 'Star Catcher', vendor: '内置输入测试', desc: '点击星星得分', size: 1767, iconUrl: null, local: false, catalogId: 'sample-game' },
 ]
 
 function isEmbeddedHost() {
@@ -260,6 +262,49 @@ function useLocalJars(enabled) {
   return { games, error, addFiles, remove, refresh }
 }
 
+function useLocalFlash(enabled) {
+  const [state, setState] = useState({ loading: enabled, error: null, skipped: 0, games: [] })
+  const [tick, setTick] = useState(0)
+
+  useEffect(() => {
+    if (!enabled) return
+    let alive = true
+    setState((current) => ({ ...current, loading: true, error: null }))
+    listLocalFlash()
+      .then(({ records, skipped }) => {
+        if (!alive) return
+        setState({
+          loading: false,
+          error: skipped ? `${skipped} 个本机 Flash 记录已跳过` : null,
+          skipped,
+          games: records.map((record) => ({
+            kind: 'flash',
+            file: record.id,
+            name: record.name,
+            vendor: record.source === 'remote' ? '本机 · 在线来源' : '本机游戏',
+            desc: record.description,
+            size: record.size,
+            iconUrl: null,
+            local: true,
+            source: record.source,
+            sourceUrl: record.sourceUrl,
+            dedupeKey: record.dedupeKey,
+          })),
+        })
+      })
+      .catch((error) => {
+        if (alive) setState((current) => ({ ...current, loading: false, error: String(error.message || error) }))
+      })
+    return () => { alive = false }
+  }, [enabled, tick])
+
+  return {
+    ...state,
+    refresh: () => setTick((value) => value + 1),
+    remove: async (id) => { await removeLocalFlash(id); setTick((value) => value + 1) },
+  }
+}
+
 function formatSize(n) {
   if (!n) return ''
   if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB'
@@ -343,6 +388,7 @@ function Library({ kind, onPlay }) {
   // 两个 hook 无条件调用，保证 hooks 顺序稳定；未命中的运行时返回空列表
   const serverJars = useServerJars(kind === 'j2me')
   const serverMrps = useServerGames(kind)
+  const localFlash = useLocalFlash(kind === 'flash')
   const server = kind === 'j2me' ? serverJars : kind === 'maopao' ? serverMrps : { loading: false, error: null, games: [] }
   const local = useLocalJars(kind === 'j2me')
   const [query, setQuery] = useState('')
@@ -378,20 +424,23 @@ function Library({ kind, onPlay }) {
 
   function openMenu(g) { setMenuGame(g) }
 
-  function removeFromMenu(g) {
+  function removeLocalGame(g) {
     if (!g.local) return
-    if (window.confirm('卸载「' + g.name + '」？')) local.remove(g.file)
+    if (window.confirm('卸载「' + g.name + '」？')) {
+      if (g.kind === 'flash') localFlash.remove(g.file)
+      else local.remove(g.file)
+    }
   }
 
   const games = useMemo(() => {
     const revival = kind === 'j2me' ? [{kind: 'local-revival', file: 'local-revival', name: '大宋豪侠 · 本地复活', vendor: '本地服务端', desc: '可移动地图、NPC 和基础战斗', size: 0, local: false}] : []
-    const all = kind === 'flash' ? FLASH_GAMES : revival.concat(server.games, local.games)
+    const all = kind === 'flash' ? FLASH_GAMES.concat(localFlash.games) : revival.concat(server.games, local.games)
     const q = query.trim().toLowerCase()
     if (!q) return all
     return all.filter(
       (g) => (g.name || '').toLowerCase().includes(q) || (g.vendor || '').toLowerCase().includes(q)
     )
-  }, [kind, server.games, local.games, query])
+  }, [kind, server.games, local.games, localFlash.games, query])
 
   function handleUpload(e) {
     const files = Array.from(e.target.files || [])
@@ -421,13 +470,13 @@ function Library({ kind, onPlay }) {
           </label>
         )}
         <span className="count">
-          {server.loading ? '加载中…' : server.error ? '加载失败' : games.length + ' 款'}
+          {server.loading || localFlash.loading ? '加载中…' : server.error || localFlash.error ? '部分加载失败' : games.length + ' 款'}
         </span>
       </div>
       {kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={popular} onOpen={openMenu} />}
       {kind !== 'flash' && <GameRow title="🕘 最近在玩" items={recent} onOpen={openMenu} />}
-      {server.error && (
-        <div className="status statusError">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>
+      {(server.error || localFlash.error) && (
+        <div className="status statusError">{server.error ? `在线列表加载失败：${server.error}（请确认本地服务已在 8080 端口运行）` : localFlash.error}</div>
       )}
       <div className="gameGrid">
           {games.map((g) => (
@@ -439,16 +488,98 @@ function Library({ kind, onPlay }) {
             />
           ))}
       </div>
-      {!server.error && !server.loading && games.length === 0 && <div className="status">没有匹配的游戏</div>}
+      {!server.error && !localFlash.error && !server.loading && !localFlash.loading && games.length === 0 && <div className="status">没有匹配的游戏</div>}
       <GameMenu
         game={menuGame}
         onStart={handlePlay}
         onSelect={setSelectedGame}
-        onRemove={removeFromMenu}
+        onRemove={removeLocalGame}
         onClose={() => setMenuGame(null)}
       />
     </section>
   )
+}
+
+function FlashStore({ onRefreshLibrary }) {
+  const local = useLocalFlash(true)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [url, setUrl] = useState('')
+  const [file, setFile] = useState(null)
+  const [busy, setBusy] = useState('')
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const added = useMemo(() => new Set(local.games.map((game) => game.dedupeKey)), [local.games])
+
+  async function addBundledGame(game) {
+    setBusy(game.file)
+    setError('')
+    setMessage('')
+    try {
+      await addBundled(game.file, { name: game.name, description: game.desc })
+      setMessage(`已加入「${game.name}」，现在可以在 Flash 库中启动。`)
+      local.refresh()
+      onRefreshLibrary()
+    } catch (cause) {
+      setError(cause.message || String(cause))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+    setBusy('custom')
+    setError('')
+    setMessage('')
+    try {
+      if (url.trim() && file) throw new Error('SWF 直链和本地文件只能选择一个')
+      if (!url.trim() && !file) throw new Error('请填写 SWF 直链或选择本地文件')
+      if (file) await addFromFile(file, { name, description })
+      else await addFromUrl(url, { name, description })
+      setMessage(`已加入「${name.trim()}」，现在可以在 Flash 库中启动。`)
+      setName('')
+      setDescription('')
+      setUrl('')
+      setFile(null)
+      const input = document.getElementById('flash-file-input')
+      if (input) input.value = ''
+      local.refresh()
+      onRefreshLibrary()
+    } catch (cause) {
+      setError(cause.message || String(cause))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  return <section className="storePage">
+    <div className="storeHero">
+      <div><span className="eyebrow">LOCAL FLASH LIBRARY</span><h2 className="storeHeroTitle">Flash 游戏商城</h2><p className="storeHeroText">游戏下载到当前设备的本机存储，服务器不会保存你的游戏文件。</p></div>
+      <button className="ghostButton" type="button" onClick={local.refresh} disabled={local.loading}>刷新本机库</button>
+    </div>
+    {(local.error || error) && <div className="status statusError">{error || local.error} <button className="inlineAction" type="button" onClick={local.refresh}>重试</button></div>}
+    {message && <div className="status">{message}</div>}
+    <form className="flashImportPanel" onSubmit={submit}>
+      <div><strong>添加自己的 Flash 游戏</strong><p className="storeInfoDesc">直链需要目标站点允许浏览器跨域读取；也可以直接选择本地 SWF 文件。</p></div>
+      <div className="flashImportFields">
+        <input className="search" required placeholder="游戏名称" value={name} onChange={(event) => setName(event.target.value)} />
+        <input className="search" type="url" placeholder="SWF 直链（可选）" value={url} onChange={(event) => setUrl(event.target.value)} />
+        <textarea className="search flashDescription" placeholder="游戏说明（可选）" value={description} onChange={(event) => setDescription(event.target.value)} />
+        <label className="upload">{file ? file.name : '选择本地 .swf'}<input id="flash-file-input" type="file" accept=".swf,application/x-shockwave-flash" hidden onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>
+        <button className="downloadButton" type="submit" disabled={busy !== '' || local.loading}>{busy === 'custom' ? '加入中…' : '加入本机'}</button>
+      </div>
+    </form>
+    <div className="storeGrid">{FLASH_GAMES.map((game) => {
+      const key = `catalog:${game.file}`
+      const isAdded = added.has(key)
+      return <article className="storeCard" key={game.file}>
+        <div className="storeIcon">{game.name.charAt(0)}</div>
+        <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">内置目录 · {formatSize(game.size)}</p><span className="storeInfoDesc">{game.desc}</span></div>
+        <button className="downloadButton" type="button" onClick={() => addBundledGame(game)} disabled={busy !== '' || local.loading}>{busy === game.file ? '下载中…' : isAdded ? '已加入' : '加入本机'}</button>
+      </article>
+    })}</div>
+  </section>
 }
 
 function Store({ onRefreshLibrary }) {
@@ -663,7 +794,7 @@ function Player({ game, onBack, nativeBackSignal }) {
         </div>}
       </div>
       <div ref={stageRef} className="playerStage">
-        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
+        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
       {confirming && (
@@ -776,7 +907,7 @@ export default function App() {
       <main className="main">
         {TABS.map((t) => (
           <div key={t.id} className="pane">
-            {tab === t.id && (t.id === 'store' ? <Store key={t.id} onRefreshLibrary={() => setLibraryTick((value) => value + 1)} /> : <Library key={t.id + libraryTick} kind={t.id} onPlay={startGame} />)}
+            {tab === t.id && (t.id === 'store' ? <Store key={t.id} onRefreshLibrary={() => setLibraryTick((value) => value + 1)} /> : t.id === 'flash-store' ? <FlashStore key={t.id} onRefreshLibrary={() => setLibraryTick((value) => value + 1)} /> : <Library key={t.id + libraryTick} kind={t.id} onPlay={startGame} />)}
           </div>
         ))}
       </main>
