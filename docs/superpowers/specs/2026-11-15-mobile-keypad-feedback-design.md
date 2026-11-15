@@ -25,10 +25,14 @@ one pull request.
   press and repeat timing, desktop mouse behavior, safe-area handling, toolbar
   actions, and user-configured vibration values.
 - **Acceptance:** Browser screenshots and geometry checks cover narrow portrait,
-  landscape, and orientation transition; visual checks cover idle and pressed
-  direction/numeric/soft keys, toolbar overlay, and control spacing. Browser
-  bridge stubs verify a single default 24 ms request per new coarse-pointer
-  press, no repeats while held, and preservation/clamping of explicit values.
+  landscape, and orientation transition. Direction arrows match the action
+  mapping for all four `TouchLayout` presets; the direction-pad and soft-key
+  hit rectangles do not overlap and keep at least `0.2 * --u` clearance where
+  they are adjacent. Numeric pressed-state pixels remain inside the idle key
+  bounds, with no extra DOM outline. In fullscreen, the stage retains the same
+  viewport bounds with toolbar expanded or collapsed. Browser bridge stubs
+  verify a single default 24 ms request per new coarse-pointer press, no
+  repeats while held, and preservation/clamping of explicit values.
   Web build, JavaScript syntax, mobile typecheck, and mobile web asset staging
   checks pass. Android emulator and physical-device vibration results are
   reported separately; unavailable device checks remain explicit residual
@@ -37,12 +41,15 @@ one pull request.
 ## Design
 
 Keep the DOM keypad as the stable hit and accessibility map and keep Canvas as
-the only visible keypad renderer. Derive the visible arrow direction from the
-actual layout preset / rendered DOM geometry so visual direction cannot drift
-from hit testing. Make the smallest targeted spacing and pressed-state changes
+the only visible keypad renderer. Render positions exclusively from each
+control's `getBoundingClientRect()` and derive each arrow's semantic action from
+the existing DOM direction slot plus `TouchLayout.visualDpad` mapping. The four
+presets (`standard`, `mirror`, `rotate-cw`, `rotate-ccw`) must agree with
+`Touchpad`'s geometric hit direction mapping; Canvas must not independently
+rotate the layout. Make the smallest targeted spacing and pressed-state changes
 in the existing responsive layout. Keep runtime toolbar controls floating over
-the stage, and ensure the measured toolbar height does not become a permanent
-layout reservation in fullscreen.
+the stage, and ensure the measured toolbar height does not reduce the fullscreen
+stage's viewport bounds when the toolbar expands or collapses.
 
 Continue to trigger haptics only on the deduplicated transition from no holders
 to the first holder for a key. Increase the phone default pulse to 24 ms while
@@ -53,8 +60,11 @@ the browser vibration API remains the fallback.
 
 ## Failure and Compatibility
 
-If native haptics are unavailable or the bridge rejects a message, the browser
-fallback is attempted where supported. Missing vibration APIs remain harmless.
+The bridge's boolean result only reports whether the WebView message was
+accepted for posting: call the browser fallback only when no native bridge is
+present, posting returns `false`, or posting throws. Do not retry the fallback
+because an asynchronous native acknowledgement is unavailable; this avoids a
+possible duplicate pulse. Missing vibration APIs remain harmless.
 The UI fix must not modify touch hit testing or game key codes. A browser stub
 can prove request delivery and pulse parameters, but it cannot prove physical
 motor strength; Android emulator and physical hardware findings must be stated
@@ -64,11 +74,16 @@ separately.
 
 - Web: build the web package and capture browser screenshots at narrow portrait
   and landscape sizes, then rotate the viewport and re-check positions and
-  pressed states.
+  pressed states. Verify the `0.2 * --u` clearance against live DOM rectangles,
+  all four arrow presets against their expected action maps, the pressed-state
+  drawing stays within key rectangles, and fullscreen stage bounds do not
+  change when the toolbar toggles.
 - Touch feedback: dispatch rapid touch presses through the bridge stub and
   assert one request per newly pressed key, no repeated request while held, the
   24 ms default, and explicit duration handling.
-- Android: typecheck and stage mobile web assets; build/install/launch an APK
-  and verify the native bridge only when Android tooling is available.
+- Android: typecheck and stage mobile web assets as required checks. Build,
+  install, and launch an APK and verify native motor behavior when Android
+  tooling/device access is available; otherwise report APK/device verification
+  as uncompleted hardware validation without treating it as a web build pass.
 - Review: complete cold-start diff review, feature audit, and WebView/platform
   validation review as required by `AGENTS.md`; document device limitations.
