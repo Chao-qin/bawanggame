@@ -32,7 +32,7 @@ Each runtime branch is treated as a shell-managed session with these responsibil
 - `cleanup`: stop runtime work, remove listeners and nodes, and release fullscreen/orientation ownership.
 - `exitPolicy`: either `dispose` for runtimes that can safely leave the SPA alive, or `reload` for runtimes whose global VM state cannot be reconstructed safely.
 
-The shell passes a synchronous `onCleanupReady(cleanup)` callback to the runtime component. The runtime registers an idempotent function that invalidates async work, removes runtime-owned DOM/listeners, and stops local work. The parent calls that function exactly once before committing the library route; React unmount calls the same function again as a no-op safety net. Cleanup is synchronous at the shell boundary; pending promises are invalidated and late completions are ignored rather than awaited.
+The shell passes a synchronous `onCleanupReady(cleanup)` callback to the runtime component. The parent initializes the cleanup ref with an idempotent no-op, so an exit during loading or failed mount still has a defined cleanup boundary. The runtime registers its real idempotent function as soon as its effect starts; that function invalidates async work, removes runtime-owned DOM/listeners, and stops local work. The parent calls the current function exactly once before committing the library route; React unmount calls the same function again as a no-op safety net. Cleanup is synchronous at the shell boundary; pending promises are invalidated and late completions are ignored rather than awaited.
 
 The current policies are:
 
@@ -62,6 +62,7 @@ The WebView must keep the existing local origin and static-server behavior. No r
 
 - Build the Web app and run the existing browser smoke verifier.
 - Add a focused route/lifecycle test or deterministic browser check that records reload calls, starts Flash and local revival, exits, and asserts the library returns without a reload while the active tab remains selected. Assert one deferred reload for MRP and the existing reload policy for J2ME.
+- Exit once during Flash boot and once after Flash failure; assert the initialized no-op or registered cleanup prevents late player attachment or state updates before the library route is committed.
 - At 390x844 and 844x390, record `.player`, `.playerStage`, toolbar, and runtime canvas rectangles for boot, running, error, and confirmation states. Assert no horizontal overflow and no toolbar/canvas overlap in landscape.
 - Exercise one Android back press in a game, cancel it, confirm it, and press back from the library. Assert one native message and one confirmation per press.
 - Run the Android build and launch the APK on an API 35 emulator when available; exercise Flash launch, Android back, cancel, confirm exit, and re-entry. Record physical-device and iOS coverage separately.

@@ -32,7 +32,7 @@ Run the focused verifier against a local production server. Expected: the assert
 
 - [ ] **Step 3: Add the policy table, cleanup handle, and idempotent exit state**
 
-Define a small policy map in `App.jsx` keyed by runtime kind. Keep `reload` for `j2me` and `maopao`, and set `dispose` for `flash` and `local-revival`. Add a `runtimeCleanupRef` and pass `onCleanupReady(cleanup)` to the runtime. The callback must register an idempotent synchronous cleanup function. Add a ref guard so only the first confirmed exit performs cleanup and route commit.
+Define a small policy map in `App.jsx` keyed by runtime kind. Keep `reload` for `j2me` and `maopao`, and set `dispose` for `flash` and `local-revival`. Initialize `runtimeCleanupRef` to an idempotent no-op before rendering the child, pass `onCleanupReady(cleanup)` to the runtime, and require each runtime to register its real idempotent synchronous cleanup at effect start. Add a ref guard so only the first confirmed exit performs cleanup and route commit, including exit during boot or error.
 
 - [ ] **Step 4: Move cleanup before route commit and gate reload**
 
@@ -44,7 +44,7 @@ Ensure Flash and local revival register cleanup handles that invalidate async wo
 
 - [ ] **Step 6: Run the focused assertion**
 
-Run the browser verifier again. Expected: Flash exit returns to `#/library/flash`, the reload counter remains zero, and re-entry creates a fresh player. Record J2ME/MRP policy checks separately.
+Run the browser verifier again. Expected: Flash exit returns to `#/library/flash`, the reload counter remains zero, re-entry creates a fresh player, and boot/error exits do not attach a late player or update state. Record J2ME/MRP policy checks separately.
 
 - [ ] **Step 7: Commit**
 
