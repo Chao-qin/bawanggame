@@ -151,6 +151,13 @@
       ctx.stroke();
     }
 
+    function visualDirection(id) {
+      if (window.TouchLayout && typeof window.TouchLayout.visualDpad === "function") {
+        return window.TouchLayout.visualDpad(id, typeof config !== "undefined" ? config.touchLayout : null);
+      }
+      return id;
+    }
+
     function drawDpad(base, color, styles) {
       var dpad = rectFor("dpad", base);
       if (!dpad) return;
@@ -176,7 +183,7 @@
       ["up", "left", "right", "down"].forEach(function (id) {
         var item = rectFor(id, base);
         paintButton(item, color, 0, "dir");
-        drawArrow(item, id, color, styles);
+        drawArrow(item, visualDirection(id), color, styles);
       });
       var ok = rectFor("ok", base);
       if (ok) {
