@@ -7,6 +7,10 @@ export type HostMessage = {
   payload?: unknown
 }
 
+export type HapticPayload = {
+  duration: number
+}
+
 export function parseHostMessage(raw: string): HostMessage | null {
   try {
     const value = JSON.parse(raw) as Partial<HostMessage>
@@ -25,8 +29,13 @@ export const injectedBridge = `
 (function () {
   var version = ${BRIDGE_VERSION};
   function send(type, payload) {
-    if (!window.ReactNativeWebView) return;
-    window.ReactNativeWebView.postMessage(JSON.stringify({ version: version, type: type, payload: payload }));
+    if (!window.ReactNativeWebView || typeof window.ReactNativeWebView.postMessage !== 'function') return false;
+    try {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ version: version, type: type, payload: payload }));
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
   window.__XIAOCHAO_NATIVE_BACK__ = function () {
     var isGame = /^#\\/play\\//.test(window.location.hash);
@@ -34,6 +43,10 @@ export const injectedBridge = `
     if (isGame) window.history.back();
     return isGame;
   };
+  function haptic(duration) {
+    if (typeof duration !== 'number' || !isFinite(duration) || duration <= 0) return false;
+    return send('haptic', { duration: Math.round(duration) });
+  }
   function setInsets(payload) {
     if (!payload || payload.version !== 1) return false;
     var insets = {
@@ -53,7 +66,7 @@ export const injectedBridge = `
     window.dispatchEvent(new CustomEvent('xiaochao:hostinsets', { detail: insets }));
     return true;
   }
-  window.__XIAOCHAO_RN_HOST__ = { version: version, send: send, setInsets: setInsets };
+  window.__XIAOCHAO_RN_HOST__ = { version: version, send: send, setInsets: setInsets, haptic: haptic };
   send('app.ready', { url: window.location.href });
 })();
 true;

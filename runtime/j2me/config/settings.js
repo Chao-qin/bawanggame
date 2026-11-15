@@ -4,7 +4,7 @@ var Settings = (function () {
   var phone = window.matchMedia && matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 800;
   var DEFAULTS = {
     screen: "auto", scale: "2", keypad: "3", orientation: "auto", theme: "classic", fps: "0", jit: "1", platform: "se",
-    keyHold: "60", tapFrames: "1", dpadOk: "press", keyRepeat: "1", repeatDelay: "450", repeatInterval: "100", vibrate: phone ? "10" : "0",
+    keyHold: "60", tapFrames: "1", dpadOk: "press", keyRepeat: "1", repeatDelay: "450", repeatInterval: "100", vibrate: phone ? "16" : "0",
     wakeLock: "0", pixelated: "0", showFps: "0"
   };
   var STD = { up: -1, down: -2, left: -3, right: -4, ok: -5, soft1: -6, soft2: -7, clear: -8, back: -11 };
@@ -71,7 +71,7 @@ var Settings = (function () {
     },
     vibrate: {
       label: tr("Вибрация клавиш", "Key vibration", "按键振动"),
-      items: [["0", tr("Выкл.", "Off", "关")], ["10", "10 ms"], ["20", "20 ms"], ["40", "40 ms"]]
+      items: [["0", tr("Выкл.", "Off", "关")], ["10", "10 ms"], ["16", "16 ms"], ["20", "20 ms"], ["40", "40 ms"]]
     },
     wakeLock: {
       label: tr("Не гасить экран", "Keep screen on", "屏幕常亮"),
