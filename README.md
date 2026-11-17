@@ -127,6 +127,7 @@ public/               generated React PWA output (ignored by Git)
 
 ## License and credits
 
+- Copyright 2026 Chao-qin and the bawanggame contributors
 - Licensed under the Apache License 2.0 (see `LICENSE`)
 - [pluotsorbet](https://github.com/mozilla/pluotsorbet) — Mozilla, Apache License 2.0; the class library is based on phoneME
 - M3G — [J2ME-Loader](https://github.com/nikita36078/J2ME-Loader), see `src/m3g/NOTICE` for details

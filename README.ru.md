@@ -109,6 +109,7 @@ apps/server/ Node.js HTTP-сервер, прокси сокетов, серве�
 
 ## Благодарности и лицензии
 
+- Copyright 2026 Chao-qin and the bawanggame contributors
 - Лицензия проекта — Apache License 2.0 (см. `LICENSE`)
 - [pluotsorbet](https://github.com/mozilla/pluotsorbet) — Mozilla, Apache License 2.0; библиотека классов основана на phoneME
 - M3G — [J2ME-Loader](https://github.com/nikita36078/J2ME-Loader), подробности в `src/m3g/NOTICE`
