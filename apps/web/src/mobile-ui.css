@@ -21,7 +21,7 @@ body, :root:root {
   --adm-color-weak: var(--ui-muted);
   --adm-color-light: var(--ui-muted);
   --adm-color-background: var(--ui-surface);
-  --adm-color-white: #102720;
+  --adm-color-text-light-solid: #102720;
   --adm-color-border: var(--ui-border);
   --adm-color-fill-content: var(--ui-raised);
   --adm-font-family: system-ui, sans-serif;
@@ -121,8 +121,13 @@ body, :root:root {
   min-height: 44px;
 }
 .appShell .adm-button-primary, .optionSheet .adm-button-primary {
-  --text-color: #102720;
+  background-color: var(--ui-accent);
+  color: #102720;
   font-weight: 700;
+}
+.appShell .adm-button:focus-visible, .optionSheet .adm-button:focus-visible, .player .adm-button:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
 }
 .appShell .upload {
   max-width: 100%;
