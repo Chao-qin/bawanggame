@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import fs from 'node:fs'
 
 const BASE_URL = process.env.VERIFY_BASE_URL || 'http://127.0.0.1:8080/'
 const CDP_PORT = Number(process.env.VERIFY_CDP_PORT || 9342)
@@ -6,6 +7,10 @@ const CHROME = process.env.VERIFY_CHROME || '/Applications/Google Chrome.app/Con
 const PROFILE = `/tmp/xiaochao-local-flash-${process.pid}`
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const chrome = spawn(CHROME, ['--headless=new', '--no-sandbox', '--no-proxy-server', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-default-browser-check', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${PROFILE}`, '--window-size=1100,900', 'about:blank'], { stdio: 'ignore' })
+const chromeExited = new Promise((resolve) => {
+  chrome.once('close', resolve)
+  chrome.once('error', resolve)
+})
 let ws
 let nextId = 0
 const pending = new Map()
@@ -113,6 +118,14 @@ try {
   console.error('Local Flash store smoke: failed:', error.message)
   process.exitCode = 1
 } finally {
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ id: 0, method: 'Browser.close' }))
+  } else {
+    chrome.kill('SIGTERM')
+  }
+  const killTimer = setTimeout(() => chrome.kill('SIGKILL'), 2000)
+  await chromeExited
+  clearTimeout(killTimer)
   ws?.close()
-  chrome.kill('SIGTERM')
+  fs.rmSync(PROFILE, { recursive: true, force: true })
 }

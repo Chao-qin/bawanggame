@@ -11,7 +11,6 @@ const BASE_URL = process.env.VERIFY_BASE_URL || 'http://127.0.0.1:8080/'
 const J2ME_FILE = process.env.VERIFY_J2ME_FILE || ''
 const MRP_FILE = process.env.VERIFY_MRP_FILE || ''
 const PROFILE = `/tmp/xiaochao-verify-${process.pid}`
-const SHOT = `/tmp/xiaochao-verify-${process.pid}.png`
 
 fs.rmSync(PROFILE, { recursive: true, force: true })
 const chrome = spawn(CHROME, [
@@ -23,6 +22,10 @@ const chrome = spawn(CHROME, [
 ], { stdio: 'ignore' })
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const chromeExited = new Promise((resolve) => {
+  chrome.once('close', resolve)
+  chrome.once('error', resolve)
+})
 let ws
 let id = 0
 const pending = new Map()
@@ -65,7 +68,7 @@ function requireCheck(condition, message) {
 async function rectSnapshot() {
   return evaluate(`(() => {
     const read = (selector) => { const node = document.querySelector(selector); if (!node) return null; const r = node.getBoundingClientRect(); return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height} }
-    const nav = read('#nav'), numpad = read('#numpad'), display = read('#display-container'), toolbar = read('.runtimeToolbar')
+    const nav = read('#nav'), numpad = read('#numpad'), display = read('#display'), toolbar = read('.runtimeToolbar')
     const overlap = (a, b) => !!a && !!b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
     return { nav, numpad, display, toolbar, sideLayout: document.body.dataset.sideLayout || '', navBeforeNumpad: !!nav && !!numpad && nav.left < numpad.left, navNumpadOverlap: overlap(nav, numpad), navDisplayOverlap: overlap(nav, display), numpadDisplayOverlap: overlap(numpad, display) }
   })()`)
@@ -132,8 +135,21 @@ try {
     hasUpload: !!document.querySelector('.upload'),
   }))()`)
   console.log('Library:', JSON.stringify(library))
-  requireCheck(library.tabs.includes('J2ME') && library.tabs.includes('冒泡社区'), 'library tabs missing')
-  await send('Page.captureScreenshot').then((result) => fs.writeFileSync(SHOT, Buffer.from(result.data, 'base64')))
+  requireCheck(JSON.stringify(library.tabs) === JSON.stringify(['J2ME', '冒泡社区', 'Flash', 'Flash 商城', '52java 商城']), 'library tabs missing')
+  requireCheck(library.hasUpload, 'JAR import missing')
+
+  await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 720, deviceScaleFactor: 1, mobile: true })
+  const mobileNav = await evaluate(`(() => {
+    const nav = document.querySelector('.tabs')
+    return { bottom: nav.getBoundingClientRect().bottom, height: innerHeight, active: nav.querySelector('[aria-current="page"]')?.innerText, overflow: document.documentElement.scrollWidth > innerWidth }
+  })()`)
+  requireCheck(!mobileNav.overflow && Math.abs(mobileNav.bottom - mobileNav.height) < 2 && mobileNav.active === 'J2ME', 'mobile navigation overflows or lost its active state')
+  await evaluate(`[...document.querySelectorAll('.tab')].find(node => node.textContent === 'Flash').click()`)
+  requireCheck(await evaluate("location.hash === '#/library/flash'"), 'mobile tab did not update route')
+  await evaluate("history.back()")
+  await sleep(300)
+  requireCheck(await evaluate("document.querySelector('.tab[aria-current=page]')?.textContent === 'J2ME'"), 'browser Back did not restore selected tab')
+  await send('Emulation.clearDeviceMetricsOverride')
 
   const optionTarget = await evaluate(`(() => {
     const card = [...document.querySelectorAll('.card')].find((node) => node.querySelector('.cardName')?.textContent.includes('本地复活'))
@@ -141,11 +157,15 @@ try {
     return !!card
   })()`)
   if (optionTarget) {
-    await sleep(250)
+    for (let attempt = 0; attempt < 40; attempt++) {
+      if (await evaluate("document.activeElement?.getAttribute('aria-label') === '游戏选项'")) break
+      await sleep(50)
+    }
     const menu = await evaluate(`(() => { const sheet = document.querySelector('.optionSheet'); const rect = sheet?.getBoundingClientRect(); return { visible: !!sheet, width: rect?.width || 0, bottomAligned: !!rect && Math.abs(rect.bottom - innerHeight) < 2, buttons: [...document.querySelectorAll('.optionBody button')].map((node) => node.textContent.trim()) } })()`)
     console.log('Option sheet:', JSON.stringify(menu))
     requireCheck(menu.visible && menu.bottomAligned && menu.buttons.includes('启动'), 'option sheet is not usable')
-    await evaluate(`document.querySelector('.optionBackdrop')?.click(); true`)
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+    requireCheck(await evaluate("!document.querySelector('.optionSheet [role=dialog]')"), 'Escape did not dismiss the option sheet')
   } else console.log('SKIP: no local-revival card for option sheet')
 
   await navigate('#/play/flash/fruit-madness.swf?tab=flash&name=Fruit%20Madness', 2500)
@@ -260,7 +280,14 @@ try {
   console.error('VERIFY FAILED:', error.message)
   process.exitCode = 1
 } finally {
-  try { ws?.close() } catch {}
-  chrome.kill('SIGKILL')
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ id: 0, method: 'Browser.close' }))
+  } else {
+    chrome.kill('SIGTERM')
+  }
+  const killTimer = setTimeout(() => chrome.kill('SIGKILL'), 2000)
+  await chromeExited
+  clearTimeout(killTimer)
+  ws?.close()
   fs.rmSync(PROFILE, { recursive: true, force: true })
 }
