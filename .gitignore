@@ -61,5 +61,11 @@ __pycache__/
 .wbapp_*.genie
 .opencode/
 
+# Release signing material — never commit (debug.keystore stays tracked on purpose)
+apps/mobile/android/keystore.properties
+*.keystore
+*.jks
+!apps/mobile/android/app/debug.keystore
+
 # Keep empty asset directories in version control when needed
 !.gitkeep
