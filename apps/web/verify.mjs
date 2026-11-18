@@ -65,6 +65,25 @@ function requireCheck(condition, message) {
   if (!condition) throw new Error(message)
 }
 
+async function clickPlayerBack() {
+  // Viewport changes and runtime startup can reapply the collapsed layout.
+  await sleep(250)
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const clicked = await evaluate(`(() => {
+      const back = document.querySelector('.runtimeToolbarBack')
+      if (back) {
+        back.click()
+        return true
+      }
+      document.querySelector('.runtimeToolbarToggle')?.click()
+      return false
+    })()`)
+    if (clicked) return
+    await sleep(100)
+  }
+  throw new Error('Back control is missing from expanded toolbar')
+}
+
 async function rectSnapshot() {
   return evaluate(`(() => {
     const read = (selector) => {
@@ -256,8 +275,7 @@ try {
     requireCheck(!standard.navBeforeNumpad, 'standard side layout should keep navigation on the right')
     await evaluate(`document.body.dataset.sideLayout='swapped'; window.ScreenSetup?.refit?.(); true`)
     await send('Emulation.clearDeviceMetricsOverride')
-    await evaluate(`document.querySelector('.runtimeToolbarCollapsed .runtimeToolbarToggle')?.click(); true`)
-    requireCheck(await evaluate(`(() => { const back = document.querySelector('.runtimeToolbarBack'); back?.click(); return !!back })()`), 'Back control is missing from expanded toolbar')
+    await clickPlayerBack()
     await sleep(150)
     requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'exit confirmation did not open')
     await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
@@ -267,8 +285,7 @@ try {
     const secondEntry = await evaluate(`(() => ({ player: !!document.querySelector('.player'), states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [] }))()`)
     requireCheck(secondEntry.player, 'J2ME second entry did not mount')
     console.log('J2ME exit/re-entry: PASS', JSON.stringify(secondEntry))
-    await evaluate(`document.querySelector('.runtimeToolbarCollapsed .runtimeToolbarToggle')?.click(); true`)
-    requireCheck(await evaluate(`(() => { const back = document.querySelector('.runtimeToolbarBack'); back?.click(); return !!back })()`), 'Back control is missing from expanded toolbar')
+    await clickPlayerBack()
     await sleep(150)
     await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
     await sleep(1500)
