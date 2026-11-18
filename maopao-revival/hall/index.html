@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>冒泡社区 · MRP 游戏大厅</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #12151b; color: #dfe5ee;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  header {
+    padding: 14px 18px 10px; display: flex; flex-wrap: wrap; gap: 10px;
+    align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #262c36; position: sticky; top: 0;
+    background: rgba(18,21,27,.92); backdrop-filter: blur(6px); z-index: 2;
+  }
+  header h1 { font-size: 17px; margin: 0; }
+  header h1 small { color: #7c8595; font-weight: normal; margin-left: 8px; }
+  .search {
+    flex: 1; min-width: 200px; max-width: 420px; padding: 8px 12px;
+    border-radius: 10px; border: 1px solid #2c3442;
+    background: #1a1f28; color: inherit; font-size: 14px; outline: none;
+  }
+  .search:focus { border-color: #3f8cff; }
+  main { max-width: 1080px; margin: 0 auto; padding: 16px 18px 40px; }
+  #grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  a.card {
+    display: block; padding: 12px 12px 10px; border-radius: 12px;
+    background: #1a1f28; border: 1px solid #262c36; text-decoration: none;
+    color: inherit; transition: transform .12s ease, border-color .12s ease;
+  }
+  a.card:hover { transform: translateY(-2px); border-color: #3f8cff; }
+  a.card b {
+    display: block; font-size: 14px; line-height: 1.35; margin-bottom: 6px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  a.card span { display: block; font-size: 11.5px; color: #7c8595; line-height: 1.5; }
+  a.card .meta { color: #5a6373; margin-top: 4px; }
+  #count { color: #7c8595; font-size: 12.5px; margin: 10px 2px; }
+  .back { color: #9fb6d8; text-decoration: none; font-size: 13px; }
+  @media (max-width: 480px) {
+    #grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+    a.card b { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🕹️ 冒泡社区 <small>斯凯 SkyEngine · MRP</small></h1>
+  <input id="search" class="search" type="search" placeholder="搜索游戏 / 厂商 / 描述…" autocomplete="off">
+  <a class="back" href="../index.html">← J2ME 游戏列表</a>
+</header>
+<main>
+  <p id="count">加载中…</p>
+  <div id="grid"></div>
+</main>
+<script>
+(function () {
+  // 同时兼容两种部署：/maopao/（8080 挂载）与站点根（8090 直跑）
+  var BASE = location.pathname.indexOf('/maopao/') === 0 ? '/maopao' : '';
+  fetch(BASE + '/hall/manifest.json')
+    .then(function (r) { return r.json(); })
+    .then(function (games) { render(games); })
+    .catch(function () {
+      document.getElementById('count').textContent = 'manifest.json 加载失败';
+    });
+
+  function playerUrl(file) {
+    // 挂载在 小潮霸王 下时走手机壳页（统一虚拟手机外观），独立部署回退 vmrp 原生页
+    if (BASE) return '/maopao.html?mrp=' + encodeURIComponent(file) + '&title=' + encodeURIComponent('冒泡社区');
+    return BASE + '/vmrp_v1.0/main.html?f=' + encodeURIComponent(BASE + '/public/mrps/' + file);
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function render(games) {
+    var grid = document.getElementById('grid');
+    var count = document.getElementById('count');
+    var input = document.getElementById('search');
+    function apply() {
+      var q = input.value.trim().toLowerCase();
+      var list = q ? games.filter(function (g) {
+        return (g.name + ' ' + g.vendor + ' ' + g.desc).toLowerCase().indexOf(q) >= 0;
+      }) : games;
+      count.textContent = '共 ' + games.length + ' 个游戏' + (q ? '，匹配 ' + list.length : '');
+      grid.innerHTML = list.map(function (g) {
+        var size = g.size > 1024 * 1024
+          ? (g.size / 1048576).toFixed(1) + 'MB'
+          : Math.round(g.size / 1024) + 'KB';
+        var scr = g.w && g.h ? ' · ' + g.w + '×' + g.h : '';
+        return '<a class="card" href="' + esc(playerUrl(g.file)) + '">' +
+          '<b>' + esc(g.name) + '</b>' +
+          '<span>' + esc(g.vendor || '未知厂商') + '</span>' +
+          '<span class="meta">' + size + scr + '</span>' +
+          '</a>';
+      }).join('');
+    }
+    input.addEventListener('input', apply);
+    apply();
+  }
+})();
+</script>
+</body>
+</html>

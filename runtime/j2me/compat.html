@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>J2ME H5 兼容性自检</title>
+<style>
+  body { margin: 0; padding: 12px; background: #10141b; color: #e8ecf2; font: 14px/1.5 system-ui, -apple-system, sans-serif; }
+  h1 { margin: 0 0 2px; font-size: 18px; font-weight: 600; }
+  .sub { margin: 0 0 12px; color: #8e99ab; font-size: 12px; }
+  .verdict { padding: 12px; border-radius: 8px; margin: 0 0 6px; font-size: 16px; font-weight: 600; border: 1px solid; }
+  .v-ok { background: #1c3a2b; color: #8ef0a8; border-color: #2f7d55; }
+  .v-warn { background: #3a341c; color: #ffd76a; border-color: #8a6d1f; }
+  .v-bad { background: #3a2020; color: #ff9c99; border-color: #8c3a3a; }
+  .meta { color: #8e99ab; font-size: 11px; margin: 0 0 12px; word-break: break-all; }
+  h2 { margin: 16px 0 4px; font-size: 13px; color: #a9c3f2; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td { padding: 5px 4px; border-bottom: 1px solid #262c38; vertical-align: top; }
+  td.st { width: 20px; text-align: center; font-weight: 700; }
+  td.nm { width: 42%; }
+  .y { color: #8ef0a8; } .n { color: #ff9c99; } .w { color: #ffd76a; }
+  .note { color: #8e99ab; font-size: 11px; }
+  .advice { margin-top: 14px; padding: 10px; border: 1px solid #39414f; border-radius: 8px; background: #1c2029; font-size: 12px; }
+  .advice div { margin: 4px 0; }
+</style>
+</head>
+<body>
+<h1>J2ME H5 兼容性自检</h1>
+<p class="sub">仅检测本模拟器实际用到的浏览器能力，不加载模拟器代码</p>
+<div id="verdict" class="verdict v-warn">检测中…</div>
+<p id="meta" class="meta"></p>
+<div id="out"></div>
+<div id="advice" class="advice"></div>
+
+<script>
+(function () {
+  function yes() { return true; }
+  function has(name) { return typeof window[name] !== "undefined"; }
+  function tryIt(fn) { try { return !!fn(); } catch (e) { return false; } }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function styleTest(prop, value) {
+    var d = document.createElement("div");
+    try { d.style[prop] = value; return d.style[prop] !== ""; } catch (e) { return false; }
+  }
+  function cssVarTest() {
+    var d = document.createElement("div");
+    if (!d.style.setProperty) return false;
+    try { d.style.setProperty("--t", "1px"); return d.style.getPropertyValue("--t") === "1px"; } catch (e) { return false; }
+  }
+  function hasSelector(sel) {
+    if (window.CSS && CSS.supports && CSS.supports("selector(" + sel + ")")) return true;
+    return tryIt(function () { document.querySelector(sel); return true; });
+  }
+
+  var groups = [
+    { title: "启动必需（缺一项就可能白屏）", level: 1, items: [
+      ["URLSearchParams", function () { return has("URLSearchParams"); }, "config/urlparams.js:2 页面加载即调用"],
+      ["fetch", function () { return has("fetch"); }, "首页 /__jars、M3G WASM 加载"],
+      ["Promise", function () { return has("Promise"); }, "上传与列表加载"],
+      ["Set", function () { return has("Set"); }, "config/default.js:35"],
+      ["Element.closest", function () { return !!(window.Element && Element.prototype.closest); }, "keymap.js 命中按键"],
+      ["CSS.escape", function () { return !!(window.CSS && CSS.escape); }, "index.js:129"],
+      ["classList / dataset", function () { var d = document.createElement("div"); return !!(d.classList && d.dataset); }, "全部交互逻辑"],
+      ["CSS 自定义属性", cssVarTest, "整个键盘 --u 尺寸体系"],
+      ["flex 布局", function () { return styleTest("display", "flex"); }, "body / #keypad / 按钮"]
+    ]},
+    { title: "布局与功能（缺失会退化，不一定不能用）", level: 2, items: [
+      ["CSS min() / clamp()", function () { return styleTest("width", "min(10px, 5vw)"); }, "窄屏自适应；缺失则键盘退回固定 46px"],
+      ["CSS mask", function () { var d = document.createElement("div"); return ("mask" in d.style) || ("webkitMask" in d.style); }, "象限按钮贴合圆盘；缺失会变方块盖住圆盘"],
+      [":has() 选择器", function () { return hasSelector(":has(*)"); }, "仅横屏布局"],
+      ["100dvh", function () { return styleTest("height", "100dvh"); }, "有 height:100% 兜底，缺失无感"],
+      ["DecompressionStream deflate-raw", function () { return tryIt(function () { return !!new DecompressionStream("deflate-raw"); }); }, "页面上传 jar；放服务端 jar/ 可绕过"],
+      ["WebAssembly", function () { return has("WebAssembly") && typeof WebAssembly.instantiate === "function"; }, "仅 M3G 3D 游戏，2D 不受影响"],
+      ["Blob.stream / pipeThrough", function () { return has("ReadableStream") && !!(window.Blob && Blob.prototype.stream) && !!(ReadableStream.prototype.pipeThrough); }, "上传 jar 解压"],
+      ["WebSocket", function () { return has("WebSocket"); }, "网络代理 / 蓝牙联机"],
+      ["requestAnimationFrame", function () { return has("requestAnimationFrame"); }, "帧同步"],
+      ["AudioContext", function () { return has("AudioContext") || has("webkitAudioContext"); }, "游戏音频"]
+    ]},
+    { title: "环境与增强（不影响能否玩）", level: 3, items: [
+      ["TextDecoder gb18030", function () { return tryIt(function () { return !!new TextDecoder("gb18030"); }); }, "项目自带 encoding.js 兜底"],
+      ["navigator.vibrate", function () { return !!(navigator.vibrate); }, "按键振动"],
+      ["navigator.wakeLock", function () { return !!(navigator.wakeLock); }, "屏幕常亮，需 HTTPS/localhost"],
+      ["AudioWorklet", function () { return has("AudioWorkletNode"); }, "外部脚本与音频增强"],
+      ["isSecureContext", function () { return window.isSecureContext === true; }, "局域网 http://IP 为 false 属正常"]
+    ]}
+  ];
+
+  var missingCritical = [], missingSoft = [], notes = [];
+  var out = document.getElementById("out");
+
+  groups.forEach(function (g) {
+    out.appendChild(el("h2", "", g.title));
+    var t = document.createElement("table");
+    g.items.forEach(function (it) {
+      var pass = tryIt(it[1]);
+      var tr = document.createElement("tr");
+      var st = el("td", "st " + (pass ? "y" : (g.level === 1 ? "n" : "w")), pass ? "✓" : "✗");
+      var nm = el("td", "nm", it[0]);
+      var ds = el("td", "note", it[2]);
+      tr.appendChild(st); tr.appendChild(nm); tr.appendChild(ds);
+      t.appendChild(tr);
+      if (!pass) {
+        if (g.level === 1) missingCritical.push(it[0]);
+        else if (g.level === 2) missingSoft.push(it[0]);
+      }
+    });
+    out.appendChild(t);
+  });
+
+  var ua = navigator.userAgent || "";
+  var m = /Chrome\/(\d+)/.exec(ua);
+  var cm = m ? parseInt(m[1], 10) : 0;
+  var fx = /Firefox\/(\d+)/.exec(ua);
+  var ver = cm ? "Chrome " + cm : (fx ? "Firefox " + fx[1] : "未知内核");
+  document.getElementById("meta").textContent =
+    ver + " · " + ua + " · " + screen.width + "×" + screen.height + " @" + (window.devicePixelRatio || 1) + "x";
+
+  var verdict = document.getElementById("verdict");
+  if (missingCritical.length) {
+    verdict.className = "verdict v-bad";
+    verdict.textContent = "预计无法启动（缺 " + missingCritical.length + " 项必需能力" +
+      (missingSoft.length ? "，另有 " + missingSoft.length + " 项功能退化" : "") + "）";
+  } else if (missingSoft.length) {
+    verdict.className = "verdict v-warn";
+    verdict.textContent = "可以运行，但有 " + missingSoft.length + " 项功能/布局退化";
+  } else {
+    verdict.className = "verdict v-ok";
+    verdict.textContent = "全部通过，预计可完整运行";
+  }
+
+  var advice = document.getElementById("advice");
+  advice.appendChild(el("div", "", "针对性说明："));
+  var added = 0;
+  function say(cond, text) { if (cond) { advice.appendChild(el("div", "", "· " + text)); added++; } }
+  say(missingCritical.indexOf("URLSearchParams") >= 0, "浏览器内核过老（需 Chrome 49+）：页面加载第一行就会报错白屏，换浏览器或换设备。");
+  say(missingCritical.indexOf("CSS 自定义属性") >= 0, "CSS 变量不支持（需 Chrome 49+）：键盘尺寸体系失效，属于内核过老。");
+  say(missingSoft.indexOf("CSS min() / clamp()") >= 0, "min() 不支持（需 Chrome 79+）：键盘会退回固定 46px 档位，窄屏可能溢出。");
+  say(missingSoft.indexOf("CSS mask") >= 0, "mask 不支持：四个象限按钮会变成完整方块盖住方向键圆盘，看起来像布局坏了。");
+  say(missingSoft.indexOf("DecompressionStream deflate-raw") >= 0, "deflate-raw 不支持（需 Chrome 103+）：页面「添加 .jar」会失败；把 jar 放进服务端 jar/ 目录即可照常玩。");
+  say(missingSoft.indexOf("WebAssembly") >= 0, "WASM 不支持（需 Chrome 57+）：3D（M3G）游戏不可用，2D 游戏不受影响。");
+  say(missingSoft.indexOf(":has() 选择器") >= 0, ":has() 不支持（需 Chrome 105+）：仅横屏布局退化，竖屏不受影响。");
+  say(missingSoft.indexOf("100dvh") >= 0, "dvh 不支持（需 Chrome 108+）：已有 height:100% 兜底，实际无感。");
+  say(window.isSecureContext !== true, "当前是 http:// 局域网地址（非安全上下文）：屏幕常亮、AudioWorklet 不可用，属正常，不影响游戏。");
+  if (!added) advice.appendChild(el("div", "", "· 无额外限制，直接用这个浏览器打开模拟器即可。"));
+  advice.appendChild(el("div", "note", "模拟器地址：本页 URL 去掉 compat.html，或直接打开 index.html"));
+})();
+</script>
+</body>
+</html>

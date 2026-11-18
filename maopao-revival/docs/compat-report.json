@@ -1,0 +1,550 @@
+{
+ "scannedAt": "2026-11-08T07:16:30.501Z",
+ "total": 664,
+ "sampled": 50,
+ "alive": 32,
+ "frozen": 3,
+ "unknown": 15,
+ "results": [
+  {
+   "file": "1000_240320_gld.mrp",
+   "name": "雷电1944",
+   "vendor": "杭州斯凯",
+   "size": 143582,
+   "animated": true,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "301008_240320_gmhkz.mrp",
+   "name": "梦幻空战",
+   "vendor": "杭州斯凯",
+   "size": 159852,
+   "animated": false,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "301053_240320_gjlxj.mrp",
+   "name": "见龙卸甲",
+   "vendor": "杭州斯凯",
+   "size": 174786,
+   "animated": false,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "301071_240320_gbsqz.mrp",
+   "name": "白蛇Q传",
+   "vendor": "杭州斯凯",
+   "size": 475741,
+   "animated": true,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "302013_240320_ggfftb.mrp",
+   "name": "功夫之斧头帮",
+   "vendor": "杭州斯凯",
+   "size": 198011,
+   "animated": false,
+   "respondsTo": [
+    "Enter",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "302032_240320_gdhsg.mrp",
+   "name": "吞食天地",
+   "vendor": "杭州斯凯",
+   "size": 391747,
+   "animated": false,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "302048_240320_gwjfxq.mrp",
+   "name": "3D玩具飞行棋",
+   "vendor": "杭州斯凯",
+   "size": 253306,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "303013_240320_gahxt.mrp",
+   "name": "暗黑血统",
+   "vendor": "杭州酷玩",
+   "size": 394594,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "307013_240320_gmlcq.mrp",
+   "name": "魔龙传奇",
+   "vendor": "杭州斯凯",
+   "size": 231959,
+   "animated": false,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "307026_240320_gdxsx.mrp",
+   "name": "喋血双雄",
+   "vendor": "杭州斯凯",
+   "size": 217790,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "308018_240320_gshddp.mrp",
+   "name": "水浒对对碰",
+   "vendor": "手游部落",
+   "size": 246295,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "309012_240320_gljb.mrp",
+   "name": "亮剑",
+   "vendor": "杭州斯凯",
+   "size": 373249,
+   "animated": false,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "309032_240320_gxxdd.mrp",
+   "name": "血腥大地",
+   "vendor": "杭州斯凯",
+   "size": 409052,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "311016_240320_gjzgmd.mrp",
+   "name": "魔教教主张无忌",
+   "vendor": "南京颂歌",
+   "size": 360017,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "311037_240320_gcjiii.mrp",
+   "name": "彩京1945III",
+   "vendor": "南京颂歌",
+   "size": 387717,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "311055_240320_gwzysqe.mrp",
+   "name": "武状元苏乞儿",
+   "vendor": "南京颂歌",
+   "size": 442879,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "311080_240320_gmnllkb.mrp",
+   "name": "制服美女连连看",
+   "vendor": "南京颂歌",
+   "size": 368687,
+   "animated": true,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "313008_240320_gddzb.mrp",
+   "name": "地道战",
+   "vendor": "杭州斯凯",
+   "size": 310687,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "315004_240320_gyxmj.mrp",
+   "name": "真人美女搓麻将",
+   "vendor": "",
+   "size": 252794,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "315021_240320_gshkcb.mrp",
+   "name": "生化危机",
+   "vendor": "杭州斯凯",
+   "size": 365927,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "315035_240320_gxzkl.mrp",
+   "name": "血战狂龙",
+   "vendor": "杭州斯凯",
+   "size": 323185,
+   "animated": false,
+   "respondsTo": [],
+   "alive": false
+  },
+  {
+   "file": "315048_240320_gslcq.mrp",
+   "name": "少林传奇",
+   "vendor": "杭州斯凯",
+   "size": 395027,
+   "animated": true,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "316008_240320_gyttlja.mrp",
+   "name": "倚天屠龙记上",
+   "vendor": "美游",
+   "size": 317320,
+   "animated": true,
+   "respondsTo": [
+    "Enter"
+   ],
+   "alive": null,
+   "error": "Error: timeout Runtime.evaluate"
+  },
+  {
+   "file": "316024_240320_ghdljdb.mrp",
+   "name": "2012末日之战",
+   "vendor": "美游",
+   "size": 312244,
+   "animated": false,
+   "respondsTo": [
+    "ArrowDown",
+    "q"
+   ],
+   "alive": true
+  },
+  {
+   "file": "318006_240320_gdxjh.mrp",
+   "name": "大笑射雕",
+   "vendor": "杭州斯凯",
+   "size": 404598,
+   "animated": true,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "319014_240320_ghkdg.mrp",
+   "name": "黑客帝国",
+   "vendor": "北京博荣无限",
+   "size": 451477,
+   "animated": true,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "322015_240320_gylzhq.mrp",
+   "name": "御龙镇魂曲",
+   "vendor": "杭州斯比",
+   "size": 367173,
+   "animated": true,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "322030_240320_gclcs.mrp",
+   "name": "大冒险之丛林传说",
+   "vendor": "杭州斯比",
+   "size": 382321,
+   "animated": true,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "323002_240320_gfktk.mrp",
+   "name": "疯狂坦克",
+   "vendor": "汉迭偌",
+   "size": 196670,
+   "animated": true,
+   "respondsTo": [
+    "Enter",
+    "ArrowDown"
+   ],
+   "alive": true
+  },
+  {
+   "file": "326002_240320_gbxsgxq.mrp",
+   "name": "中国象棋典藏版",
+   "vendor": "杭州斯凯",
+   "size": 353697,
+   "animated": true,
+   "respondsTo": [
+    "ArrowDown",
+    "q"
+   ],
+   "alive": true
+  },
+  {
+   "file": "326016_240320_gdppkdc.mrp",
+   "name": "3D跑跑卡丁车",
+   "vendor": "杭州斯凯",
+   "size": 276810,
+   "animated": false,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "328001_240320_gyymsd.mrp",
+   "name": "永远的冒险岛",
+   "vendor": "杭州斯凯",
+   "size": 243669,
+   "animated": true,
+   "respondsTo": [
+    "q",
+    "5"
+   ],
+   "alive": true
+  },
+  {
+   "file": "331016_240320_gyzcd.mrp",
+   "name": "泳装垂钓",
+   "vendor": "asionsky",
+   "size": 395350,
+   "animated": false,
+   "respondsTo": [
+    "q"
+   ],
+   "alive": null,
+   "error": "Error: timeout Runtime.evaluate"
+  },
+  {
+   "file": "332017_240320_gzmb.mrp",
+   "name": "祖玛2",
+   "vendor": "?",
+   "size": 392181,
+   "animated": false,
+   "respondsTo": [
+    "Enter",
+    "q"
+   ],
+   "alive": true
+  },
+  {
+   "file": "334001_240320_gfktjb.mrp",
+   "name": "反恐特警2",
+   "vendor": "杭州斯凯",
+   "size": 308596,
+   "alive": null,
+   "error": "Error: timeout Runtime.evaluate"
+  },
+  {
+   "file": "334014_240320_glzc.mrp",
+   "name": "聊斋3",
+   "vendor": "华娱无线",
+   "size": 408521,
+   "animated": false,
+   "respondsTo": [],
+   "alive": null,
+   "error": "Error: timeout Runtime.evaluate"
+  },
+  {
+   "file": "391014_240320_axhzd.mrp",
+   "name": "掌星汉字字典",
+   "vendor": "掌星无限",
+   "size": 449224,
+   "animated": true,
+   "respondsTo": [],
+   "alive": true
+  },
+  {
+   "file": "398940_240320_gcjk.mrp",
+   "name": "苍井空的故事",
+   "vendor": "sky",
+   "size": 601944,
+   "alive": null,
+   "error": "Error: timeout Runtime.evaluate"
+  },
+  {
+   "file": "399166_240320_ggdda.mrp",
+   "name": "干爹的爱",
+   "vendor": "杭州魔石",
+   "size": 538084,
+   "alive": null,
+   "error": "Error: timeout Runtime.evaluate"
+  },
+  {
+   "file": "399470_240320_gmnj.mrp",
+   "name": "干柴烈火美女剑",
+   "vendor": "杭州斯凯",
+   "size": 448389,
+   "alive": null,
+   "error": "Error: timeout Runtime.evaluate"
+  },
+  {
+   "file": "399718_240320_gdsymv.mrp",
+   "name": "撕衣美女之对对碰",
+   "vendor": "杭州洋葱头",
+   "size": 443588,
+   "animated": false,
+   "respondsTo": [],
+   "alive": false
+  },
+  {
+   "file": "399750_240320_gmyqy.mrp",
+   "name": "倩女幽魂-媚妖情缘",
+   "vendor": "多乐科技",
+   "size": 477371,
+   "animated": false,
+   "respondsTo": [],
+   "alive": false
+  },
+  {
+   "file": "399971_240320_gwabc.mrp",
+   "name": "为爱泊车",
+   "vendor": "syclan",
+   "size": 274196,
+   "animated": false,
+   "respondsTo": [],
+   "alive": null,
+   "error": "Error: timeout Runtime.evaluate"
+  },
+  {
+   "file": "8396_240320_rxhua10.mrp",
+   "name": "外国笑话典藏",
+   "vendor": "杭州斯凯",
+   "size": 25467,
+   "alive": null,
+   "error": "Error: timeout Page.enable"
+  },
+  {
+   "file": "8410_240320_rxhua24.mrp",
+   "name": "让你笑喷的笑话",
+   "vendor": "杭州斯凯",
+   "size": 25863,
+   "alive": null,
+   "error": "TypeError: fetch failed"
+  },
+  {
+   "file": "ehex2013b.mrp",
+   "name": "易编辑",
+   "vendor": "eleqian",
+   "size": 77928,
+   "alive": null,
+   "error": "TypeError: fetch failed"
+  },
+  {
+   "file": "lines.mrp",
+   "name": "梦幻宝石",
+   "vendor": "杭州斯凯",
+   "size": 81244,
+   "alive": null,
+   "error": "TypeError: fetch failed"
+  },
+  {
+   "file": "opdyry.mrp",
+   "name": "地狱熔岩",
+   "vendor": "杭州斯凯",
+   "size": 314519,
+   "alive": null,
+   "error": "TypeError: fetch failed"
+  },
+  {
+   "file": "opmtbj.mrp",
+   "name": "魔塔之八戒的爱情",
+   "vendor": "杭州斯凯",
+   "size": 176577,
+   "alive": null,
+   "error": "TypeError: fetch failed"
+  },
+  {
+   "file": "opsznz.mrp",
+   "name": "太阳指南针",
+   "vendor": "斯凯",
+   "size": 126700,
+   "alive": null,
+   "error": "TypeError: fetch failed"
+  }
+ ]
+}

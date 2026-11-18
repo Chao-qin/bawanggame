@@ -1,0 +1,17 @@
+.worktrees/
+.wbapp_*.genie
+.workbuddy/
+.opencode/
+node_modules/
+**/node_modules/
+public/
+site-deploy/
+apps/server/dist/
+apps/web/dist/
+coverage/
+.vite/
+.turbo/
+games/jar/*.jar
+games/jar/*.jad
+games/jar/.cache/
+xiaochao-bawang-*.tgz
