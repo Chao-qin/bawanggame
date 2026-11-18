@@ -67,7 +67,15 @@ function requireCheck(condition, message) {
 
 async function rectSnapshot() {
   return evaluate(`(() => {
-    const read = (selector) => { const node = document.querySelector(selector); if (!node) return null; const r = node.getBoundingClientRect(); return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height} }
+    const read = (selector) => {
+      const node = document.querySelector(selector)
+      if (!node) return null
+      const {left, top, right, bottom} = node.getBoundingClientRect()
+      const style = getComputedStyle(node)
+      return {left: left + parseFloat(style.paddingLeft), top, right: right - parseFloat(style.paddingRight), bottom}
+    }
+    // The landscape viewport wrapper spans the viewport. Measure the display
+    // itself and exclude the keypad's horizontal gutters from hit regions.
     const nav = read('#nav'), numpad = read('#numpad'), display = read('#display'), toolbar = read('.runtimeToolbar')
     const overlap = (a, b) => !!a && !!b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
     return { nav, numpad, display, toolbar, sideLayout: document.body.dataset.sideLayout || '', navBeforeNumpad: !!nav && !!numpad && nav.left < numpad.left, navNumpadOverlap: overlap(nav, numpad), navDisplayOverlap: overlap(nav, display), numpadDisplayOverlap: overlap(numpad, display) }
@@ -121,7 +129,7 @@ try {
     new MutationObserver(() => {
       if (document.querySelector('.runtimeBoot') && !window.__XIAOCHAO_VERIFY_RUNTIME_STATES__.includes('boot')) window.__XIAOCHAO_VERIFY_RUNTIME_STATES__.push('boot')
       if (document.querySelector('.runtimeFailure') && !window.__XIAOCHAO_VERIFY_RUNTIME_STATES__.includes('failure')) window.__XIAOCHAO_VERIFY_RUNTIME_STATES__.push('failure')
-    }).observe(document.documentElement, { childList: true, subtree: true })
+    }).observe(document, { childList: true, subtree: true })
   `
   await send('Page.addScriptToEvaluateOnNewDocument', { source: runtimeStateObserver })
   await evaluate(`(() => { ${runtimeStateObserver} })()`)
@@ -248,7 +256,8 @@ try {
     requireCheck(!standard.navBeforeNumpad, 'standard side layout should keep navigation on the right')
     await evaluate(`document.body.dataset.sideLayout='swapped'; window.ScreenSetup?.refit?.(); true`)
     await send('Emulation.clearDeviceMetricsOverride')
-    await evaluate(`document.querySelector('.runtimeToolbarBack')?.click(); true`)
+    await evaluate(`document.querySelector('.runtimeToolbarCollapsed .runtimeToolbarToggle')?.click(); true`)
+    requireCheck(await evaluate(`(() => { const back = document.querySelector('.runtimeToolbarBack'); back?.click(); return !!back })()`), 'Back control is missing from expanded toolbar')
     await sleep(150)
     requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'exit confirmation did not open')
     await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
@@ -258,7 +267,8 @@ try {
     const secondEntry = await evaluate(`(() => ({ player: !!document.querySelector('.player'), states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [] }))()`)
     requireCheck(secondEntry.player, 'J2ME second entry did not mount')
     console.log('J2ME exit/re-entry: PASS', JSON.stringify(secondEntry))
-    await evaluate(`document.querySelector('.runtimeToolbarBack')?.click(); true`)
+    await evaluate(`document.querySelector('.runtimeToolbarCollapsed .runtimeToolbarToggle')?.click(); true`)
+    requireCheck(await evaluate(`(() => { const back = document.querySelector('.runtimeToolbarBack'); back?.click(); return !!back })()`), 'Back control is missing from expanded toolbar')
     await sleep(150)
     await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
     await sleep(1500)

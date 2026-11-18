@@ -40,7 +40,7 @@ body, :root:root {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-block: max(14px, var(--safe-area-top, 0px)) 14px;
+  padding-block: calc(14px + var(--safe-area-top, 0px)) 14px;
   border-bottom: 1px solid var(--ui-border);
 }
 .brand {
@@ -130,6 +130,8 @@ body, :root:root {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.toolbar .upload { flex-shrink: 0; }
+.toolbar .upload > span { display: flex; align-items: center; gap: 4px; }
 .appShell .ghostButton, .categorySelect {
   white-space: nowrap;
 }
