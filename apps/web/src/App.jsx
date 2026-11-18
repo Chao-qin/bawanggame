@@ -1,3 +1,5 @@
+import { Button, Card, DotLoading, Empty, Input, Popup, SearchBar, TextArea } from 'antd-mobile'
+import { AddOutline, AppstoreOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline } from 'antd-mobile-icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
 import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
@@ -9,11 +11,11 @@ import { installResponsiveContract } from './responsive.js'
 import { addBundled, addFromFile, addFromUrl, list as listLocalFlash, remove as removeLocalFlash } from './localFlash.js'
 
 const TABS = [
-  { id: 'j2me', label: 'J2ME' },
-  { id: 'maopao', label: '冒泡社区' },
-  { id: 'flash', label: 'Flash' },
-  { id: 'flash-store', label: 'Flash 商城' },
-  { id: 'store', label: '52java 商城' },
+  { id: 'j2me', label: 'J2ME', Icon: AppstoreOutline },
+  { id: 'maopao', label: '冒泡社区', Icon: CompassOutline },
+  { id: 'flash', label: 'Flash', Icon: MovieOutline },
+  { id: 'flash-store', label: 'Flash 商城', Icon: ShopbagOutline },
+  { id: 'store', label: '52java 商城', Icon: ShopbagOutline },
 ]
 
 const TAB_IDS = new Set(TABS.map((item) => item.id))
@@ -319,12 +321,11 @@ function localJarName(name, id) {
 function GameCard({ game, onOpen, selected }) {
   const initial = (game.name || '?').trim().charAt(0).toUpperCase()
   return (
-    <div
-      className={'card ' + (selected ? 'cardSelected' : '')}
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
+      className={'card' + (selected ? ' cardSelected' : '')}
+      aria-pressed={!!selected}
       onClick={() => onOpen(game)}
-      onKeyDown={(e) => e.key === 'Enter' && onOpen(game)}
       title={game.desc || game.name}
     >
       <div className="cardIcon">
@@ -334,7 +335,7 @@ function GameCard({ game, onOpen, selected }) {
       <div className="cardMeta">
         {[game.vendor, formatSize(game.size), game.local ? '本机' : ''].filter(Boolean).join(' · ') || '\u00a0'}
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -365,22 +366,33 @@ function GameRow({ title, items, onOpen }) {
 }
 
 function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
-  if (!game) return null
+  const sheet = useRef(null)
   return (
-    <div className="optionBackdrop" role="presentation" onClick={onClose}>
-      <section className="optionSheet" role="dialog" aria-modal="true" aria-label="游戏选项" onClick={(e) => e.stopPropagation()}>
+    <Popup visible={!!game} onClose={onClose} closeOnMaskClick destroyOnClose
+      afterShow={() => sheet.current?.focus()}
+      className="gameMenu" maskClassName="optionBackdrop" bodyClassName="optionSheet">
+      {game && <section ref={sheet} role="dialog" aria-modal="true" aria-label="游戏选项" tabIndex={-1}
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab') return
+          const buttons = event.currentTarget.querySelectorAll('button')
+          const target = event.shiftKey ? buttons[0] : buttons[buttons.length - 1]
+          if (event.target !== target && !(event.shiftKey && event.target === event.currentTarget)) return
+          event.preventDefault()
+          const next = event.shiftKey ? buttons[buttons.length - 1] : buttons[0]
+          next?.focus()
+        }}>
         <div className="optionHead">
-          <div className="optionIcon">{(game.name || '?').trim().charAt(0).toUpperCase()}</div>
-          <div className="min-w-0 grid gap-1"><strong className="overflow-hidden text-ellipsis whitespace-nowrap">{game.name}</strong><span>{game.vendor || (game.local ? '本机游戏' : '在线游戏')}</span></div>
-          <button className="border-0 bg-transparent text-2xl text-dim" onClick={onClose} aria-label="关闭">×</button>
+          <div className="optionIcon" aria-hidden="true">{(game.name || '?').trim().charAt(0).toUpperCase()}</div>
+          <div className="optionTitle"><strong>{game.name}</strong><span>{game.vendor || (game.local ? '本机游戏' : '在线游戏')}</span></div>
+          <Button fill="none" className="iconButton" onClick={onClose} aria-label="关闭"><CloseOutline aria-hidden="true" /></Button>
         </div>
         <div className="optionBody">
-          <button className="optionButton" onClick={() => { onSelect(game); onClose() }}>选择</button>
-          <button className="optionButton optionPrimary" onClick={() => { onStart(game); onClose() }}>启动</button>
-          {game.local && <button className="optionButton optionDanger" onClick={() => { onRemove(game); onClose() }}>卸载</button>}
+          <Button className="optionButton" color="primary" onClick={() => { onStart(game); onClose() }}>启动</Button>
+          <Button className="optionButton" onClick={() => { onSelect(game); onClose() }}>选择</Button>
+          {game.local && <Button className="optionButton optionDanger" color="danger" fill="outline" onClick={() => { onRemove(game); onClose() }}>卸载</Button>}
         </div>
-      </section>
-    </div>
+      </section>}
+    </Popup>
   )
 }
 
@@ -400,13 +412,12 @@ function Library({ kind, onPlay }) {
 
   useEffect(() => {
     if (!menuGame) return undefined
+    const opener = document.activeElement
     const close = (event) => event.key === 'Escape' && setMenuGame(null)
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', close)
     return () => {
-      document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', close)
+      if (opener?.isConnected) opener.focus({ preventScroll: true })
     }
   }, [menuGame])
 
@@ -455,28 +466,29 @@ function Library({ kind, onPlay }) {
 
   return (
     <section className="library">
+      <div className="sectionHeading">
+        <h2>{TABS.find((tab) => tab.id === kind)?.label}游戏库</h2>
+        <span className="count" role="status">
+          {server.loading || localFlash.loading ? <><DotLoading /> 加载中</> : server.error || localFlash.error ? '部分加载失败' : games.length + ' 款'}
+        </span>
+      </div>
       <div className="toolbar">
-        <input
+        <SearchBar
           className="search"
-          type="search"
           placeholder={'搜索' + (kind === 'j2me' ? ' J2ME' : kind === 'flash' ? ' Flash' : ' 冒泡') + '游戏…'}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={setQuery}
         />
         {kind === 'j2me' && (
-          <label className={'upload' + (busy ? ' opacity-60 pointer-events-none' : '')}>
-            {busy ? '导入中…' : '＋ 添加 .jar'}
-            <input type="file" accept=".jar" multiple hidden onChange={handleUpload} />
-          </label>
+          <FilePicker accept=".jar" multiple onChange={handleUpload} disabled={busy}>
+            {busy ? '导入中…' : <><AddOutline aria-hidden="true" /> 添加 JAR</>}
+          </FilePicker>
         )}
-        <span className="count">
-          {server.loading || localFlash.loading ? '加载中…' : server.error || localFlash.error ? '部分加载失败' : games.length + ' 款'}
-        </span>
       </div>
       {kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={popular} onOpen={openMenu} />}
       {kind !== 'flash' && <GameRow title="🕘 最近在玩" items={recent} onOpen={openMenu} />}
       {(server.error || localFlash.error) && (
-        <div className="status statusError">{server.error ? `在线列表加载失败：${server.error}（请确认本地服务已在 8080 端口运行）` : localFlash.error}</div>
+        <div className="status statusError" role="alert">{server.error ? `在线列表加载失败：${server.error}（请确认本地服务已在 8080 端口运行）` : localFlash.error}</div>
       )}
       <div className="gameGrid">
           {games.map((g) => (
@@ -488,7 +500,7 @@ function Library({ kind, onPlay }) {
             />
           ))}
       </div>
-      {!server.error && !localFlash.error && !server.loading && !localFlash.loading && games.length === 0 && <div className="status">没有匹配的游戏</div>}
+      {!server.error && !localFlash.error && !server.loading && !localFlash.loading && games.length === 0 && <Empty className="emptyPanel" description="没有匹配的游戏" />}
       <GameMenu
         game={menuGame}
         onStart={handlePlay}
@@ -497,6 +509,16 @@ function Library({ kind, onPlay }) {
         onClose={() => setMenuGame(null)}
       />
     </section>
+  )
+}
+
+function FilePicker({ children, ...inputProps }) {
+  const input = useRef(null)
+  return (
+    <>
+      <Button className="upload" size="small" disabled={inputProps.disabled} onClick={() => input.current?.click()}>{children}</Button>
+      <input {...inputProps} type="file" ref={input} hidden />
+    </>
   )
 }
 
@@ -533,6 +555,7 @@ function FlashStore({ onRefreshLibrary }) {
     setError('')
     setMessage('')
     try {
+      if (!name.trim()) throw new Error('请填写游戏名称')
       if (url.trim() && file) throw new Error('SWF 直链和本地文件只能选择一个')
       if (!url.trim() && !file) throw new Error('请填写 SWF 直链或选择本地文件')
       if (file) await addFromFile(file, { name, description })
@@ -555,29 +578,32 @@ function FlashStore({ onRefreshLibrary }) {
 
   return <section className="storePage">
     <div className="storeHero">
-      <div><span className="eyebrow">LOCAL FLASH LIBRARY</span><h2 className="storeHeroTitle">Flash 游戏商城</h2><p className="storeHeroText">游戏下载到当前设备的本机存储，服务器不会保存你的游戏文件。</p></div>
-      <button className="ghostButton" type="button" onClick={local.refresh} disabled={local.loading}>刷新本机库</button>
+      <div><h2 className="storeHeroTitle">Flash 游戏商城</h2><p className="storeHeroText">游戏下载到当前设备的本机存储，服务器不会保存你的游戏文件。</p></div>
+      <Button className="ghostButton" size="small" fill="outline" type="button" onClick={local.refresh} disabled={local.loading}>刷新本机库</Button>
     </div>
-    {(local.error || error) && <div className="status statusError">{error || local.error} <button className="inlineAction" type="button" onClick={local.refresh}>重试</button></div>}
-    {message && <div className="status">{message}</div>}
+    {(local.error || error) && <div className="status statusError" role="alert">{error || local.error} <Button className="inlineAction" fill="none" type="button" onClick={local.refresh}>重试</Button></div>}
+    {message && <div className="status statusSuccess" role="status">{message}</div>}
     <form className="flashImportPanel" onSubmit={submit}>
-      <div><strong>添加自己的 Flash 游戏</strong><p className="storeInfoDesc">直链需要目标站点允许浏览器跨域读取；也可以直接选择本地 SWF 文件。</p></div>
+      <h3>添加 Flash 游戏</h3>
+      <p>输入允许跨域读取的 SWF 直链，或选择本地文件。</p>
       <div className="flashImportFields">
-        <input className="search" required placeholder="游戏名称" value={name} onChange={(event) => setName(event.target.value)} />
-        <input className="search" type="url" placeholder="SWF 直链（可选）" value={url} onChange={(event) => setUrl(event.target.value)} />
-        <textarea className="search flashDescription" placeholder="游戏说明（可选）" value={description} onChange={(event) => setDescription(event.target.value)} />
-        <label className="upload">{file ? file.name : '选择本地 .swf'}<input id="flash-file-input" type="file" accept=".swf,application/x-shockwave-flash" hidden onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>
-        <button className="downloadButton" type="submit" disabled={busy !== '' || local.loading}>{busy === 'custom' ? '加入中…' : '加入本机'}</button>
+        <label>游戏名称<Input className="field" placeholder="输入游戏名称" value={name} onChange={setName} aria-required="true" /></label>
+        <label>SWF 直链<Input className="field" type="url" placeholder="https://…" value={url} onChange={setUrl} /></label>
+        <label>游戏说明<TextArea className="field flashDescription" placeholder="选填" rows={2} value={description} onChange={setDescription} /></label>
+        <FilePicker id="flash-file-input" accept=".swf,application/x-shockwave-flash" onChange={(event) => setFile(event.target.files?.[0] || null)}>
+          {file ? file.name : '选择本地 SWF'}
+        </FilePicker>
+        <Button className="downloadButton" color="primary" size="small" type="submit" disabled={busy !== '' || local.loading}>{busy === 'custom' ? '加入中…' : '加入本机'}</Button>
       </div>
     </form>
     <div className="storeGrid">{FLASH_GAMES.map((game) => {
       const key = `catalog:${game.catalogId}`
       const isAdded = added.has(key)
-      return <article className="storeCard" key={game.file}>
+      return <Card className="storeCard" bodyClassName="storeCardBody" key={game.file}>
         <div className="storeIcon">{game.name.charAt(0)}</div>
         <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">内置目录 · {formatSize(game.size)}</p><span className="storeInfoDesc">{game.desc}</span></div>
-        <button className="downloadButton" type="button" onClick={() => addBundledGame(game)} disabled={busy !== '' || local.loading}>{busy === game.file ? '下载中…' : isAdded ? '已加入' : '加入本机'}</button>
-      </article>
+        <Button className="downloadButton" color="primary" size="small" type="button" onClick={() => addBundledGame(game)} disabled={busy !== '' || local.loading}>{busy === game.file ? '下载中…' : isAdded ? '已加入' : '加入本机'}</Button>
+      </Card>
     })}</div>
   </section>
 }
@@ -611,6 +637,10 @@ function Store({ onRefreshLibrary }) {
     } catch (error) { window.alert('下载失败：' + (error.message || error)) }
     finally { setBusy('') }
   }
+  function search(value) {
+    setPage(1)
+    setAppliedQuery(value.trim())
+  }
   if (store.offline) {
     return <section className="storePage">
       <div className="emptyPanel">
@@ -621,25 +651,25 @@ function Store({ onRefreshLibrary }) {
   }
   return <section className="storePage">
     <div className="storeHero">
-      <div><span className="eyebrow">REMOTE LIBRARY</span><h2 className="storeHeroTitle">52java 游戏商城</h2><p className="storeHeroText">从经典 Java 游戏目录直接加入你的本地模拟器。</p></div>
-      <div className="storeActions"><button className="ghostButton" onClick={store.refresh} disabled={store.loading}>刷新目录</button><a className="ghostButton" href={store.siteUrl} target="_blank" rel="noreferrer">打开原站 ↗</a></div>
+      <div><h2 className="storeHeroTitle">52java 游戏商城</h2><p className="storeHeroText">从经典 Java 游戏目录直接加入你的本地模拟器。</p></div>
+      <div className="storeActions"><Button className="ghostButton" size="small" fill="outline" onClick={store.refresh} disabled={store.loading}>刷新目录</Button><a className="ghostButton" href={store.siteUrl} target="_blank" rel="noreferrer">打开原站 ↗</a></div>
     </div>
-    <form className="storeFilters" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedQuery(query.trim()) }}>
-      <input className="search" type="search" placeholder="搜索 52java 游戏" value={query} onChange={(event) => setQuery(event.target.value)} />
+    <form className="storeFilters" onSubmit={(event) => { event.preventDefault(); search(query) }}>
+      <SearchBar className="search" placeholder="搜索 52java 游戏" value={query} onChange={setQuery} onSearch={search} />
       <select className="categorySelect" value={category} onChange={(event) => { setPage(1); setCategory(event.target.value) }} aria-label="游戏分类">
         <option value="">全部分类</option><option value="1">角色</option><option value="2">动作</option><option value="3">益智</option><option value="4">策略</option><option value="5">射击</option><option value="7">冒险</option><option value="8">赛车</option><option value="9">棋牌</option><option value="10">养成</option><option value="11">经营</option><option value="12">飞行</option><option value="13">格斗</option><option value="14">体育</option>
       </select>
-      <button className="ghostButton" type="submit">搜索</button>
+      <Button className="ghostButton" size="small" fill="outline" type="submit">搜索</Button>
     </form>
-    {store.error && <div className="status statusError">商城目录加载失败：{store.error} <button className="inlineAction" onClick={store.refresh}>重试</button></div>}
-    {store.loading && <div className="status">正在同步 52java 目录…</div>}
+    {store.error && <div className="status statusError" role="alert">商城目录加载失败：{store.error} <Button className="inlineAction" fill="none" onClick={store.refresh}>重试</Button></div>}
+    {store.loading && <div className="status" role="status"><DotLoading /> 正在同步 52java 目录…</div>}
     {!store.loading && !store.error && !store.games.length && <div className="emptyPanel"><strong>{appliedQuery ? '没有匹配的游戏' : '目录暂时为空'}</strong><span>可以调整筛选条件，或稍后刷新目录。</span></div>}
-    <div className="storeGrid">{store.games.map((game) => <article className="storeCard" key={game.id}>
+    <div className="storeGrid">{store.games.map((game) => <Card className="storeCard" bodyClassName="storeCardBody" key={game.id}>
       <div className="storeIcon">{game.iconUrl ? <img src={game.iconUrl} alt="" /> : (game.name || '?').charAt(0)}</div>
       <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">52java · {game.plays.toLocaleString()} 次下载</p><span className="storeInfoDesc">经典 Java 手机游戏</span></div>
-      <button className="downloadButton" onClick={() => download(game)} disabled={busy === game.id}>{busy === game.id ? '下载中…' : done === game.id ? '已加入' : '加入库'}</button>
-    </article>)}</div>
-    {!store.loading && !store.error && store.games.length > 0 && <div className="storePagination"><span>第 {page} / {store.pages} 页 · {store.total.toLocaleString()} 款</span><div><button type="button" className="ghostButton" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</button><button type="button" className="ghostButton" disabled={page >= store.pages} onClick={() => setPage(page + 1)}>下一页</button></div></div>}
+      <Button className="downloadButton" color="primary" size="small" onClick={() => download(game)} disabled={busy === game.id}>{busy === game.id ? '下载中…' : done === game.id ? '已加入' : '加入库'}</Button>
+    </Card>)}</div>
+    {!store.loading && !store.error && store.games.length > 0 && <div className="storePagination"><span>第 {page} / {store.pages} 页 · {store.total.toLocaleString()} 款</span><div><Button type="button" size="small" fill="outline" className="ghostButton" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button><Button type="button" size="small" fill="outline" className="ghostButton" disabled={page >= store.pages} onClick={() => setPage(page + 1)}>下一页</Button></div></div>}
   </section>
 }
 
@@ -784,27 +814,27 @@ function Player({ game, onBack, nativeBackSignal }) {
   return (
     <div ref={playerRef} className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
       <div className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
-        <button className="runtimeToolbarToggle" onClick={() => setToolbarCollapsed((value) => !value)} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}>•••</button>
+        <Button className="runtimeToolbarToggle" onClick={() => setToolbarCollapsed((value) => !value)} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}><MoreOutline aria-hidden="true" /></Button>
         {!toolbarCollapsed && <div className="runtimeToolbarContent">
-          <button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅"><span aria-hidden="true">←</span></button>
+          <Button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅"><LeftOutline aria-hidden="true" /></Button>
           <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
           <span className="runtimeToolbarSpacer" />
-          {game.kind === 'j2me' && <button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={openSettings} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><span aria-hidden="true">⚙</span></button>}
-          <button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}><span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span></button>
+          {game.kind === 'j2me' && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={openSettings} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><SetOutline aria-hidden="true" /></Button>}
+          <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}><span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span></Button>
         </div>}
       </div>
-      <div ref={stageRef} className="playerStage">
+      <div ref={stageRef} className={game.kind === 'flash' ? 'playerStage flashPlayerStage' : 'playerStage'}>
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
       {confirming && (
-        <div className="exitConfirm" role="dialog" aria-modal="true">
+        <div className="exitConfirm" role="dialog" aria-modal="true" aria-label="退出当前游戏？">
           <div className="exitBox">
             <strong>退出当前游戏？</strong>
             <span>当前游戏进度可能尚未保存。</span>
             <div>
-              <button className="optionButton" onClick={() => setConfirming(false)}>继续游戏</button>
-              <button className="optionButton optionDanger" onClick={exit}>退出游戏</button>
+              <Button className="optionButton" onClick={() => setConfirming(false)}>继续游戏</Button>
+              <Button className="optionButton optionDanger" color="danger" fill="outline" onClick={exit}>退出游戏</Button>
             </div>
           </div>
         </div>
@@ -889,18 +919,21 @@ export default function App() {
   if (route.type === 'play') return <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />
 
   return (
-    <div className="appShell app">
+    <div className="appShell">
       <header className="header">
-        <div><h1 className="logo">小潮霸王</h1><span className="tagline">RETRO JAVA ARCADE</span></div>
-        <nav className="tabs">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              className={'tab' + (tab === t.id ? ' tabActive' : '')}
-              onClick={() => switchTab(t.id)}
+        <div className="brand"><AppstoreOutline aria-hidden="true" /><h1>小潮霸王</h1></div>
+        <nav className="tabs" aria-label="游戏库和商城">
+          {TABS.map(({ id, label, Icon }) => (
+            <Button
+              key={id}
+              className={'tab' + (tab === id ? ' tabActive' : '')}
+              fill="none"
+              aria-current={tab === id ? 'page' : undefined}
+              onClick={() => switchTab(id)}
             >
-              {t.label}
-            </button>
+              <Icon aria-hidden="true" />
+              <span>{label}</span>
+            </Button>
           ))}
         </nav>
       </header>

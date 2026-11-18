@@ -41,8 +41,8 @@ function AppContent() {
     return () => subscription.remove()
   }, [origin])
 
-  useEffect(() => {
-    if (!origin || !webViewRef.current) return
+  const syncInsets = useCallback(() => {
+    if (!webViewRef.current) return
     const payload = JSON.stringify({
       version: 1,
       top: insets.top,
@@ -51,7 +51,11 @@ function AppContent() {
       left: insets.left,
     })
     webViewRef.current.injectJavaScript(`window.__XIAOCHAO_RN_HOST__?.setInsets(${payload}); true;`)
-  }, [origin, insets.top, insets.right, insets.bottom, insets.left])
+  }, [insets.top, insets.right, insets.bottom, insets.left])
+
+  useEffect(() => {
+    if (origin) syncInsets()
+  }, [origin, syncInsets])
 
   const handleBack = useCallback(() => {
     if (!webViewRef.current) return false
@@ -110,7 +114,7 @@ function AppContent() {
               onMessage={handleMessage}
               onError={handleWebError}
               onNavigationStateChange={handleNavigation}
-              onLoadEnd={() => setAttempt(0)}
+              onLoadEnd={() => { syncInsets(); setAttempt(0) }}
             />
           ) : error ? (
             <View style={styles.center}>

@@ -1,11 +1,14 @@
 import React from 'react'
+import { ConfigProvider } from 'antd-mobile'
+import zhCN from 'antd-mobile/es/locales/zh-CN'
 import { createRoot } from 'react-dom/client'
 import '@unocss/reset/tailwind.css'
 import 'virtual:uno.css'
+import './mobile-ui.css'
 import App from './App.jsx'
 
 function render() {
-  createRoot(document.getElementById('root')).render(<App />)
+  createRoot(document.getElementById('root')).render(<ConfigProvider locale={zhCN}><App /></ConfigProvider>)
 }
 
 async function clearLegacyBrowserState() {

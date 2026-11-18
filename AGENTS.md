@@ -95,10 +95,10 @@ git fetch --prune origin
 
 每个包含代码、配置或运行时行为的 PR 都必须经过冷启动 review。reviewer 不继承实现者的聊天上下文，只接收任务摘要、`AGENTS.md`、spec、验收标准、`origin/main...HEAD` diff、改动文件的相关调用链和验证结果。
 
-默认使用少量动态上下文：
+按当前会话的全局 Agent 协作规则选择审查模型。优先使用经核实对当前账号或工作区免费、且有剩余额度的 OpenCode 模型。每次审查记录实际使用的 `provider/model`，并遵守全局规则对付费调用、证据范围与权限隔离的要求。
 
-1. 普通改动启动一个 `gpt-6-luna` reviewer，使用低 reasoning，单个上下文最多 300k tokens。
-2. 涉及 Android、WebView、网络、性能、全屏、旋转或跨模块生命周期时，再启动一个独立的 `gpt-6-luna` validation reviewer，执行真实命令或运行场景。
+1. 普通改动启动一个独立 reviewer。模型支持时使用低 reasoning，审查上下文遵守模型限制且最多 300k tokens。
+2. 涉及 Android、WebView、网络、性能、全屏、旋转或跨模块生命周期时，再启动一个独立的 validation reviewer。由 reviewer 在受限环境中执行实际验证，或由主 Agent 执行 reviewer 指定的命令并返还结果供其判断。
 3. 初始顺序固定为：先完成 diff review，再完成 feature audit；需要平台或外部系统验证时才执行 validation review。必须完成全部适用的 review pass 并先汇总 findings，才能启动 fixer；不能只完成 diff review 就启动 fixer。发现 P0/P1/P2 后启动 fixer；P0 也必须进入 fixer，若无法安全修复则立即升级并停止交付。fixer 修改任务 worktree，不能由 reviewer 直接改代码。
 
 reviewer 默认只读，必须按 `docs/review-matrix.md` 检查，并使用 `docs/review-report-template.md` 输出 findings。每条 finding 必须包含触发条件、调用路径、错误结果、影响场景和修复建议。没有证据的猜测不能作为阻塞项。

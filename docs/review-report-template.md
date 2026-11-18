@@ -5,9 +5,9 @@
 - PR:
 - Base SHA:
 - Head SHA:
-- Reviewer model: `gpt-6-luna`
-- Reasoning: `low`
-- Context budget: `300k`
+- Reviewer model: actual `provider/model`
+- Reasoning: actual setting, if supported
+- Context budget: actual limit
 - Review round: `R1` / `R2` / `R3`
 - Review pass: `diff` / `feature-audit` / `validation` (validation only when required)
 
