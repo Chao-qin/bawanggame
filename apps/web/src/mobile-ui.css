@@ -306,6 +306,22 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
 }
 @media (orientation: portrait) {
   .player .runtimeToolbar .runtimeToolbarToggle { display: none; }
+  body:not(.viewport-landscape):not([data-orientation="landscape"]) .j2mePlayer:not(.runtimePlayerToolbarCollapsed) {
+    display: flex;
+    flex-direction: column;
+  }
+  body:not(.viewport-landscape):not([data-orientation="landscape"]) .j2mePlayer:not(.runtimePlayerToolbarCollapsed) .runtimeToolbar {
+    position: relative;
+    top: auto;
+    flex: none;
+    margin-block: max(8px, var(--safe-area-top, 0px)) 8px;
+  }
+  body:not(.viewport-landscape):not([data-orientation="landscape"]) .j2mePlayer:not(.runtimePlayerToolbarCollapsed) .playerStage {
+    position: relative;
+    inset: auto;
+    flex: 1;
+    min-height: 0;
+  }
 }
 
 @media (max-width: 700px) {
