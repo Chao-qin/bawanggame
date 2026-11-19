@@ -222,20 +222,24 @@ function useLocalJars(enabled) {
       window.LocalJars.list()
         .then((infos) => {
           if (!alive) return
+          setError(null)
           setGames(
-            (infos || []).map((info) => ({
-              kind: 'j2me',
-              file: info.file,
-              name: info.name || info.file,
-              vendor: info.vendor || '',
-              desc: '',
-              size: info.data ? info.data.size : 0,
-              iconUrl: info.icon ? URL.createObjectURL(info.icon) : null,
-              local: true,
-            }))
+            (infos || []).map((info) => {
+              const iconUrl = info.icon ? URL.createObjectURL(info.icon) : null
+              return {
+                kind: 'j2me',
+                file: info.file,
+                name: info.name || info.file,
+                vendor: info.vendor || '',
+                desc: '',
+                size: info.data ? info.data.size : 0,
+                iconUrl,
+                local: true,
+              }
+            })
           )
         })
-        .catch((e) => setError(String(e.message || e)))
+        .catch((e) => { if (alive) setError(String(e.message || e)) })
     }
     poll()
     return () => {
@@ -243,26 +247,47 @@ function useLocalJars(enabled) {
     }
   }, [enabled, tick])
 
+  useEffect(() => () => {
+    for (const game of games) {
+      if (game.iconUrl) URL.revokeObjectURL(game.iconUrl)
+    }
+  }, [games])
+
   function refresh() {
     setTick((t) => t + 1)
   }
 
   async function addFiles(files) {
     if (!hasLocalJars()) throw new Error('LocalJars 未加载')
-    for (const f of files) {
-      await window.LocalJars.add(f)
+    let added = 0
+    let duplicates = 0
+    try {
+      for (const file of files) {
+        try {
+          await window.LocalJars.add(file)
+          added += 1
+        } catch (error) {
+          if (error.code !== 'already_installed') throw error
+          duplicates += 1
+        }
+      }
+      return { added, duplicates }
+    } finally {
+      if (added) refresh()
     }
-    refresh()
   }
 
-  async function remove(file) {
-    if (!hasLocalJars()) return
-    await window.LocalJars.remove(file)
-    await window.LocalJars.clearData('local:' + file)
-    refresh()
-  }
+  return { games, error, addFiles, refresh }
+}
 
-  return { games, error, addFiles, remove, refresh }
+async function uninstallLocalGame(game) {
+  if (game.kind === 'flash') {
+    await removeLocalFlash(game.file)
+  } else {
+    if (!hasLocalJars()) throw new Error('浏览器本机存储不可用')
+    await window.LocalJars.remove(game.file)
+    await window.LocalJars.clearData('local:' + game.file)
+  }
 }
 
 function useLocalFlash(enabled) {
@@ -304,7 +329,6 @@ function useLocalFlash(enabled) {
   return {
     ...state,
     refresh: () => setTick((value) => value + 1),
-    remove: async (id) => { await removeLocalFlash(id); setTick((value) => value + 1) },
   }
 }
 
@@ -319,16 +343,27 @@ function localJarName(name, id) {
   return base.toLowerCase().endsWith('.jar') ? base : base + '.jar'
 }
 
-function GameCard({ game, onOpen, selected }) {
+function gameKey(game) {
+  return (game.local ? 'local:' : '') + game.kind + ':' + game.file
+}
+
+function duplicateMessage(name) {
+  return `已安装过「${name}」，无需重复安装`
+}
+
+function GameCard({ game, onOpen, selected, selecting, disabled }) {
   const initial = (game.name || '?').trim().charAt(0).toUpperCase()
   return (
     <button
       type="button"
       className={'card' + (selected ? ' cardSelected' : '')}
-      aria-pressed={!!selected}
+      aria-pressed={selecting && game.local ? selected : undefined}
+      aria-disabled={disabled || undefined}
+      disabled={disabled}
       onClick={() => onOpen(game)}
       title={game.desc || game.name}
     >
+      {selected && <span className="cardCheck" aria-hidden="true">✓</span>}
       <div className="cardIcon">
         {game.iconUrl ? <img className="h-full w-full object-contain image-render-pixel" src={game.iconUrl} alt="" /> : initial}
       </div>
@@ -389,7 +424,7 @@ function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
         </div>
         <div className="optionBody">
           <Button className="optionButton" color="primary" onClick={() => { onStart(game); onClose() }}>启动</Button>
-          <Button className="optionButton" onClick={() => { onSelect(game); onClose() }}>选择</Button>
+          {game.local && <Button className="optionButton" onClick={() => { onSelect(game); onClose() }}>选择</Button>}
           {game.local && <Button className="optionButton optionDanger" color="danger" fill="outline" onClick={() => { onRemove(game); onClose() }}>卸载</Button>}
         </div>
       </section>}
@@ -409,7 +444,12 @@ function Library({ kind, onPlay }) {
   const [recent, setRecent] = useState([])
   const [popular, setPopular] = useState([])
   const [menuGame, setMenuGame] = useState(null)
-  const [selectedGame, setSelectedGame] = useState(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [picked, setPicked] = useState(() => new Set())
+  const [removing, setRemoving] = useState(false)
+  const [notice, setNotice] = useState(null)
+  const localGames = kind === 'flash' ? localFlash.games : local.games
+  const selectedGames = localGames.filter((game) => picked.has(gameKey(game)))
 
   useEffect(() => {
     if (!menuGame) return undefined
@@ -434,14 +474,60 @@ function Library({ kind, onPlay }) {
     if (g.kind !== 'flash') recordPlay(g)
   }
 
-  function openMenu(g) { setMenuGame(g) }
+  function exitSelection() {
+    setSelectMode(false)
+    setPicked(new Set())
+  }
 
-  function removeLocalGame(g) {
-    if (!g.local) return
-    if (window.confirm('卸载「' + g.name + '」？')) {
-      if (g.kind === 'flash') localFlash.remove(g.file)
-      else local.remove(g.file)
+  useEffect(() => {
+    if (!selectMode || removing) return undefined
+    const close = (event) => {
+      if (event.key === 'Escape') exitSelection()
     }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [selectMode, removing])
+
+  function openGame(game) {
+    if (removing) return
+    if (!selectMode) {
+      setMenuGame(game)
+      return
+    }
+    if (!game.local) return
+    const key = gameKey(game)
+    setPicked((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function selectGame(game) {
+    setPicked(new Set([gameKey(game)]))
+    setNotice(null)
+    setSelectMode(true)
+  }
+
+  async function removeGames(targets, confirmation) {
+    if (busy || removing || targets.length === 0 || !window.confirm(confirmation)) return
+    setRemoving(true)
+    setNotice(null)
+    let failed = 0
+    for (const game of targets) {
+      try {
+        await uninstallLocalGame(game)
+      } catch (_) {
+        failed += 1
+      }
+    }
+    if (kind === 'flash') localFlash.refresh()
+    else local.refresh()
+    const removed = targets.length - failed
+    setNotice({ text: `已卸载 ${removed} 款` + (failed ? `，${failed} 款卸载失败` : ''), failed })
+    exitSelection()
+    setRemoving(false)
   }
 
   const games = useMemo(() => {
@@ -459,14 +545,18 @@ function Library({ kind, onPlay }) {
     e.target.value = ''
     if (!files.length) return
     setBusy(true)
+    setNotice(null)
     local
       .addFiles(files)
+      .then(({ added, duplicates }) => {
+        setNotice({ text: `已导入 ${added} 款，${duplicates} 款已安装过` })
+      })
       .catch((err) => window.alert('导入失败：' + (err.message || err)))
       .finally(() => setBusy(false))
   }
 
   return (
-    <section className="library">
+    <section className={selectMode ? "library librarySelecting" : "library"}>
       <div className="sectionHeading">
         <h2>{TABS.find((tab) => tab.id === kind)?.label}游戏库</h2>
         <span className="count" role="status">
@@ -481,32 +571,44 @@ function Library({ kind, onPlay }) {
           onChange={setQuery}
         />
         {kind === 'j2me' && (
-          <FilePicker accept=".jar" multiple onChange={handleUpload} disabled={busy}>
+          <FilePicker accept=".jar" multiple onChange={handleUpload} disabled={busy || selectMode || removing}>
             {busy ? '导入中…' : <><AddOutline aria-hidden="true" /> 添加 JAR</>}
           </FilePicker>
         )}
       </div>
-      {kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={popular} onOpen={openMenu} />}
-      {kind !== 'flash' && <GameRow title="🕘 最近在玩" items={recent} onOpen={openMenu} />}
-      {(server.error || localFlash.error) && (
-        <div className="status statusError" role="alert">{server.error ? `在线列表加载失败：${server.error}（请确认本地服务已在 8080 端口运行）` : localFlash.error}</div>
+      {notice && <div className={notice.failed ? 'status statusError' : 'status statusSuccess'} role={notice.failed ? 'alert' : 'status'}>{notice.text}</div>}
+      {!selectMode && kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={popular} onOpen={openGame} />}
+      {!selectMode && kind !== 'flash' && <GameRow title="🕘 最近在玩" items={recent} onOpen={openGame} />}
+      {server.error && <div className="status statusError" role="alert">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>}
+      {(kind === 'j2me' ? local.error : localFlash.error) && (
+        <div className="status statusError" role="alert">{kind === 'j2me' ? local.error : localFlash.error}</div>
       )}
       <div className="gameGrid">
           {games.map((g) => (
             <GameCard
-              key={(g.local ? 'local:' : '') + g.kind + ':' + g.file}
+              key={gameKey(g)}
               game={g}
-              onOpen={openMenu}
-              selected={selectedGame && selectedGame.file === g.file && selectedGame.kind === g.kind}
+              onOpen={openGame}
+              selecting={selectMode}
+              selected={selectMode && picked.has(gameKey(g))}
+              disabled={removing || (selectMode && !g.local)}
             />
           ))}
       </div>
       {!server.error && !localFlash.error && !server.loading && !localFlash.loading && games.length === 0 && <Empty className="emptyPanel" description="没有匹配的游戏" />}
+      {selectMode && <div className="selectBar" aria-label="已选游戏操作">
+        <span role="status">已选 {selectedGames.length} 个</span>
+        <Button color="danger" size="small" disabled={busy || removing || !selectedGames.length}
+          onClick={() => removeGames(selectedGames, `卸载所选 ${selectedGames.length} 款游戏？`)}>
+          {removing ? '卸载中…' : '卸载'}
+        </Button>
+        <Button size="small" disabled={removing} onClick={exitSelection}>取消</Button>
+      </div>}
       <GameMenu
         game={menuGame}
         onStart={handlePlay}
-        onSelect={setSelectedGame}
-        onRemove={removeLocalGame}
+        onSelect={selectGame}
+        onRemove={(game) => removeGames([game], `卸载「${game.name}」？`)}
         onClose={() => setMenuGame(null)}
       />
     </section>
@@ -544,7 +646,10 @@ function FlashStore({ onRefreshLibrary }) {
       local.refresh()
       onRefreshLibrary()
     } catch (cause) {
-      setError(cause.message || String(cause))
+      if (cause.code === 'already_exists') {
+        setMessage(duplicateMessage(game.name))
+        local.refresh()
+      } else setError(cause.message || String(cause))
     } finally {
       setBusy('')
     }
@@ -571,7 +676,8 @@ function FlashStore({ onRefreshLibrary }) {
       local.refresh()
       onRefreshLibrary()
     } catch (cause) {
-      setError(cause.message || String(cause))
+      if (cause.code === 'already_exists') setMessage(duplicateMessage(name.trim()))
+      else setError(cause.message || String(cause))
     } finally {
       setBusy('')
     }
@@ -616,15 +722,40 @@ function Store({ onRefreshLibrary }) {
   const [page, setPage] = useState(1)
   const store = useJavaStore(appliedQuery, category, page)
   const [busy, setBusy] = useState('')
-  const [done, setDone] = useState('')
+  const [installed, setInstalled] = useState([])
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    if (!hasLocalJars()) return undefined
+    let active = true
+    window.LocalJars.list().then((records) => {
+      if (active) setInstalled(records)
+    }).catch(() => {})
+    return () => { active = false }
+  }, [])
+
+  function isInstalled(game, records = installed) {
+    const id = String(game.id)
+    const file = localJarName(game.name, id)
+    return records.some((record) => record.sourceId === id || record.file === file)
+  }
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
   }, [appliedQuery, category, page])
   async function download(game) {
-    setBusy(game.id); setDone('')
+    const id = String(game.id)
+    setBusy(id)
+    setMessage('')
     try {
       if (!hasLocalJars()) throw new Error('浏览器本机存储不可用')
-      const response = await fetch(apiPath('/__52java/download?id=' + encodeURIComponent(game.id)))
+      const records = await window.LocalJars.list()
+      setInstalled(records)
+      if (isInstalled(game, records)) {
+        setMessage(duplicateMessage(game.name))
+        return
+      }
+      const response = await fetch(apiPath('/__52java/download?id=' + encodeURIComponent(id)))
       if (!response.ok) {
         let message = '下载失败'
         try { message = (await response.json()).error || message } catch (_) {}
@@ -632,10 +763,14 @@ function Store({ onRefreshLibrary }) {
       }
       const blob = await response.blob()
       if (!blob.size) throw new Error('下载内容为空')
-      await window.LocalJars.add(new File([blob], localJarName(game.name, game.id), { type: 'application/java-archive' }))
-      setDone(game.id)
+      const file = new File([blob], localJarName(game.name, id), { type: 'application/java-archive' })
+      const record = await window.LocalJars.add(file, { sourceId: id })
+      setInstalled([...records, record])
       onRefreshLibrary()
-    } catch (error) { window.alert('下载失败：' + (error.message || error)) }
+    } catch (error) {
+      if (error.code === 'already_installed') setMessage(duplicateMessage(game.name))
+      else window.alert('下载失败：' + (error.message || error))
+    }
     finally { setBusy('') }
   }
   function search(value) {
@@ -662,13 +797,14 @@ function Store({ onRefreshLibrary }) {
       </select>
       <Button className="ghostButton" size="small" fill="outline" type="submit">搜索</Button>
     </form>
+    {message && <div className="status statusSuccess" role="status">{message}</div>}
     {store.error && <div className="status statusError" role="alert">商城目录加载失败：{store.error} <Button className="inlineAction" fill="none" onClick={store.refresh}>重试</Button></div>}
     {store.loading && <div className="status" role="status"><DotLoading /> 正在同步 52java 目录…</div>}
     {!store.loading && !store.error && !store.games.length && <div className="emptyPanel"><strong>{appliedQuery ? '没有匹配的游戏' : '目录暂时为空'}</strong><span>可以调整筛选条件，或稍后刷新目录。</span></div>}
     <div className="storeGrid">{store.games.map((game) => <Card className="storeCard" bodyClassName="storeCardBody" key={game.id}>
       <div className="storeIcon">{game.iconUrl ? <img src={game.iconUrl} alt="" /> : (game.name || '?').charAt(0)}</div>
       <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">52java · {game.plays.toLocaleString()} 次下载</p><span className="storeInfoDesc">经典 Java 手机游戏</span></div>
-      <Button className="downloadButton" color="primary" size="small" onClick={() => download(game)} disabled={busy === game.id}>{busy === game.id ? '下载中…' : done === game.id ? '已加入' : '加入库'}</Button>
+      <Button className="downloadButton" color="primary" size="small" onClick={() => download(game)} disabled={busy !== ''}>{busy === String(game.id) ? '下载中…' : isInstalled(game) ? '已加入' : '加入库'}</Button>
     </Card>)}</div>
     {!store.loading && !store.error && store.games.length > 0 && <div className="storePagination"><span>第 {page} / {store.pages} 页 · {store.total.toLocaleString()} 款</span><div><Button type="button" size="small" fill="outline" className="ghostButton" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button><Button type="button" size="small" fill="outline" className="ghostButton" disabled={page >= store.pages} onClick={() => setPage(page + 1)}>下一页</Button></div></div>}
   </section>

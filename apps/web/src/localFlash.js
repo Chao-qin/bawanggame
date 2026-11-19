@@ -106,7 +106,8 @@ function transaction(mode, operation) {
     let settled = false
     const tx = db.transaction(STORE_NAME, mode)
     try {
-      value = operation(tx.objectStore(STORE_NAME))
+      value = Promise.resolve(operation(tx.objectStore(STORE_NAME)))
+      value.catch(() => {})
     } catch (error) {
       reject(error)
       return
@@ -232,6 +233,15 @@ export async function get(id) {
   return record
 }
 
+function alreadyExists() {
+  return flashError('already_exists', '该游戏已安装过')
+}
+
+export async function has(dedupeKey) {
+  const key = await transaction('readonly', (store) => requestValue(store.index('dedupeKey').getKey(dedupeKey)))
+  return key !== undefined
+}
+
 export async function add({ name, description = '', source, sourceUrl = '', blob, dedupeKey }) {
   const cleanName = normalizeText(name)
   if (!cleanName) throw flashError('invalid_name', '请输入游戏名称')
@@ -240,13 +250,16 @@ export async function add({ name, description = '', source, sourceUrl = '', blob
   const key = String(dedupeKey || '')
   if (!key) throw flashError('invalid_source', '缺少游戏来源标识')
   const now = Date.now()
-  return transaction('readwrite', (store) => {
+  const record = await transaction('readwrite', (store) => {
     const existingRequest = store.index('dedupeKey').get(key)
     const result = new Promise((resolve, reject) => {
       existingRequest.onsuccess = () => {
-        const existing = existingRequest.result
+        if (existingRequest.result) {
+          resolve(null)
+          return
+        }
         const record = {
-          id: existing?.id || randomId(),
+          id: randomId(),
           dedupeKey: key,
           source,
           sourceUrl: String(sourceUrl || ''),
@@ -254,10 +267,10 @@ export async function add({ name, description = '', source, sourceUrl = '', blob
           description: normalizeText(description),
           data: blob,
           size: blob.size,
-          addedAt: existing?.addedAt || now,
+          addedAt: now,
           updatedAt: now,
         }
-        const request = store.put(record)
+        const request = store.add(record)
         request.onsuccess = () => resolve(record)
         request.onerror = () => reject(request.error || flashError('storage_error', '保存本机 Flash 游戏失败'))
       }
@@ -265,6 +278,8 @@ export async function add({ name, description = '', source, sourceUrl = '', blob
     })
     return result
   })
+  if (!record) throw alreadyExists()
+  return record
 }
 
 export async function remove(id) {
@@ -273,35 +288,41 @@ export async function remove(id) {
 
 export async function addFromFile(file, metadata = {}) {
   const blob = await validateSwf(file)
+  const dedupeKey = `sha256:${await digestHex(blob)}`
+  if (await has(dedupeKey)) throw alreadyExists()
   return add({
     ...metadata,
     source: 'file',
     sourceUrl: '',
     blob,
-    dedupeKey: `sha256:${await digestHex(blob)}`,
+    dedupeKey,
   })
 }
 
 export async function addFromUrl(url, metadata = {}, signal) {
   const sourceUrl = normalizedUrl(url)
+  const dedupeKey = `url:${sourceUrl}`
+  if (await has(dedupeKey)) throw alreadyExists()
   const blob = await fetchSwf(sourceUrl, signal)
   return add({
     ...metadata,
     source: 'remote',
     sourceUrl,
     blob,
-    dedupeKey: `url:${sourceUrl}`,
+    dedupeKey,
   })
 }
 
 export async function addBundled(file, metadata = {}, catalogId = file) {
   const sourceUrl = `/flash/${encodeURIComponent(file)}`
+  const dedupeKey = `catalog:${catalogId}`
+  if (await has(dedupeKey)) throw alreadyExists()
   const blob = await fetchSwf(sourceUrl)
   return add({
     ...metadata,
     source: 'bundled',
     sourceUrl,
     blob,
-    dedupeKey: `catalog:${catalogId}`,
+    dedupeKey,
   })
 }
