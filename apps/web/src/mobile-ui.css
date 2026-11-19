@@ -292,9 +292,15 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
   --background-color: #202b3b;
   --border-color: #354254;
   --border-radius: 8px;
+  place-items: center;
   padding: 0;
   font-size: 16px;
   min-width: 36px;
+}
+.player .runtimeToolbar .runtimeToolbarButton,
+.player .runtimeToolbar .adm-button > span {
+  display: grid;
+  place-items: center;
 }
 .player:not(.runtimePlayerToolbarCollapsed) .flashPlayerStage {
   top: calc(max(8px, var(--safe-area-top, 0px)) + 56px);
@@ -305,7 +311,10 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
   }
 }
 @media (orientation: portrait) {
-  .player .runtimeToolbar .runtimeToolbarToggle { display: none; }
+  body:not(.viewport-landscape):not([data-orientation="landscape"]) .j2mePlayer .runtimeToolbarToggle { display: grid; }
+  body:not(.viewport-landscape):not([data-orientation="landscape"]) .j2mePlayer.runtimePlayerToolbarCollapsed .playerStage {
+    inset: 0;
+  }
   body:not(.viewport-landscape):not([data-orientation="landscape"]) .j2mePlayer:not(.runtimePlayerToolbarCollapsed) {
     display: flex;
     flex-direction: column;

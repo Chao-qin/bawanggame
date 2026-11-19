@@ -677,7 +677,9 @@ function Player({ game, onBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(fullscreenElement()))
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
-  const [toolbarCollapsed, setToolbarCollapsed] = useState(() => window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
+  const [toolbarLandscape, setToolbarLandscape] = useState(() => window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
+  const [toolbarChoice, setToolbarChoice] = useState(null)
+  const toolbarCollapsed = toolbarChoice?.landscape === toolbarLandscape ? toolbarChoice.collapsed : toolbarLandscape
   const playerRef = useRef(null)
   const stageRef = useRef(null)
   const lastNativeBackSignal = useRef(nativeBackSignal)
@@ -689,7 +691,7 @@ function Player({ game, onBack, nativeBackSignal }) {
   }, [])
   useEffect(() => {
     const syncToolbarMode = () => {
-      setToolbarCollapsed(document.body.classList.contains('viewport-landscape') || (window.matchMedia?.('(orientation: landscape)')?.matches ?? false))
+      setToolbarLandscape(document.body.classList.contains('viewport-landscape') || (window.matchMedia?.('(orientation: landscape)')?.matches ?? false))
     }
     window.addEventListener('xiaochao:viewportchange', syncToolbarMode)
     return () => {
@@ -814,7 +816,7 @@ function Player({ game, onBack, nativeBackSignal }) {
   return (
     <div ref={playerRef} className={`player${game.kind === 'j2me' ? ' j2mePlayer' : ''}${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
       <div className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
-        <Button className="runtimeToolbarToggle" onClick={() => setToolbarCollapsed((value) => !value)} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}><MoreOutline aria-hidden="true" /></Button>
+        <Button className="runtimeToolbarToggle" onClick={() => setToolbarChoice({ landscape: toolbarLandscape, collapsed: !toolbarCollapsed })} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}><MoreOutline aria-hidden="true" /></Button>
         {!toolbarCollapsed && <div className="runtimeToolbarContent">
           <Button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅"><LeftOutline aria-hidden="true" /></Button>
           <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
