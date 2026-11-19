@@ -274,7 +274,16 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
 .optionTitle { display: grid; flex: 1; min-width: 0; }
 .optionTitle strong { font-size: 16px; }
 .optionTitle span { color: var(--ui-muted); font-size: 13px; }
-.optionSheet .iconButton { min-width: 44px; padding: 0; }
+.optionSheet .iconButton {
+  display: inline-flex;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+}
 .optionBody { display: grid; gap: 8px; }
 .player .exitBox { background: var(--ui-surface); border-color: var(--ui-border); border-radius: 18px; }
 .exitBox > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
