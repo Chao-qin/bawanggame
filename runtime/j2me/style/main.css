@@ -575,11 +575,12 @@ body.runtime-active #numpad {
   transform: translate(-50%, -25%) rotate(45deg);
 }
 
-/* Keep portrait soft-key hit targets outside the circular direction pad. */
-body.runtime-active:not([data-orientation="landscape"]) #choice,
-body.runtime-active:not([data-orientation="landscape"]) #back,
-body.runtime-active:not([data-orientation="landscape"]) #ret,
-body.runtime-active:not([data-orientation="landscape"]) #clear {
+/* Keep portrait action keys clear of the d-pad and each other. */
+body.runtime-active:not(.viewport-landscape):not([data-orientation="landscape"]) .runtime-stage:not(.mrp-stage) :is(#choice, #back, #ret, #clear) {
+  height: calc(50% - var(--u) * 0.09);
+}
+
+body.runtime-active:not([data-orientation="landscape"]) :is(#choice, #back, #ret, #clear) {
   width: calc(50% - var(--u) * 2.5);
 }
 

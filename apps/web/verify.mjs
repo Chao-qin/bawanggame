@@ -257,13 +257,28 @@ try {
     console.log('J2ME startup:', JSON.stringify(j2me))
     requireCheck(j2me.player && j2me.phone && j2me.editor, 'J2ME player did not mount')
     requireCheck(j2me.states.includes('boot') || j2me.states.includes('failure') || j2me.boot || j2me.failure, 'J2ME startup state was never rendered')
-    const viewports = [[844, 390], [1280, 720], [390, 844]]
+    const viewports = [[844, 390], [1280, 720], [390, 844], [375, 667]]
     for (const [width, height] of viewports) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
       await evaluate(`document.body.dataset.orientation='${width > height ? 'landscape' : 'portrait'}'; window.TouchLayout?.apply(window.TouchLayout.defaults()); window.ScreenSetup?.refit?.(); true`)
       await sleep(100)
       const snapshot = await rectSnapshot()
       console.log(`Viewport ${width}x${height}:`, JSON.stringify(snapshot))
+      if (width === 375) {
+        const portrait = await evaluate(`(() => {
+          const rect = (id) => document.querySelector(id).getBoundingClientRect()
+          const canvas = rect('#canvas')
+          return {
+            canvasHeight: canvas.height,
+            headerGap: canvas.top - rect('.runtimeToolbar').bottom,
+            leftGap: rect('#ret').top - rect('#choice').bottom,
+            rightGap: rect('#clear').top - rect('#back').bottom,
+          }
+        })()`)
+        console.log('J2ME portrait gaps:', JSON.stringify(portrait))
+        requireCheck(portrait.canvasHeight > 0 && portrait.headerGap > 0, 'J2ME toolbar overlaps the game canvas')
+        requireCheck(portrait.leftGap > 0 && portrait.rightGap > 0, 'J2ME side buttons have no vertical gap')
+      }
       if (snapshot.nav && snapshot.numpad && snapshot.display) {
         requireCheck(!snapshot.navNumpadOverlap && !snapshot.navDisplayOverlap && !snapshot.numpadDisplayOverlap, `controls overlap at ${width}x${height}`)
         if (width > height) requireCheck(snapshot.navBeforeNumpad && snapshot.sideLayout === 'swapped', `default navigation is not on the left at ${width}x${height}`)

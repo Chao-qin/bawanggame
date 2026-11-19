@@ -812,7 +812,7 @@ function Player({ game, onBack, nativeBackSignal }) {
     }
   }
   return (
-    <div ref={playerRef} className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
+    <div ref={playerRef} className={`player${game.kind === 'j2me' ? ' j2mePlayer' : ''}${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
       <div className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <Button className="runtimeToolbarToggle" onClick={() => setToolbarCollapsed((value) => !value)} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}><MoreOutline aria-hidden="true" /></Button>
         {!toolbarCollapsed && <div className="runtimeToolbarContent">
