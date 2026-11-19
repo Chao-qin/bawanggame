@@ -189,6 +189,7 @@ function mappedPath(urlPath: string) {
     ['java/', join(J2ME, 'java') + sep], ['libs/', join(J2ME, 'libs') + sep],
     ['style/', join(J2ME, 'style') + sep], ['jar/', JARS + sep],
     ['maopao/', MRP + sep], ['runtime/j2me/', J2ME + sep], ['runtime/mrp/', MRPRUNTIME + sep],
+    ['runtime/input/', join(PROJECT, 'runtime', 'input') + sep],
   ]
   for (const [prefix, base] of aliases) {
     if (path.startsWith(prefix)) {

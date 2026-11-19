@@ -1,11 +1,6 @@
 (function () {
-  var KEYS = { ArrowUp: -1, ArrowDown: -2, ArrowLeft: -3, ArrowRight: -4, Enter: -5, SoftLeft: -6, SoftRight: -7, Backspace: -8, Delete: -8, Escape: -11, "*": 42, "#": 35 };
   var BUTTONS = { up: -1, down: -2, left: -3, right: -4, ok: -5, choice: -6, back: -7, ret: -11, clear: -8, star: 42, pound: 35 };
-
-  for (var d = 0; d <= 9; d++) {
-    KEYS[d] = 48 + d;
-    BUTTONS["num" + d] = 48 + d;
-  }
+  for (var d = 0; d <= 9; d++) BUTTONS["num" + d] = 48 + d;
 
   var NAMES = { "-1": "up", "-2": "down", "-3": "left", "-4": "right", "-5": "ok", "-6": "soft1", "-7": "soft2", "-8": "clear", "-11": "back" };
 
@@ -35,6 +30,33 @@
       if (code != null && BUTTONS[slot] != null) out[slot] = code;
     });
     return out;
+  }
+
+  function actionOf(code) {
+    if (NAMES[code]) {
+      var name = NAMES[code];
+      return name === "soft1" ? "choice" : name === "soft2" ? "back" : name === "back" ? "ret" : name;
+    }
+    if (code >= 48 && code <= 57) return "num" + (code - 48);
+    if (code === 42) return "star";
+    if (code === 35) return "pound";
+    return null;
+  }
+
+  function codeOf(action) {
+    if (action === "up") return -1;
+    if (action === "down") return -2;
+    if (action === "left") return -3;
+    if (action === "right") return -4;
+    if (action === "ok") return -5;
+    if (action === "choice") return -6;
+    if (action === "back") return -7;
+    if (action === "clear") return -8;
+    if (action === "ret") return -11;
+    if (action === "star") return 42;
+    if (action === "pound") return 35;
+    if (/^num[0-9]$/.test(action)) return 48 + Number(action.slice(3));
+    return null;
   }
 
   function mapped(code) {
@@ -256,8 +278,6 @@
   }
 
   function releaseAll() {
-    for (var pk in physical) inputClear(physical[pk].timer);
-    physical = Object.create(null);
     cancelReleaseWatchdog();
     for (var k in S) {
       S[k].q.length = 0;
@@ -270,18 +290,34 @@
   // keymap.js 是同步脚本，而 config/*.js 与 bld/main-all.js 是 defer —— 顶层直接
   // 引用 config/vmSetTimeout 会 ReferenceError。因此惰性 boot：defer 链就绪后再 bind。
   var pad = null;
+  var inputController = null;
+  function dispatchAction(action, pressed, source, meta) {
+    var code = codeOf(action);
+    if (code == null) return;
+    code = mapped(code);
+    enqueue(code, pressed, meta || null);
+    kick();
+  }
   function bindTouchpad() {
     var buttons = touchButtons();
     pad = Touchpad.bind({
       buttons: buttons,
       dpadVisual: function (direction) { return window.TouchLayout ? TouchLayout.visualDpad(direction, config.touchLayout) : direction; },
       sink: {
-        press: function (code, meta) { enqueue(mapped(code), true, meta); kick(); },
-        release: function (code, meta) { enqueue(mapped(code), false, meta); kick(); },
+        press: function (code, meta) {
+          var action = actionOf(code);
+          if (action && inputController) inputController.press("touch:" + action, action, meta);
+        },
+        release: function (code, meta) {
+          var action = actionOf(code);
+          if (action && inputController) inputController.release("touch:" + action, action, meta);
+        },
         repeat: function (code) {
+          var action = actionOf(code);
           var rc = mapped(code);
           var s = S[rc];
-          if (s && s.seen) { MIDP.sendKeyRepeat(rc); trace(rc, "p"); }
+          if (action && inputController) inputController.repeat("touch:" + action, action);
+          else if (s && s.seen) { MIDP.sendKeyRepeat(rc); trace(rc, "p"); }
         }
       },
       feedback: {
@@ -299,6 +335,29 @@
   }
   function boot() {
     if (pad || !window.Touchpad) return;
+    if (!inputController && window.InputMapping) {
+      inputController = window.InputMapping.create({
+        gameId: config.gameId,
+        keyboard: true,
+        gamepad: true,
+        legacyKeyboardMap: config.keymap,
+        repeat: String(config.keyRepeat) !== "0",
+        repeatDelay: config.repeatDelay,
+        repeatInterval: config.repeatInterval,
+        sink: {
+          press: function (action, source, meta) { dispatchAction(action, true, source, meta); },
+          release: function (action, source, meta) { dispatchAction(action, false, source, meta); },
+          repeat: function (action) {
+            var code = codeOf(action);
+            if (code == null) return;
+            code = mapped(code);
+            var state = S[code];
+            if (state && state.seen) { MIDP.sendKeyRepeat(code); trace(code, "p"); }
+          }
+        }
+      });
+      window.__XIAOCHAO_INPUT_CONTROLLER__ = inputController;
+    }
     bindTouchpad();
   }
   window.__XIAOCHAO_KEYMAP_REBIND__ = function () {
@@ -313,9 +372,13 @@
       pad = null;
     }
     releaseAll();
+    if (inputController) {
+      try { inputController.destroy(); } catch (_) {}
+      inputController = null;
+    }
+    if (window.__XIAOCHAO_INPUT_CONTROLLER__) delete window.__XIAOCHAO_INPUT_CONTROLLER__;
     Object.keys(rafTasks).forEach(function (id) { delete rafTasks[id]; });
     fbTimer = 0;
-    physical = Object.create(null);
     S = Object.create(null);
     frameGaps.length = 0;
     lastFrameAt = 0;
@@ -326,61 +389,8 @@
   if (typeof config !== "undefined" && typeof vmSetTimeout !== "undefined") boot();
   if (!pad) document.addEventListener("DOMContentLoaded", boot);
 
-  // ---------- 物理键盘 ----------
-  var CODES = { KeyQ: -6, KeyE: -7 };
-
-  function keyOf(e) {
-    var custom = config.keymap || {};
-    for (var action in custom) if (custom[action] === e.code || custom[action] === e.key) {
-      var code = Object.keys(NAMES).filter(function (k) { return NAMES[k] === action; })[0];
-      if (code !== undefined) return +code;
-    }
-    return e.code in CODES ? CODES[e.code] : e.key in KEYS ? KEYS[e.key] : null;
-  }
-
-  function typing(e) {
-    var t = e.target;
-    if (!t || !t.tagName) return false;
-    var n = t.tagName.toLowerCase();
-    return n === "input" || n === "textarea" || n === "select" || t.isContentEditable;
-  }
-
-  var physical = Object.create(null);
-  function physicalRepeat(id) {
-    var p = physical[id];
-    if (!p) return;
-    if (String(config.keyRepeat) !== "0") {
-      MIDP.sendKeyRepeat(p.code);
-      trace(p.code, "p");
-      p.timer = inputSet(function () { physicalRepeat(id); }, Math.max(16, num(config.repeatInterval, 100)));
-    }
-  }
-
-  window.addEventListener("keydown", function (e) {
-    if (!window.__XIAOCHAO_RUNTIME__) return;
-    var k = keyOf(e);
-    if (k === null) return;
-    if (!typing(e)) e.preventDefault();
-    var id = e.code || e.key;
-    if (physical[id]) return;
-    var code = mapped(k);
-    physical[id] = { code: code, timer: inputSet(function () { physicalRepeat(id); }, Math.max(0, num(config.repeatDelay, 450))) };
-    enqueue(code, true);
-    kick();
-  }, { passive: false });
-
-  window.addEventListener("keyup", function (e) {
-    if (!window.__XIAOCHAO_RUNTIME__) return;
-    var k = keyOf(e);
-    if (k !== null) { enqueue(mapped(k), false); kick(); }
-    var id = e.code || e.key;
-    if (physical[id]) { inputClear(physical[id].timer); delete physical[id]; }
-  }, true);
-
   window.addEventListener("blur", releaseAll);
-  document.addEventListener("visibilitychange", function () {
-    if (document.hidden) releaseAll();
-  });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) releaseAll(); });
   window.addEventListener("pagehide", releaseAll);
 
   // ---------- 诊断 ----------

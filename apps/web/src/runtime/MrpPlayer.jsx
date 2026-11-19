@@ -18,7 +18,7 @@ export function MrpPlayer({ game, onExit, onReady }) {
     ;(async () => {
       try {
         await Promise.all(styles.map((src) => loadStyle(src, session)))
-        for (const src of ['/config/i18n.js', '/ui-feedback.js', '/keypad-canvas.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/maopao/vmrp_v1.0/vmrp.js']) {
+        for (const src of ['/config/i18n.js', '/ui-feedback.js', '/keypad-canvas.js', '/runtime/input/input-mapping.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/maopao/vmrp_v1.0/vmrp.js']) {
           await loadClassic(src, session)
           if (!alive || !session.active) return
         }
