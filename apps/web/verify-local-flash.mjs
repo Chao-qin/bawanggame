@@ -62,6 +62,47 @@ function check(condition, message) {
   if (!condition) throw new Error(message)
 }
 
+
+async function waitFor(expression, message) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (await evaluate(expression)) return
+    await sleep(100)
+  }
+  throw new Error(message)
+}
+
+async function click(selector, text) {
+  const found = await evaluate(`(() => {
+    const button = [...document.querySelectorAll(${JSON.stringify(selector)})]
+      .find((node) => !node.disabled && node.textContent.trim().includes(${JSON.stringify(text)}))
+    button?.click()
+    return Boolean(button)
+  })()`)
+  check(found, `Button not found: ${selector} ${text}`)
+}
+
+async function submitFlash(name, url, localFile = false) {
+  await evaluate(`(() => {
+    const inputs = document.querySelectorAll('.flashImportFields input:not([type=file])')
+    for (const [index, value] of [${JSON.stringify(name)}, ${JSON.stringify(url)}].entries()) {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inputs[index], value)
+      inputs[index].dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    if (${localFile}) {
+      const input = document.querySelector('#flash-file-input')
+      const transfer = new DataTransfer()
+      transfer.items.add(new File(['FWS smoke file'], 'smoke.swf'))
+      input.files = transfer.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+  })()`)
+  await click('.flashImportPanel button[type=submit]', '加入本机')
+}
+
+// Minimal stored ZIP fixtures with MIDlet manifests.
+const storeJar = 'UEsDBBQAAAAAANy+c10F55o+LgAAAC4AAAAUAAAATUVUQS1JTkYvTUFOSUZFU1QuTUZNYW5pZmVzdC1WZXJzaW9uOiAxLjAKTUlEbGV0LU5hbWU6IFNtb2tlIEphdmEKUEsBAhQDFAAAAAAA3L5zXQXnmj4uAAAALgAAABQAAAAAAAAAAAAAAIABAAAAAE1FVEEtSU5GL01BTklGRVNULk1GUEsFBgAAAAABAAEAQgAAAGAAAAAAAA=='
+const importJar = 'UEsDBBQAAAAAANy+c12KmxHaMAAAADAAAAAUAAAATUVUQS1JTkYvTUFOSUZFU1QuTUZNYW5pZmVzdC1WZXJzaW9uOiAxLjAKTUlEbGV0LU5hbWU6IFNtb2tlIEltcG9ydApQSwECFAMUAAAAAADcvnNdipsR2jAAAAAwAAAAFAAAAAAAAAAAAAAAgAEAAAAATUVUQS1JTkYvTUFOSUZFU1QuTUZQSwUGAAAAAAEAAQBCAAAAYgAAAAAA'
+
 try {
   await connect()
   await send('Page.enable')
@@ -81,6 +122,46 @@ try {
   console.log('Local records:', JSON.stringify(localState))
   check(localState.length === 1 && localState[0].key === 'catalog:fruit-madness', 'Flash catalog item was not stored locally')
   const id = localState[0].id
+
+  await evaluate(`(() => {
+    const fetchOriginal = window.fetch
+    window.smokeFetches = { catalog: 0, url: 0 }
+    window.fetch = (input, ...args) => {
+      const path = new URL(input, location.href).pathname
+      if (path.startsWith('/flash/')) window.smokeFetches.catalog += 1
+      if (path === '/smoke-test.swf') {
+        window.smokeFetches.url += 1
+        return Promise.resolve(new Response('FWS smoke URL'))
+      }
+      return fetchOriginal(input, ...args)
+    }
+  })()`)
+  await click('.storeCard button', '已加入')
+  await waitFor(`document.querySelector('.statusSuccess')?.textContent.includes('已安装过')`, 'Flash catalog duplicate prompt missing')
+  check(await evaluate('smokeFetches.catalog === 0'), 'Duplicate Flash catalog entry triggered a download')
+
+  const swfUrl = new URL('/smoke-test.swf', BASE_URL).href
+  await submitFlash('Smoke URL', swfUrl)
+  await waitFor(`document.querySelector('.statusSuccess')?.textContent.includes('已加入「Smoke URL」')`, 'Initial Flash URL import failed')
+  await submitFlash('Smoke URL', swfUrl)
+  await waitFor(`document.querySelector('.statusSuccess')?.textContent.includes('已安装过「Smoke URL」')`, 'Flash URL duplicate prompt missing')
+  check(await evaluate(`smokeFetches.url === 1 && document.querySelector('.flashImportFields input[type=url]').value === ${JSON.stringify(swfUrl)}`), 'Duplicate URL downloaded or cleared the form')
+
+  await submitFlash('Smoke SWF', '', true)
+  await waitFor(`document.querySelector('.statusSuccess')?.textContent.includes('已加入「Smoke SWF」')`, 'Initial SWF upload failed')
+  await submitFlash('Smoke SWF', '', true)
+  await waitFor(`document.querySelector('.statusSuccess')?.textContent.includes('已安装过「Smoke SWF」')`, 'SWF duplicate prompt missing')
+
+  await navigate('#/library/flash')
+  await click('.card', 'Smoke URL')
+  await click('.optionSheet button', '选择')
+  await waitFor(`document.querySelector('.selectBar')?.textContent.includes('已选 1 个')`, 'Selection did not preselect the first card')
+  check(await evaluate(`[...document.querySelectorAll('.card')].some((card) => card.disabled && card.getAttribute('aria-disabled') === 'true')`), 'Online Flash cards remained selectable')
+  await click('.card', 'Smoke SWF')
+  await waitFor(`document.querySelector('.selectBar')?.textContent.includes('已选 2 个')`, 'Selection did not include both cards')
+  await click('.selectBar button', '卸载')
+  await waitFor(`!document.querySelector('.selectBar') && document.querySelector('.statusSuccess')?.textContent.includes('已卸载 2 款') && ![...document.querySelectorAll('.card')].some((card) => /Smoke URL|Smoke SWF/.test(card.textContent))`, 'Batch Flash uninstall did not refresh the library')
+  await navigate('#/library/flash-store')
 
   await send('Page.reload')
   await sleep(1200)
@@ -113,6 +194,75 @@ try {
   await sleep(500)
   const remaining = await evaluate(`new Promise((resolve, reject) => { const request = indexedDB.open('flash-local'); request.onerror = () => reject(request.error); request.onsuccess = () => { const tx = request.result.transaction('games'); const get = tx.objectStore('games').getAll(); get.onsuccess = () => resolve(get.result.length); get.onerror = () => reject(get.error) } })`)
   check(remaining === 0, 'Deleting local Flash game did not remove IndexedDB record')
+
+  // Seed a v1 record before opening the J2ME library to exercise the real upgrade.
+  await evaluate(`new Promise((resolve, reject) => {
+    const req = indexedDB.open('j2me-local', 1)
+    req.onupgradeneeded = () => req.result.createObjectStore('jars', { keyPath: 'file' })
+    req.onerror = () => reject(req.error)
+    req.onsuccess = () => {
+      const db = req.result
+      const tx = db.transaction('jars', 'readwrite')
+      tx.objectStore('jars').add({ file: 'old.jar', name: 'Legacy JAR', data: new Blob(['legacy']) })
+      tx.oncomplete = () => { db.close(); resolve() }
+      tx.onabort = () => { db.close(); reject(tx.error) }
+    }
+  })`)
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const fetchOriginal = window.fetch
+    const bytes = (value) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0))
+    window.smokeJarBytes = bytes
+    window.smokeDownloads = 0
+    window.fetch = (input, ...args) => {
+      const url = new URL(input, location.href)
+      if (url.pathname === '/__52java/catalog') {
+        return Promise.resolve(Response.json({ games: [{ id: 123, name: 'Smoke Java', plays: 0 }], total: 1 }))
+      }
+      if (url.pathname === '/__52java/download') {
+        window.smokeDownloads += 1
+        if (url.searchParams.get('id') !== '123') return Promise.resolve(new Response(null, { status: 400 }))
+        return Promise.resolve(new Response(bytes(${JSON.stringify(storeJar)})))
+      }
+      return fetchOriginal(input, ...args)
+    }
+  })()` })
+  await navigate('#/library/store')
+  await send('Page.reload')
+  await waitFor(`document.querySelector('.storeCard button')?.textContent.includes('加入库')`, '52java test catalog failed to load')
+  await click('.storeCard button', '加入库')
+  await waitFor(`document.querySelector('.storeCard button')?.textContent.includes('已加入')`, '52java install failed')
+  check(await evaluate(`smokeDownloads === 1 && LocalJars.list().then((rows) => rows.some((row) => row.sourceId === '123') && rows.some((row) => row.file === 'old.jar'))`), 'Source ID or v1 JAR record missing')
+  await send('Page.reload')
+  await waitFor(`document.querySelector('.storeCard button')?.textContent.includes('已加入')`, '52java installed state did not survive reload')
+  await click('.storeCard button', '已加入')
+  await waitFor(`document.querySelector('.statusSuccess')?.textContent.includes('已安装过')`, '52java duplicate prompt missing')
+  check(await evaluate('smokeDownloads === 0'), 'Duplicate 52java game triggered a download')
+
+  await navigate('#/library/j2me')
+  await evaluate(`(() => {
+    const input = document.querySelector('input[type=file]')
+    const transfer = new DataTransfer()
+    transfer.items.add(new File([smokeJarBytes(${JSON.stringify(storeJar)})], 'renamed.jar'))
+    transfer.items.add(new File([smokeJarBytes(${JSON.stringify(importJar)})], 'import.jar'))
+    input.files = transfer.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await waitFor(`document.querySelector('.statusSuccess')?.textContent.includes('已导入 1 款，1 款已安装过')`, 'Mixed JAR upload did not report one duplicate and one import')
+  check(await evaluate(`LocalJars.list().then((rows) => rows.length === 3 && rows.some((row) => row.file === 'import.jar'))`), 'Mixed JAR upload wrote the wrong records')
+
+  await click('.card', '大宋豪侠')
+  check(await evaluate(`![...document.querySelectorAll('.optionSheet button')].some((button) => button.textContent.includes('选择'))`), 'Server game menu exposed selection')
+  await click('.optionSheet button[aria-label="关闭"]', '')
+  await click('.card', 'Smoke Java')
+  await click('.optionSheet button', '选择')
+
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+  check(await evaluate(`document.querySelector('.selectBar').getBoundingClientRect().bottom <= document.querySelector('.tabs').getBoundingClientRect().top`), 'Selection bar overlaps phone navigation')
+  await click('.card', 'Smoke Import')
+  await click('.selectBar button', '卸载')
+  await waitFor(`!document.querySelector('.selectBar') && document.querySelector('.statusSuccess')?.textContent.includes('已卸载 2 款')`, 'Batch JAR uninstall did not finish')
+  check(await evaluate(`LocalJars.list().then((rows) => rows.length === 1 && rows[0].file === 'old.jar')`), 'Batch JAR uninstall removed the wrong records')
+  console.log('Game dedup and batch uninstall smoke: pass')
   console.log('Local Flash store smoke: pass')
 } catch (error) {
   console.error('Local Flash store smoke: failed:', error.message)

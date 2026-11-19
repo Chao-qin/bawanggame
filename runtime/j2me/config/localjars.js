@@ -4,19 +4,40 @@ var LocalJars = (function () {
 
   function open() {
     if (db) return db;
-    db = new Promise(function (resolve, reject) {
-      var req = indexedDB.open("j2me-local", 1);
+    var opening = new Promise(function (resolve, reject) {
+      var req = indexedDB.open("j2me-local", 2);
       req.onupgradeneeded = function () {
-        req.result.createObjectStore("jars", { keyPath: "file" });
+        var store = req.result.objectStoreNames.contains("jars")
+          ? req.transaction.objectStore("jars")
+          : req.result.createObjectStore("jars", { keyPath: "file" });
+        store.createIndex("sourceId", "sourceId");
+        store.createIndex("sha256", "sha256");
       };
       req.onsuccess = function () {
-        resolve(req.result);
+        var connection = req.result;
+        if (db !== opening) {
+          connection.close();
+          return;
+        }
+        connection.onversionchange = function () {
+          connection.close();
+          if (db === opening) db = null;
+        };
+        resolve(connection);
       };
       req.onerror = function () {
         reject(req.error);
       };
+      req.onblocked = function () {
+        if (db === opening) db = null;
+        reject(new Error("本机 JAR 存储正被其他页面占用，请关闭旧页面后重试"));
+      };
     });
-    return db;
+    db = opening;
+    opening.catch(function () {
+      if (db === opening) db = null;
+    });
+    return opening;
   }
 
   function run(mode, fn) {
@@ -106,6 +127,47 @@ var LocalJars = (function () {
     });
   }
 
+  async function add(file, meta) {
+    var bytes = await file.arrayBuffer();
+    var info = await describe(file.name, bytes);
+    if (meta && meta.sourceId != null) info.sourceId = String(meta.sourceId);
+    if (globalThis.crypto && globalThis.crypto.subtle) {
+      var digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+      info.sha256 = Array.from(new Uint8Array(digest), function (byte) {
+        return byte.toString(16).padStart(2, "0");
+      }).join("");
+    }
+
+    var duplicate = false;
+    await run("readwrite", function (store) {
+      var checks = [];
+      if (info.sourceId) checks.push([store.index("sourceId"), info.sourceId]);
+      if (info.sha256) checks.push([store.index("sha256"), info.sha256]);
+      checks.push([store, info.file]);
+
+      function check(index) {
+        if (index === checks.length) {
+          store.add(info);
+          return;
+        }
+        var lookup = checks[index];
+        var req = lookup[0].getKey(lookup[1]);
+        req.onsuccess = function () {
+          if (req.result !== undefined) duplicate = true;
+          else check(index + 1);
+        };
+      }
+
+      check(0);
+    });
+    if (duplicate) {
+      var error = new Error("该游戏已安装过");
+      error.code = "already_installed";
+      throw error;
+    }
+    return info;
+  }
+
   function storageId(jar) {
     // Keep non-ASCII names distinct: collapsing them to "_" makes different CJK jars share one RMS store.
     return encodeURIComponent(jar).replace(/%/g, "_").replace(/[^A-Za-z0-9._-]/g, "_");
@@ -143,17 +205,7 @@ var LocalJars = (function () {
     isLocal: function (jar) {
       return jar.indexOf(PREFIX) === 0;
     },
-    add: function (file) {
-      return file.arrayBuffer().then(function (buf) {
-        return describe(file.name, buf);
-      }).then(function (info) {
-        return run("readwrite", function (s) {
-          return s.put(info);
-        }).then(function () {
-          return info;
-        });
-      });
-    },
+    add: add,
     list: function () {
       return run("readonly", function (s) {
         return s.getAll();
