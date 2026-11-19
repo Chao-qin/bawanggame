@@ -278,6 +278,31 @@ try {
         console.log('J2ME portrait gaps:', JSON.stringify(portrait))
         requireCheck(portrait.canvasHeight > 0 && portrait.headerGap > 0, 'J2ME toolbar overlaps the game canvas')
         requireCheck(portrait.leftGap > 0 && portrait.rightGap > 0, 'J2ME side buttons have no vertical gap')
+        const toolbar = await evaluate(`(() => {
+          const toggle = document.querySelector('.runtimeToolbarToggle')
+          const buttons = [...document.querySelectorAll('.runtimeToolbar .adm-button')]
+          const centered = buttons.every((button) => {
+            const outer = button.getBoundingClientRect()
+            const icon = button.querySelector('svg, span > span').getBoundingClientRect()
+            return outer.width > 0 && Math.abs(outer.left + outer.width / 2 - icon.left - icon.width / 2) < 1
+              && Math.abs(outer.top + outer.height / 2 - icon.top - icon.height / 2) < 1
+          })
+          toggle.click()
+          return centered
+        })()`)
+        requireCheck(toolbar, 'J2ME toolbar icons are off-center')
+        await sleep(100)
+        await send('Emulation.setDeviceMetricsOverride', { width: 376, height: 667, deviceScaleFactor: 1, mobile: true })
+        await sleep(100)
+        requireCheck(await evaluate(`(() => {
+          const toggle = document.querySelector('.runtimeToolbarToggle')
+          const floating = toggle.getBoundingClientRect()
+          const stage = document.querySelector('.playerStage').getBoundingClientRect()
+          return toggle.getAttribute('aria-expanded') === 'false' && floating.left < 16 && stage.width === innerWidth
+        })()`), 'J2ME toolbar did not stay collapsed at the left after a portrait resize')
+        await evaluate("document.querySelector('.runtimeToolbarToggle').click(); true")
+        await sleep(100)
+        requireCheck(await evaluate("document.querySelector('.runtimeToolbarToggle').getAttribute('aria-expanded') === 'true'"), 'J2ME toolbar did not reopen')
       }
       if (snapshot.nav && snapshot.numpad && snapshot.display) {
         requireCheck(!snapshot.navNumpadOverlap && !snapshot.navDisplayOverlap && !snapshot.numpadDisplayOverlap, `controls overlap at ${width}x${height}`)
