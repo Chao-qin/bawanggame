@@ -27,4 +27,4 @@
 - [x] Rebind MRP Touchpad after layout edits and release active controls during rebind.
 - [x] Add a touch-layout view to the shared toolbar popup with Java's layout options and reset behavior.
 - [x] Verify defaults, saved MRP settings, action-to-MRP-code routing, cleanup paths, build, and browser shell smoke. No game fixtures were present for gameplay testing.
-- [ ] Search for duplicate PRs/templates, commit, push, create one PR via GitHub MCP, and verify its metadata.
+- [x] Search for duplicate PRs/templates, commit, push, create one draft PR via GitHub MCP, and verify its metadata. Independent cold-start review remains pending under repository review policy.
