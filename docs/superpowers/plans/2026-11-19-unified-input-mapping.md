@@ -12,7 +12,7 @@
 
 ## File Structure
 
-- Create `runtime/input/input-mapping.js` for logical action names, configurable physical controls, action reference counting, Gamepad polling, and teardown.
+- Create `runtime/j2me/input-mapping.js` for logical action names, configurable physical controls, action reference counting, Gamepad polling, and teardown.
 - Modify `apps/web/src/runtime/J2MEPlayer.jsx` and `apps/web/src/runtime/MrpPlayer.jsx` only for script loading, mounting, and cleanup integration.
 - Modify `runtime/j2me/keymap.js` to use action IDs for touch and keyboard while retaining `mapped()` and MIDP edge scheduling.
 - Modify `runtime/mrp/mrp-runtime.js` to route touch and supported keyboard actions through logical actions without duplicate SDL events.
