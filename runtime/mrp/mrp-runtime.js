@@ -26,17 +26,33 @@
     num0: 0, num1: 1, num2: 2, num3: 3, num4: 4,
     num5: 5, num6: 6, num7: 7, num8: 8, num9: 9
   };
-  var PHYS = {
-    ArrowUp: 12, ArrowDown: 13, ArrowLeft: 14, ArrowRight: 15,
-    Enter: 20, q: 17, e: 18, Q: 17, E: 18,
-    Escape: 16, Backspace: 23,
-    '*': 10, '-': 10, '#': 11, '=': 11
-  };
-  for (var d = 0; d <= 9; d++) PHYS[String(d)] = d;
-
   function cEvent(type, code) {
     if (window.Module && Module._c_event) Module._c_event(type, code, 0);
   }
+  var ACTION_CODES = {};
+  Object.keys(KEYCODES).forEach(function (action) { ACTION_CODES[KEYCODES[action]] = action; });
+  var inputController = window.InputMapping && window.InputMapping.create({
+    gameId: "mrp:" + (mrpFile || f || "default"),
+    keyboard: true,
+    gamepad: true,
+    repeat: true,
+    sink: {
+      press: function (action) {
+        if (KEYCODES[action] == null) return;
+        cEvent(0, KEYCODES[action]);
+        tapFx(document.getElementById(action));
+      },
+      release: function (action) { if (KEYCODES[action] != null) cEvent(1, KEYCODES[action]); },
+      repeat: function (action) { if (KEYCODES[action] != null) cEvent(0, KEYCODES[action]); }
+    }
+  });
+  window.__XIAOCHAO_INPUT_CONTROLLER__ = inputController;
+  window.__XIAOCHAO_INPUT_RESET__ = function () {
+    if (inputController) inputController.destroy();
+    inputController = null;
+    if (window.__XIAOCHAO_INPUT_CONTROLLER__) delete window.__XIAOCHAO_INPUT_CONTROLLER__;
+    delete window.__XIAOCHAO_INPUT_RESET__;
+  };
   function tapFx(node) {
     node.classList.add('tap');
     setTimeout(function () { node.classList.remove('tap'); }, 160);
@@ -52,9 +68,18 @@
   Touchpad.bind({
     buttons: KEYCODES,
     sink: {
-      press: function (code) { cEvent(0, code); },
-      release: function (code) { cEvent(1, code); },
-      repeat: function (code) { cEvent(0, code); }  // MR 平台无 keyState 查询，连发即重复 PRESS（真机行为）
+      press: function (code, meta) {
+        var action = ACTION_CODES[code];
+        if (inputController && action) inputController.press("touch:" + action, action, meta);
+      },
+      release: function (code, meta) {
+        var action = ACTION_CODES[code];
+        if (inputController && action) inputController.release("touch:" + action, action, meta);
+      },
+      repeat: function (code) {
+        var action = ACTION_CODES[code];
+        if (inputController && action) inputController.repeat("touch:" + action, action);
+      }
     },
     feedback: {
       vibrate: phone ? 10 : 0,
@@ -69,38 +94,7 @@
     onActivate: function () { try { canvas.focus(); } catch (_) {} }
   });
 
-  // code -> DOM 按钮反查（物理键按下时点亮对应虚拟键，作为"按键已收到"的视觉反馈）
-  var CODE2ID = {};
-  Object.keys(KEYCODES).forEach(function (k) { CODE2ID[KEYCODES[k]] = k; });
-
-  // 物理键盘：emscripten SDL 路径已内置处理方向/确认/数字/软键/挂机（vmrp main.c keyEvent），
-  // 桥接会与之重复投递（游戏收到两次 press，菜单选择跳两格回到原位，表现为"方向键失灵"）。
-  // 因此物理键只做三件事：防滚动默认行为 + 按键视觉反馈、补 SDL 未映射的键（Backspace/＊/#）、对话框打开时完全放行。
-  function physCode(e) {
-    return PHYS[e.key] !== undefined ? PHYS[e.key] : PHYS[e.code];
-  }
-  document.addEventListener('keydown', function (e) {
-    var code = physCode(e);
-    if (code === undefined) return;
-    if (dialog.classList.contains('show')) return;  // 输入框打开时不拦截，让 textarea 正常打字
-    e.preventDefault();
-    var node = CODE2ID[code] && document.getElementById(CODE2ID[code]);
-    if (node) tapFx(node);
-    if (e.repeat) return;
-    // SDL 未映射的键才走桥：Backspace→清除(23)，'*'(10)，'#'(11)
-    if (e.key === 'Backspace') cEvent(0, 23);
-    else if (e.key === '*' || e.key === '-') cEvent(0, 10);
-    else if (e.key === '#' || e.key === '=') cEvent(0, 11);
-  });
-  document.addEventListener('keyup', function (e) {
-    var code = physCode(e);
-    if (code === undefined) return;
-    if (dialog.classList.contains('show')) return;
-    e.preventDefault();
-    if (e.key === 'Backspace') cEvent(1, 23);
-    else if (e.key === '*' || e.key === '-') cEvent(1, 10);
-    else if (e.key === '#' || e.key === '=') cEvent(1, 11);
-  });
+  // Keyboard events are captured before SDL so each physical control is mapped once.
 
   /* ---------- 画布等比缩放 ---------- */
   var canvas = document.getElementById('canvas');

@@ -502,6 +502,8 @@
         function capture(e) {
           e.preventDefault(); e.stopPropagation();
           map[name] = e.code || e.key; config.keymap = map; Settings.setKeymap(id, map); b.textContent = (labels[name] || name) + "：" + map[name];
+          var action = name === "soft1" ? "choice" : name === "soft2" ? "back" : name === "back" ? "ret" : name;
+          if (window.__XIAOCHAO_INPUT_CONTROLLER__) window.__XIAOCHAO_INPUT_CONTROLLER__.setKeyboardBinding(action, map[name]);
           window.removeEventListener("keydown", capture, true);
         }
         window.addEventListener("keydown", capture, true);
@@ -509,7 +511,13 @@
       row.appendChild(b); sec.appendChild(row);
     });
     var reset = txt("button", "ghost", tr("恢复默认映射", "Restore defaults", "恢复默认映射"));
-    reset.addEventListener("click", function () { Settings.setKeymap(id, null); config.keymap = {}; render(); });
+    reset.addEventListener("click", function () {
+      Settings.setKeymap(id, null);
+      config.keymap = {};
+      var controller = window.__XIAOCHAO_INPUT_CONTROLLER__;
+      if (controller && controller.resetKeyboardBindings) controller.resetKeyboardBindings();
+      render();
+    });
     sec.appendChild(reset);
     return sec;
   }

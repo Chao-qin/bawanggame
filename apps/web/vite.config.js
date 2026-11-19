@@ -31,6 +31,7 @@ const proxyTargets = [
   '/ui-feedback.js',
   '/runtime-extras.js',
   '/runtime/j2me',
+  '/runtime/input',
   '/debug-graphics.js',
   '/debug-native.js',
   '/btroom.js',
