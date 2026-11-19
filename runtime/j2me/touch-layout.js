@@ -100,10 +100,107 @@
       if (node) node.style.order = String(order[item]);
     });
     if (typeof window.__XIAOCHAO_KEYMAP_REBIND__ === "function") window.__XIAOCHAO_KEYMAP_REBIND__();
+    if (window.KeypadCanvas) window.KeypadCanvas.refresh();
     return current;
   }
 
+  function el(tag, cls, props) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (props) Object.keys(props).forEach(function (k) { e[k] = props[k]; });
+    return e;
+  }
+
+  function txt(tag, cls, text) {
+    return el(tag, cls, { textContent: text });
+  }
+
+  function renderControls(adapter) {
+    var sec = el("div", "touch-layout-controls");
+    var current = adapter.get();
+    var syncControls = [];
+    function refresh(next) {
+      current = normalize(next);
+      syncControls.forEach(function (sync) { sync(); });
+    }
+    function saveLayout(next) {
+      refresh(adapter.save(next));
+    }
+    function row(label, options, field, onChange) {
+      var wrap = el("label", "opt");
+      wrap.appendChild(txt("span", "opt-name", label));
+      var select = el("select");
+      options.forEach(function (item) { select.appendChild(el("option", "", { value: item[0], textContent: item[1] })); });
+      select.value = current[field];
+      syncControls.push(function () { select.value = current[field]; });
+      select.addEventListener("change", function () { onChange(select.value); });
+      wrap.appendChild(select);
+      return wrap;
+    }
+    sec.appendChild(row(tr("方向键", "D-pad", "方向键"), [
+      ["standard", tr("标准", "Standard", "标准")],
+      ["mirror", tr("左右镜像", "Mirror", "左右镜像")],
+      ["rotate-cw", tr("顺时针 90°", "Rotate 90° clockwise", "顺时针 90°")],
+      ["rotate-ccw", tr("逆时针 90°", "Rotate 90° counter-clockwise", "逆时针 90°")]
+    ], "dpad", function (value) { saveLayout(Object.assign({}, current, { dpad: value })); }));
+    sec.appendChild(row(tr("横屏两侧", "Landscape sides", "横屏两侧"), [
+      ["standard", tr("数字键左 / 导航键右", "Numbers left / navigation right", "数字键左 / 导航键右")],
+      ["swapped", tr("导航键左 / 数字键右", "Navigation left / numbers right", "导航键左 / 数字键右")]
+    ], "sides", function (value) { saveLayout(Object.assign({}, current, { sides: value })); }));
+    sec.appendChild(txt("p", "layout-note", tr("数字键保持 3×4 网格。选择某个槽位时，已占用的数字会自动交换。", "The numeric pad stays a 3×4 grid. Selecting an occupied slot swaps the two numbers.", "数字键保持 3×4 网格，选择已占用数字时会自动交换位置。")));
+    var order = el("div", "layout-order");
+    current.numbers.forEach(function (number, index) {
+      var select = el("select");
+      select.setAttribute("aria-label", tr("数字键槽位", "Number slot", "数字键槽位") + " " + (index + 1));
+      TouchLayout.numbers.forEach(function (item) {
+        var label = item === "star" ? "*" : item === "pound" ? "#" : item;
+        select.appendChild(el("option", "", { value: item, textContent: label }));
+      });
+      select.value = number;
+      syncControls.push(function () { select.value = current.numbers[index]; });
+      select.addEventListener("change", function () {
+        var next = current.numbers.slice();
+        var other = next.indexOf(select.value);
+        if (other >= 0 && other !== index) next[other] = next[index];
+        next[index] = select.value;
+        saveLayout({ dpad: current.dpad, sides: current.sides, numbers: next, actions: current.actions });
+      });
+      order.appendChild(select);
+    });
+    sec.appendChild(order);
+    var actions = el("div", "layout-actions");
+    var actionLabels = { up: "↑", down: "↓", left: "←", right: "→", ok: tr("确认", "OK", "确认"), choice: tr("软键 1", "Soft 1", "软键 1"), back: tr("软键 2", "Soft 2", "软键 2"), ret: tr("返回", "Back", "返回"), clear: tr("清除", "Clear", "清除") };
+    ACTION_SLOTS.forEach(function (slot) {
+      var r = el("label", "layout-action-row");
+      var slotLabel = actionLabels[slot] || (slot === "num0" ? "0" : slot === "star" ? "*" : slot === "pound" ? "#" : slot.replace(/^num/, ""));
+      r.appendChild(txt("span", "opt-name", slotLabel));
+      var select = el("select");
+      TouchLayout.actions.forEach(function (action) {
+        var label = actionLabels[action] || (action === "star" ? "*" : action === "pound" ? "#" : action.replace(/^num/, ""));
+        select.appendChild(el("option", "", { value: action, textContent: label }));
+      });
+      select.value = current.actions[slot] || slot;
+      syncControls.push(function () { select.value = current.actions[slot]; });
+      select.addEventListener("change", function () {
+        var nextActions = Object.assign({}, current.actions);
+        nextActions[slot] = select.value;
+        saveLayout({ dpad: current.dpad, sides: current.sides, numbers: current.numbers, actions: nextActions });
+      });
+      r.appendChild(select);
+      actions.appendChild(r);
+    });
+    sec.appendChild(actions);
+    var reset = txt("button", "ghost", tr("恢复默认触摸布局", "Restore touch layout", "恢复默认触摸布局"));
+    reset.type = "button";
+    reset.addEventListener("click", function () {
+      refresh(adapter.reset());
+    });
+    sec.appendChild(reset);
+    return sec;
+  }
+
   window.TouchLayout = {
+    renderControls: renderControls,
     numbers: NUMBERS.slice(),
     actions: ACTIONS.slice(),
     defaults: defaults,
