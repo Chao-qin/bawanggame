@@ -8,6 +8,7 @@
   var ACTION_SLOTS = ["up", "right", "down", "left", "ok", "choice", "back", "ret", "clear", "star", "num0", "pound", "num1", "num2", "num3", "num4", "num5", "num6", "num7", "num8", "num9"];
   var DEFAULT_ACTIONS = { choice: "choice", back: "back", ret: "ret", clear: "clear", ok: "ok" };
   var DEFAULT = { dpad: "standard", sides: "swapped", numbers: NUMBERS.slice(), actions: {} };
+  var gameAdapter = null;
   var D_PAD_VISUAL = {
     standard: { up: "up", right: "right", down: "down", left: "left" },
     mirror: { up: "up", right: "left", down: "down", left: "right" },
@@ -49,8 +50,46 @@
     return D_PAD_VISUAL[current.dpad][direction] || direction;
   }
 
+  function mapButtons(buttons, layout) {
+    var current = normalize(layout);
+    var out = {};
+    Object.keys(buttons || {}).forEach(function (slot) { out[slot] = buttons[slot]; });
+    Object.keys(current.actions).forEach(function (slot) {
+      var action = current.actions[slot];
+      if (buttons[action] != null && buttons[slot] != null) out[slot] = buttons[action];
+    });
+    return out;
+  }
+
+  function forGame(gameId) {
+    var settings = window.Settings || (typeof Settings !== "undefined" ? Settings : null);
+    var adapter = { current: normalize(settings && settings.touchLayout ? settings.touchLayout(gameId) : null) };
+    gameAdapter = adapter;
+
+    function applyCurrent() {
+      apply(adapter.current);
+      return copy(adapter.current);
+    }
+
+    applyCurrent();
+    return {
+      get: function () { return copy(adapter.current); },
+      save: function (value) {
+        adapter.current = normalize(value);
+        if (settings && settings.setTouchLayout) settings.setTouchLayout(gameId, adapter.current);
+        return applyCurrent();
+      },
+      reset: function () {
+        adapter.current = defaults();
+        if (settings && settings.setTouchLayout) settings.setTouchLayout(gameId, null);
+        return applyCurrent();
+      }
+    };
+  }
+
   function apply(value) {
     var current = normalize(value);
+    if (gameAdapter) gameAdapter.current = current;
     if (typeof config !== "undefined") config.touchLayout = current;
     document.body.dataset.dpadLayout = current.dpad;
     document.body.dataset.sideLayout = current.sides;
@@ -69,7 +108,9 @@
     actions: ACTIONS.slice(),
     defaults: defaults,
     normalize: normalize,
+    mapButtons: mapButtons,
     visualDpad: visualDpad,
-    apply: apply
+    apply: apply,
+    forGame: forGame
   };
 })();

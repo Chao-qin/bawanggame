@@ -26,6 +26,11 @@
     num0: 0, num1: 1, num2: 2, num3: 3, num4: 4,
     num5: 5, num6: 6, num7: 7, num8: 8, num9: 9
   };
+  var layoutId = "mrp:" + (mrpFile || f || "default");
+  var touchLayout = TouchLayout.forGame(layoutId);
+  var keypadLayout = touchLayout.get();
+  window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__ = touchLayout;
+
   function cEvent(type, code) {
     if (window.Module && Module._c_event) Module._c_event(type, code, 0);
   }
@@ -65,34 +70,54 @@
   var REPEAT_DELAY = 450, REPEAT_INTERVAL = 100;
   if (new URLSearchParams(location.search).get('repeat') === '0') { REPEAT_DELAY = 0; }
   var phone = window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 800;
-  Touchpad.bind({
-    buttons: KEYCODES,
-    sink: {
-      press: function (code, meta) {
-        var action = ACTION_CODES[code];
-        if (inputController && action) inputController.press("touch:" + action, action, meta);
+  var keypadTouchpad = null;
+  function bindTouchpad() {
+    keypadTouchpad = Touchpad.bind({
+      buttons: TouchLayout.mapButtons(KEYCODES, keypadLayout),
+      dpadVisual: function (direction) { return TouchLayout.visualDpad(direction, keypadLayout); },
+      sink: {
+        press: function (code, meta) {
+          var action = ACTION_CODES[code];
+          if (inputController && action) inputController.press("touch:" + action, action, meta);
+        },
+        release: function (code, meta) {
+          var action = ACTION_CODES[code];
+          if (inputController && action) inputController.release("touch:" + action, action, meta);
+        },
+        repeat: function (code) {
+          var action = ACTION_CODES[code];
+          if (inputController && action) inputController.repeat("touch:" + action, action);
+        }
       },
-      release: function (code, meta) {
-        var action = ACTION_CODES[code];
-        if (inputController && action) inputController.release("touch:" + action, action, meta);
+      feedback: {
+        vibrate: phone ? 24 : 0,
+        keyRepeat: REPEAT_DELAY !== 0,
+        repeatDelay: REPEAT_DELAY || 450,
+        repeatInterval: REPEAT_INTERVAL,
+        dpadOk: 'press',
+        okHold: 200,
+        tapMs: 240
       },
-      repeat: function (code) {
-        var action = ACTION_CODES[code];
-        if (inputController && action) inputController.repeat("touch:" + action, action);
-      }
-    },
-    feedback: {
-      vibrate: phone ? 10 : 0,
-      keyRepeat: REPEAT_DELAY !== 0,
-      repeatDelay: REPEAT_DELAY || 450,
-      repeatInterval: REPEAT_INTERVAL,
-      dpadOk: 'press',
-      okHold: 200,
-      tapMs: 240
-    },
-    exclude: '#mrp-dialog',
-    onActivate: function () { try { canvas.focus(); } catch (_) {} }
-  });
+      exclude: '#mrp-dialog',
+      onActivate: function () { try { canvas.focus(); } catch (_) {} }
+    });
+  }
+
+  function rebindTouchpad() {
+    keypadLayout = touchLayout.get();
+    if (keypadTouchpad) keypadTouchpad.destroy();
+    bindTouchpad();
+  }
+
+  window.__XIAOCHAO_KEYMAP_REBIND__ = rebindTouchpad;
+  window.__XIAOCHAO_TOUCH_LAYOUT_RESET__ = function () {
+    if (keypadTouchpad) keypadTouchpad.destroy();
+    keypadTouchpad = null;
+    delete window.__XIAOCHAO_KEYMAP_REBIND__;
+    delete window.__XIAOCHAO_TOUCH_LAYOUT_RESET__;
+    if (window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__ === touchLayout) delete window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__;
+  };
+  bindTouchpad();
 
   // Keyboard events are captured before SDL so each physical control is mapped once.
 

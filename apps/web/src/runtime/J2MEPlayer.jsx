@@ -43,6 +43,9 @@ export function J2MEPlayer({ game, onExit, onReady }) {
           await loadClassic(src, session)
           ensureActive()
         }
+        if (window.TouchLayout?.forGame && window.config?.gameId) {
+          window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__ = window.TouchLayout.forGame(window.config.gameId)
+        }
         ensureActive()
         const overlayRoot = document.querySelector('.runtime-overlay-root')
         ;[

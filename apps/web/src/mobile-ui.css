@@ -363,6 +363,12 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
 .inputMappingRow .adm-button { min-width: 54px; min-height: 30px; font-size: 12px; }
 .inputMappingFooter { justify-content: flex-start; padding-top: 8px; border-top: 1px solid var(--ui-border); }
 .inputMappingFooter .adm-button { font-size: 12px; }
+.inputMappingPanel .adm-tabs-content { padding-top: 8px; }
+.touchLayoutEditor { display: grid; gap: 8px; max-height: min(58vh, 520px); overflow-y: auto; padding-right: 2px; }
+.touchLayoutEditor .opt { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 8px; margin: 0; }
+.touchLayoutEditor .layout-action-row { grid-template-columns: 52px minmax(0, 1fr); }
+.touchLayoutEditor .layout-order { gap: 5px; }
+.touchLayoutEditor .layout-note { margin: 0; }
 .player:not(.runtimePlayerToolbarCollapsed) .flashPlayerStage {
   top: calc(max(8px, var(--safe-area-top, 0px)) + 56px);
 }
