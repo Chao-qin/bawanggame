@@ -1,6 +1,6 @@
 # Unified Input Mapping Implementation Plan
 
-> **For agentic workers:** Implement this plan in the task worktree. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** This plan was implemented in the task worktree. Steps use checkbox (`- [x]`) syntax to record completed work.
 
 **Goal:** Route touch, keyboard, and Gamepad controls through shared logical actions before dispatching to J2ME or MRP.
 
@@ -12,7 +12,7 @@
 
 ## File Structure
 
-- Create `runtime/input/action-map.js` for logical action names, configurable physical controls, action reference counting, Gamepad polling, and teardown.
+- Create `runtime/input/input-mapping.js` for logical action names, configurable physical controls, action reference counting, Gamepad polling, and teardown.
 - Modify `apps/web/src/runtime/J2MEPlayer.jsx` and `apps/web/src/runtime/MrpPlayer.jsx` only for script loading, mounting, and cleanup integration.
 - Modify `runtime/j2me/keymap.js` to use action IDs for touch and keyboard while retaining `mapped()` and MIDP edge scheduling.
 - Modify `runtime/mrp/mrp-runtime.js` to route touch and supported keyboard actions through logical actions without duplicate SDL events.
@@ -41,4 +41,4 @@
 - [x] Map analog axes to directions with dead-zone and hysteresis.
 - [x] Run targeted Node tests, syntax checks, web build, and browser shell smoke checks.
 - [x] Check `git diff --check`, document unsupported native system buttons, and record unverified physical-device scenarios.
-- [ ] Commit task files, push branch, search for duplicate PRs/templates via GitHub MCP, create one PR, and verify its metadata via MCP.
+- [x] Commit task files, push branch, search for duplicate PRs/templates via GitHub MCP, create one draft PR, and verify its metadata via MCP. The independent reviewer pass remains pending because no eligible free OpenCode account is configured and paid review was not authorized.
