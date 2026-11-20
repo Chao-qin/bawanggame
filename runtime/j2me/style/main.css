@@ -335,6 +335,23 @@ body.fixed-screen #display-container {
   -webkit-text-fill-color: transparent !important;
 }
 
+#keypad .key .keypadIcon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(60%, 24px);
+  height: min(60%, 24px);
+  color: var(--phone-text, #e8ecf2) !important;
+  pointer-events: none;
+}
+
+#keypad .key.down .keypadIcon { color: #081018 !important; }
+#dpad > .key { position: relative; }
+#keypad .key:has(.keypadIcon)::before { display: none; }
+body[data-dpad-layout="mirror"] :is(#left, #right) .keypadIcon { transform: rotate(180deg); }
+body[data-dpad-layout="rotate-cw"] .dir .keypadIcon { transform: rotate(90deg); }
+body[data-dpad-layout="rotate-ccw"] .dir .keypadIcon { transform: rotate(-90deg); }
+
 #keypad.keypad-canvas-mode .key::before,
 #keypad.keypad-canvas-mode #dpad {
   background: transparent !important;
