@@ -93,6 +93,13 @@
       };
     }
 
+    function visualDirection(id) {
+      if (window.TouchLayout && typeof window.TouchLayout.visualDpad === "function") {
+        return window.TouchLayout.visualDpad(id, typeof config !== "undefined" ? config.touchLayout : null);
+      }
+      return id;
+    }
+
     function font(styles, role, size) {
       var style = styles[role];
       return (style.weight || "400") + " " + Math.max(1, size || style.size) + "px " + styles.family;
@@ -123,7 +130,7 @@
       ctx.shadowOffsetY = 0;
     }
 
-    function drawDpad(base, color) {
+    function drawDpad(base, color, styles) {
       var dpad = rectFor("dpad", base);
       if (!dpad) return;
       var cx = dpad.x + dpad.w / 2, cy = dpad.y + dpad.h / 2, radius = Math.min(dpad.w, dpad.h) / 2;
@@ -147,7 +154,22 @@
       ctx.clip();
       ["up", "left", "right", "down"].forEach(function (id) {
         var item = rectFor(id, base);
-        paintButton(item, color, 0, "dir");
+        if (!item) return;
+        var active = item.node.classList.contains("down");
+        ctx.fillStyle = active ? "rgba(74,120,194,.65)" : "rgba(61,77,91,.22)";
+        roundedRect(ctx, item.x, item.y, item.w, item.h, Math.min(item.w, item.h) * .24);
+        ctx.fill();
+        var cx0 = item.x + item.w / 2, cy0 = item.y + item.h / 2;
+        var size = Math.min(item.w, item.h) * .2;
+        ctx.strokeStyle = active ? "#081018" : color.text;
+        ctx.lineWidth = Math.max(2, styles.unit * .09);
+        ctx.lineCap = "square";
+        ctx.beginPath();
+        if (visualDirection(id) === "up") { ctx.moveTo(cx0-size, cy0+size*.35); ctx.lineTo(cx0, cy0-size*.35); ctx.lineTo(cx0+size, cy0+size*.35); }
+        else if (visualDirection(id) === "down") { ctx.moveTo(cx0-size, cy0-size*.35); ctx.lineTo(cx0, cy0+size*.35); ctx.lineTo(cx0+size, cy0-size*.35); }
+        else if (visualDirection(id) === "left") { ctx.moveTo(cx0+size*.35, cy0-size); ctx.lineTo(cx0-size*.35, cy0); ctx.lineTo(cx0+size*.35, cy0+size); }
+        else { ctx.moveTo(cx0-size*.35, cy0-size); ctx.lineTo(cx0+size*.35, cy0); ctx.lineTo(cx0-size*.35, cy0+size); }
+        ctx.stroke();
       });
       var ok = rectFor("ok", base);
       if (ok) {
@@ -166,7 +188,7 @@
 
     function drawSoft(item, color) {
       if (!item) return;
-      paintButton(item, color, Math.min(item.w, item.h) * 0.18, "soft");
+      paintButton(item, color, Math.min(item.w, item.h) * 0.24, "soft");
     }
 
     function drawNumbers(base, color, styles) {
@@ -210,11 +232,11 @@
         ? requestedOrientation
         : document.body.dataset.viewportOrientation || document.body.dataset.orientation;
       var portrait = orientation === "portrait";
-      if (!portrait) drawDpad(canvasRect, color);
+      if (!portrait) drawDpad(canvasRect, color, styles);
       ["choice", "back", "ret", "clear"].forEach(function (id) {
         drawSoft(rectFor(id, canvasRect), color);
       });
-      if (portrait) drawDpad(canvasRect, color);
+      if (portrait) drawDpad(canvasRect, color, styles);
       drawNumbers(canvasRect, color, styles);
     }
 

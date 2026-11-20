@@ -470,6 +470,10 @@ body.runtime-active #numpad {
   mask: radial-gradient(circle at var(--mx) var(--my), transparent 0 var(--mask-r), #000 calc(var(--mask-r) + 2px));
 }
 
+/* Side controls read as two curved rails around the directional module. */
+#choice, #ret { border-radius: calc(var(--u) * .28) 0 0 calc(var(--u) * .28); }
+#back, #clear { border-radius: 0 calc(var(--u) * .28) calc(var(--u) * .28) 0; }
+
 #choice {
   left: 0;
   top: 0;
@@ -556,8 +560,17 @@ body.runtime-active #numpad {
   overflow: hidden;
 }
 
+#dpad::after {
+  content: "";
+  position: absolute;
+  inset: 16%;
+  border: 1px solid rgba(155, 224, 211, .08);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
 .dir {
-  background: var(--phone-panel);
+  background: transparent;
 }
 
 .dir::before {
