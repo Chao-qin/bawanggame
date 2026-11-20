@@ -102,6 +102,13 @@ var LocalJars = (function () {
     return attrs;
   }
 
+  function identity(info) {
+    function normalized(value) {
+      return String(value || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+    }
+    return JSON.stringify([normalized(info.suiteName || info.name || info.file.replace(/\.jar$/i, "")), normalized(info.vendor), normalized(info.version)]);
+  }
+
   function describe(file, buf) {
     var list = entries(buf);
     var mf = list["META-INF/MANIFEST.MF"];
@@ -114,6 +121,8 @@ var LocalJars = (function () {
         file: file,
         name: midlet[0].trim() || attrs["MIDlet-Name"] || file.replace(/\.jar$/i, ""),
         vendor: attrs["MIDlet-Vendor"] || "",
+        suiteName: attrs["MIDlet-Name"] || midlet[0].trim(),
+        version: attrs["MIDlet-Version"] || "",
         data: new Blob([buf]),
         icon: null
       };
@@ -138,6 +147,9 @@ var LocalJars = (function () {
       }).join("");
     }
 
+    var historical = new Map((await list()).map(function (record) {
+      return [record.file, record];
+    }));
     var duplicate = false;
     await run("readwrite", function (store) {
       var checks = [];
@@ -158,7 +170,18 @@ var LocalJars = (function () {
         };
       }
 
-      check(0);
+      var existing = store.openCursor();
+      existing.onsuccess = function () {
+        var cursor = existing.result;
+        if (!cursor) return check(0);
+        var record = cursor.value;
+        if (record.suiteName === undefined) record = historical.get(record.file) || record;
+        if (identity(record) === identity(info)) {
+          duplicate = true;
+          return;
+        }
+        cursor.continue();
+      };
     });
     if (duplicate) {
       var error = new Error("该游戏已安装过");
@@ -198,6 +221,22 @@ var LocalJars = (function () {
     });
   }
 
+  function list() {
+    return run("readonly", function (s) {
+      return s.getAll();
+    }).then(function (records) {
+      return Promise.all(records.map(async function (record) {
+        if (record.suiteName !== undefined || !record.data) return record;
+        try {
+          var parsed = await describe(record.file, await record.data.arrayBuffer());
+          record.suiteName = parsed.suiteName;
+          record.version = parsed.version;
+        } catch (_) {}
+        return record;
+      }));
+    });
+  }
+
   return {
     PREFIX: PREFIX,
     storageId: storageId,
@@ -206,9 +245,12 @@ var LocalJars = (function () {
       return jar.indexOf(PREFIX) === 0;
     },
     add: add,
-    list: function () {
-      return run("readonly", function (s) {
-        return s.getAll();
+    identity: identity,
+    list: list,
+    describe: describe,
+    removeGroup: function (files) {
+      return run("readwrite", function (store) {
+        files.forEach(function (file) { store.delete(file); });
       });
     },
     remove: function (file) {

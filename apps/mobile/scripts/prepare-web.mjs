@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { runInNewContext } from 'node:vm'
 
 const mobileRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = path.resolve(mobileRoot, '../..')
@@ -30,18 +31,21 @@ fs.cpSync(generatedSite, target, { recursive: true })
 const revision = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim()
 fs.writeFileSync(path.join(target, 'mobile-resource-version'), `${revision}\n`, 'utf8')
 const jarRoot = path.join(target, 'jar')
-const jarManifest = fs.readdirSync(jarRoot, { withFileTypes: true })
+const jarReader = { Blob, TextDecoder, DecompressionStream, Response }
+runInNewContext(fs.readFileSync(path.join(repoRoot, 'runtime/j2me/config/localjars.js'), 'utf8'), jarReader)
+const jarEntries = fs.readdirSync(jarRoot, { withFileTypes: true })
   .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.jar'))
   .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-  .map((entry) => ({
-    kind: 'j2me',
-    file: entry.name,
-    name: entry.name.replace(/\.jar$/i, ''),
-    vendor: '',
-    desc: '本地内置游戏',
-    size: fs.statSync(path.join(jarRoot, entry.name)).size,
-    icon: false,
-  }))
+const jarManifest = []
+for (const entry of jarEntries) {
+  const bytes = await fs.promises.readFile(path.join(jarRoot, entry.name))
+  let metadata = { name: entry.name.replace(/\.jar$/i, ''), vendor: '' }
+  try {
+    const { name, suiteName, vendor, version } = await jarReader.LocalJars.describe(entry.name, new Uint8Array(bytes).buffer)
+    metadata = { name, suiteName, vendor, version }
+  } catch (_) {}
+  jarManifest.push({ ...metadata, kind: 'j2me', file: entry.name, size: bytes.length, icon: false })
+}
 fs.writeFileSync(path.join(target, 'jar-manifest.json'), `${JSON.stringify(jarManifest)}\n`, 'utf8')
 fs.rmSync(androidAssetsTarget, { recursive: true, force: true })
 fs.cpSync(target, androidAssetsTarget, { recursive: true })
