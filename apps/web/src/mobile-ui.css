@@ -343,6 +343,40 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
   font-size: 16px;
   min-width: 36px;
 }
+
+/* Landscape game controls float over the central screen instead of adding a
+   full-width layout row above the side keypads. */
+body.viewport-landscape .j2mePlayer .runtimeToolbar,
+body.runtime-active[data-orientation="landscape"] .j2mePlayer .runtimeToolbar,
+body.viewport-landscape .player:has(.mrp-stage) .runtimeToolbar,
+body.runtime-active[data-orientation="landscape"] .player:has(.mrp-stage) .runtimeToolbar {
+  position: absolute;
+  z-index: 220;
+  top: max(10px, var(--safe-area-top, 0px));
+  left: 50%;
+  width: min(46vw, 520px);
+  max-width: calc(100% - 32px);
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--ui-surface) 78%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-color: color-mix(in srgb, var(--ui-border) 72%, transparent);
+}
+
+body.viewport-landscape .j2mePlayer .runtimeToolbarContent,
+body.runtime-active[data-orientation="landscape"] .j2mePlayer .runtimeToolbarContent,
+body.viewport-landscape .player:has(.mrp-stage) .runtimeToolbarContent,
+body.runtime-active[data-orientation="landscape"] .player:has(.mrp-stage) .runtimeToolbarContent {
+  min-height: 42px;
+  padding: 4px 6px;
+}
+
+body.viewport-landscape .j2mePlayer .runtimeToolbar .runtimeGame,
+body.runtime-active[data-orientation="landscape"] .j2mePlayer .runtimeToolbar .runtimeGame,
+body.viewport-landscape .player:has(.mrp-stage) .runtimeToolbar .runtimeGame,
+body.runtime-active[data-orientation="landscape"] .player:has(.mrp-stage) .runtimeToolbar .runtimeGame {
+  font-size: 13px;
+}
 .player .runtimeToolbar .runtimeToolbarButton,
 .player .runtimeToolbar .adm-button > span {
   display: grid;
