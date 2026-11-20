@@ -553,8 +553,7 @@ function Library({ kind, onPlay }) {
   }
 
   const games = useMemo(() => {
-    const revival = kind === 'j2me' ? [{kind: 'local-revival', file: 'local-revival', name: '大宋豪侠 · 本地复活', vendor: '本地服务端', desc: '可移动地图、NPC 和基础战斗', size: 0, local: false}] : []
-    const all = kind === 'flash' ? FLASH_GAMES.concat(localFlash.games) : revival.concat(kind === 'j2me' ? javaGames : server.games)
+    const all = kind === 'flash' ? FLASH_GAMES.concat(localFlash.games) : kind === 'j2me' ? javaGames : server.games
     const q = query.trim().toLowerCase()
     if (!q) return all
     return all.filter(
