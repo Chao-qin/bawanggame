@@ -1,0 +1,21 @@
+services:
+  web:
+    volumes:
+      - type: bind
+        source: ./maopao-revival/vendor/vmrp.github.io/vmrp_v1.0
+        target: /app/maopao-revival/vendor/vmrp.github.io/vmrp_v1.0
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./maopao-revival/vendor/vmrp.github.io/public/mrps
+        target: /app/maopao-revival/vendor/vmrp.github.io/public/mrps
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./maopao-revival/hall
+        target: /app/maopao-revival/vendor/vmrp.github.io/hall
+        read_only: true
+        bind:
+          create_host_path: false

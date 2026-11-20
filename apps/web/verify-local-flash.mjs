@@ -22,7 +22,8 @@ async function connect() {
     } catch (_) {}
     await sleep(100)
   }
-  const tab = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?${encodeURIComponent(BASE_URL)}`, { method: 'PUT' })).json()
+  const initialUrl = new URL('#/library/flash-store', BASE_URL).href
+  const tab = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?${encodeURIComponent(initialUrl)}`, { method: 'PUT' })).json()
   ws = new WebSocket(tab.webSocketDebuggerUrl)
   await new Promise((resolve, reject) => { ws.addEventListener('open', resolve); ws.addEventListener('error', reject) })
   ws.addEventListener('message', (event) => {
@@ -110,7 +111,7 @@ try {
   await send('Page.setDownloadBehavior', { behavior: 'deny' })
   await evaluate(`(() => { window.__revokedUrls = []; const revoke = URL.revokeObjectURL; URL.revokeObjectURL = (value) => { window.__revokedUrls.push(value); return revoke.call(URL, value) } })()`)
 
-  await navigate('#/library/flash-store')
+  await waitFor(`Boolean(document.querySelector('.storeCard button:not(:disabled)'))`, 'Flash Store did not finish loading')
   const addButton = await evaluate(`(() => { const button = [...document.querySelectorAll('.storeCard button')].find((node) => node.textContent.includes('加入')); if (!button) return false; button.click(); return true })()`)
   if (!addButton) {
     const state = await evaluate(`({ hash: location.hash, tabs: [...document.querySelectorAll('.tab')].map((node) => node.textContent.trim()), cards: document.querySelectorAll('.storeCard').length, buttons: [...document.querySelectorAll('button')].map((node) => node.textContent.trim()) })`)

@@ -7,6 +7,14 @@
 
 ## 启动
 
+需要时可将上游运行时克隆到本项目约定的目录。以下命令在仓库根目录执行。
+
+```bash
+git clone https://github.com/vmrp/vmrp.github.io.git maopao-revival/vendor/vmrp.github.io
+```
+
+Docker 部署使用 [Web 部署说明](../README.md#docker--render) 中的 MRP 挂载配置。
+
 ```zsh
 ./serve.sh          # 独立运行，端口 8090
 # 或直接用 小潮霸王 的 8080（已软链接挂载）：
