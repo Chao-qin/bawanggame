@@ -1,5 +1,5 @@
 import { Button, Card, DotLoading, Empty, Input, Popup, SearchBar, TextArea } from 'antd-mobile'
-import { AddOutline, AppstoreOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline } from 'antd-mobile-icons'
+import { AppstoreOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline } from 'antd-mobile-icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
 import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
@@ -584,24 +584,25 @@ function Library({ kind, onPlay }) {
           {server.loading || localFlash.loading ? <><DotLoading /> 加载中</> : server.error || localFlash.error ? '部分加载失败' : games.length + ' 款'}
         </span>
       </div>
-      <div className="toolbar">
+      <div className={kind === 'j2me' ? 'toolbar javaLibraryToolbar' : 'toolbar'}>
         <SearchBar
           className="search"
-          placeholder={'搜索' + (kind === 'j2me' ? ' J2ME' : kind === 'flash' ? ' Flash' : ' 冒泡') + '游戏…'}
+          placeholder={kind === 'j2me' ? '搜索游戏' : kind === 'flash' ? '搜索 Flash 游戏…' : '搜索冒泡游戏…'}
           value={query}
           onChange={setQuery}
         />
         {kind === 'j2me' && (
           <FilePicker accept=".jar" multiple onChange={handleUpload} disabled={busy || selectMode || removing}>
-            {busy ? '导入中…' : <><AddOutline aria-hidden="true" /> 添加 JAR</>}
+            {busy ? '导入中' : '添加'}
           </FilePicker>
         )}
+        {kind === 'j2me' && (
+          <Button size="small" fill="outline" disabled={busy || removing || (!selectMode && !localGames.length)} onClick={() => {
+            if (selectMode) exitSelection()
+            else setSelectMode(true)
+          }}>{selectMode ? '取消' : '卸载'}</Button>
+        )}
       </div>
-      {kind === 'j2me' && !selectMode && localGames.length > 0 &&
-        <Button size="small" fill="outline" disabled={busy || removing} onClick={() => {
-          setPicked(new Set())
-          setSelectMode(true)
-        }}>批量卸载</Button>}
       {notice && <div className={notice.failed ? 'status statusError' : 'status statusSuccess'} role={notice.failed ? 'alert' : 'status'}>{notice.text}</div>}
       {!selectMode && kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={popular} onOpen={openGame} />}
       {!selectMode && kind !== 'flash' && <GameRow title="🕘 最近在玩" items={recent} onOpen={openGame} />}
