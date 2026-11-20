@@ -191,6 +191,36 @@
       paintButton(item, color, Math.min(item.w, item.h) * 0.24, "soft");
     }
 
+    function drawFeatureGlyph(item, id, color, styles) {
+      if (!item) return;
+      var active = item.node.classList.contains("down") || item.node.classList.contains("tap");
+      var stroke = active ? "#081018" : color.text;
+      var cx = item.x + item.w / 2;
+      var cy = item.y + item.h / 2;
+      var size = Math.min(item.w, item.h) * 0.18;
+      ctx.strokeStyle = stroke;
+      ctx.fillStyle = stroke;
+      ctx.lineWidth = Math.max(2, styles.unit * .085);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      if (id === "choice" || id === "back") {
+        ctx.moveTo(cx - size * 1.25, cy);
+        ctx.lineTo(cx + size * 1.25, cy);
+      } else if (id === "ret") {
+        ctx.arc(cx, cy, size * 1.25, Math.PI * .15, Math.PI * 1.65, false);
+        ctx.moveTo(cx - size * 1.35, cy - size * .1);
+        ctx.lineTo(cx - size * 1.35, cy - size * .9);
+        ctx.lineTo(cx - size * .55, cy - size * .9);
+      } else {
+        ctx.moveTo(cx - size * 1.2, cy - size * 1.2);
+        ctx.lineTo(cx + size * 1.2, cy + size * 1.2);
+        ctx.moveTo(cx + size * 1.2, cy - size * 1.2);
+        ctx.lineTo(cx - size * 1.2, cy + size * 1.2);
+      }
+      ctx.stroke();
+    }
+
     function drawNumbers(base, color, styles) {
       Object.keys(labels).forEach(function (id) {
         var item = rectFor(id, base), label = labels[id];
@@ -234,7 +264,9 @@
       var portrait = orientation === "portrait";
       if (!portrait) drawDpad(canvasRect, color, styles);
       ["choice", "back", "ret", "clear"].forEach(function (id) {
-        drawSoft(rectFor(id, canvasRect), color);
+        var item = rectFor(id, canvasRect);
+        drawSoft(item, color);
+        drawFeatureGlyph(item, id, color, styles);
       });
       if (portrait) drawDpad(canvasRect, color, styles);
       drawNumbers(canvasRect, color, styles);
