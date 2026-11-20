@@ -50,7 +50,13 @@ journalctl -u j2me -f
 
 ### Docker / Render
 
-`Dockerfile` запускает `start.sh`: если доступен UDP, рядом с сервером поднимается coturn. На Render UDP нет, поэтому TURN там не запускается. Чтобы игроки с Render могли соединяться через TURN, задайте в Environment `TURN_URL` и `TURN_SECRET` от своего VPS. Для Render есть `render.yaml`.
+Из корня репозитория запустите:
+
+```bash
+docker compose up --build -d --wait
+```
+
+Откройте http://127.0.0.1:8080. Настройки порта, подключение MRP и развёртывание на Render описаны в [английской инструкции](README.md#docker--render).
 
 ### Переменные окружения
 

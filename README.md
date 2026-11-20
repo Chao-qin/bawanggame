@@ -16,7 +16,7 @@
 - Platform selectable per game (default Sony Ericsson): changes `microedition.platform` and key codes (soft keys, joystick, C/Back) to match Nokia/SE/Samsung, Siemens, Motorola, LG; C (−8) and Back (−11) keys are supported; PC keyboard: arrows, Enter, Q/E as soft keys, Backspace is C, Esc is Back
 - System properties (`microedition.locale` and others) editable per game: Settings → "System properties", with reset to defaults
 - Load your own .jar files straight from the page (stored in the browser)
-- Browse the 52emu.cn Java game catalog and install JARs into the server library
+- Browse the 52emu.cn Java game catalog and install JARs into the browser library
 - File manager for the phone's virtual storage (memory card, saves): upload, download, folders
 
 ## Quick start
@@ -63,7 +63,32 @@ journalctl -u j2me -f
 
 ### Docker / Render
 
-The `Dockerfile` runs `start.sh`: if UDP is available, coturn is started next to the server. Render has no UDP, so TURN is not started there. To let players on Render connect through TURN, set `TURN_URL` and `TURN_SECRET` from your own VPS in Environment. A `render.yaml` is included.
+Use Docker with the Compose plugin. From the repository root, run:
+
+```bash
+docker compose up --build -d --wait
+```
+
+Open http://127.0.0.1:8080 for the Web lobby, Flash, J2ME and the 52java store. Set `WEB_PORT=8081` before starting Compose to use a different host port. Compose binds to loopback by default. If you set `WEB_BIND` to a network address, restrict access to trusted clients because the server includes a game socket proxy.
+
+Place your server-side JAR files in `games/jar/`. Compose mounts the directory read-only and the library reads it on request. Games and saves added from the browser are stored for that browser and site origin.
+
+To include the MRP library, first place the vmrp runtime and your local game assets under `maopao-revival/vendor/vmrp.github.io/` as described in [the MRP setup](maopao-revival/README.md). Start with the additional Compose file:
+
+```bash
+docker compose -f compose.yaml -f compose.mrp.yaml up --build -d --wait
+```
+
+The default container starts with an empty MRP catalog. The optional Compose file mounts the runtime and games from the host. The 「大宋豪侠 · 本地复活」 entry requires the separate `dasong-server` service.
+
+```bash
+docker compose logs -f web
+docker compose down
+```
+
+Render builds the same Dockerfile and supplies the container's `PORT` at runtime. Compose and Render leave bundled coturn off by default. For direct Docker runs, set `TURN=0` to run just the Node service.
+
+The React Native app continues to package its local site through `pnpm mobile:prepare-web` and the platform build commands above.
 
 ### Environment variables
 

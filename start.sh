@@ -9,4 +9,7 @@ if [ -z "$TURN_URL" ] && [ -z "$RENDER" ] && [ "$TURN" != "0" ] && command -v tu
     turnserver -c turnserver.conf --external-ip="$TURN_IP" --static-auth-secret="$TURN_SECRET" &
   fi
 fi
-exec pnpm start
+if [ "$#" -eq 0 ]; then
+  set -- pnpm start
+fi
+exec "$@"
