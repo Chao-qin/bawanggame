@@ -3,8 +3,10 @@ const RUNTIME_NODE_IDS = ['fps-hud', 'screen-hint', 'text-diag', 'drawlog-btn']
 export function cleanupRuntimeArtifacts() {
   try { window.KeypadCanvas?.destroy?.() } catch (_) {}
   try { window.__XIAOCHAO_RUNTIME_EXTRAS_CLEANUP__?.() } catch (_) {}
+  try { window.__XIAOCHAO_TOUCH_LAYOUT_RESET__?.() } catch (_) {}
   try { window.__XIAOCHAO_KEYMAP_RESET__?.() } catch (_) {}
   try { window.__XIAOCHAO_INPUT_RESET__?.() } catch (_) {}
+  delete window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__
 
   RUNTIME_NODE_IDS.forEach((id) => document.getElementById(id)?.remove())
   document.querySelectorAll('.screen-hint').forEach((node) => node.remove())
