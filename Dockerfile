@@ -28,19 +28,20 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-ENV NODE_ENV=production PORT=8080
+ENV NODE_ENV=production PORT=8080 TURN_STATE_DIR=/app/turn
 
 COPY --from=build /app/public/ public/
 COPY --from=production-dependencies /app/node_modules/ node_modules/
 COPY --from=production-dependencies /app/apps/server/node_modules/ apps/server/node_modules/
 COPY --from=build /app/apps/server/package.json apps/server/
 # The server resolves asset paths relative to its entrypoint.
-COPY --from=build /app/apps/server/dist/src/index.js apps/server/src/
+COPY --from=build /app/apps/server/dist/src/ apps/server/src/
 COPY runtime/ runtime/
 COPY games/jar/.keep games/jar/
 COPY start.sh turnserver.conf ./
 RUN mkdir -p maopao-revival/vendor/vmrp.github.io/hall \
- && printf '[]\n' > maopao-revival/vendor/vmrp.github.io/hall/manifest.json
+ && printf '[]\n' > maopao-revival/vendor/vmrp.github.io/hall/manifest.json \
+ && install -d -o node -g node "$TURN_STATE_DIR"
 
 USER node
 EXPOSE 8080 3478/tcp 3478/udp 49160-49200/udp

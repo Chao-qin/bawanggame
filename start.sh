@@ -6,7 +6,11 @@ if [ -z "$TURN_URL" ] && [ -z "$RENDER" ] && [ "$TURN" != "0" ] && command -v tu
   if [ -n "$TURN_IP" ]; then
     export TURN_SECRET=${TURN_SECRET:-$(head -c 24 /dev/urandom | base64 | tr -d '/+=')}
     export TURN_URL="turn:$TURN_IP:3478,turn:$TURN_IP:3478?transport=tcp"
-    turnserver -c turnserver.conf --external-ip="$TURN_IP" --static-auth-secret="$TURN_SECRET" &
+    turn_options=()
+    if [ -n "$TURN_STATE_DIR" ]; then
+      turn_options+=(--pidfile="$TURN_STATE_DIR/turnserver.pid" --log-file=stdout --simple-log)
+    fi
+    turnserver -c turnserver.conf --external-ip="$TURN_IP" --static-auth-secret="$TURN_SECRET" "${turn_options[@]}" &
   fi
 fi
 if [ "$#" -eq 0 ]; then
