@@ -88,6 +88,8 @@ docker compose down
 
 Render builds the same Dockerfile and supplies the container's `PORT` at runtime. Compose and Render run the Web service without publishing TURN ports. For direct Docker runs, set `TURN=0` to run just the Node service.
 
+Run `node scripts/verify-web-docker.mjs` with Node.js 22 to test the image in an isolated Compose project. The test checks the built lobby and runtime assets, the read-only JAR mount, and 52java preflight without contacting the upstream catalog.
+
 The React Native app continues to package its local site through `pnpm mobile:prepare-web` and the platform build commands above.
 
 ### Environment variables
