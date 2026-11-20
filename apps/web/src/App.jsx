@@ -592,7 +592,7 @@ function Library({ kind, onPlay }) {
           onChange={setQuery}
         />
         {kind === 'j2me' && (
-          <FilePicker accept=".jar" multiple onChange={handleUpload} disabled={busy || selectMode || removing}>
+          <FilePicker fill="outline" accept=".jar" multiple onChange={handleUpload} disabled={busy || selectMode || removing}>
             {busy ? '导入中' : '添加'}
           </FilePicker>
         )}
@@ -642,11 +642,11 @@ function Library({ kind, onPlay }) {
   )
 }
 
-function FilePicker({ children, ...inputProps }) {
+function FilePicker({ children, fill, ...inputProps }) {
   const input = useRef(null)
   return (
     <>
-      <Button className="upload" size="small" disabled={inputProps.disabled} onClick={() => input.current?.click()}>{children}</Button>
+      <Button className="upload" size="small" fill={fill} disabled={inputProps.disabled} onClick={() => input.current?.click()}>{children}</Button>
       <input {...inputProps} type="file" ref={input} hidden />
     </>
   )

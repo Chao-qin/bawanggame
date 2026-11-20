@@ -166,6 +166,15 @@ try {
   requireCheck(library.hasUpload, 'JAR import missing')
 
   await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 720, deviceScaleFactor: 1, mobile: true })
+  requireCheck(await evaluate(`[...document.querySelectorAll('.javaLibraryToolbar > button')].length === 2 &&
+    [...document.querySelectorAll('.javaLibraryToolbar > button')].every((button) => {
+      const range = document.createRange()
+      range.selectNodeContents(button)
+      const label = range.getBoundingClientRect()
+      const box = button.getBoundingClientRect()
+      return label.width > 0 && Math.abs(label.left + label.width / 2 - box.left - box.width / 2) < 2 &&
+        Math.abs(label.top + label.height / 2 - box.top - box.height / 2) < 2
+    })`), 'Java toolbar button labels are off-center')
   const mobileNav = await evaluate(`(() => {
     const nav = document.querySelector('.tabs')
     return { bottom: nav.getBoundingClientRect().bottom, height: innerHeight, active: nav.querySelector('[aria-current="page"]')?.innerText, overflow: document.documentElement.scrollWidth > innerWidth }
