@@ -5,10 +5,12 @@ import { createRoot } from 'react-dom/client'
 import '@unocss/reset/tailwind.css'
 import 'virtual:uno.css'
 import './mobile-ui.css'
-import App from './App.jsx'
+import App, { isRuntimeFrame, RuntimeFramePage } from './App.jsx'
+
+const runtimeFrame = isRuntimeFrame()
 
 function render() {
-  createRoot(document.getElementById('root')).render(<ConfigProvider locale={zhCN}><App /></ConfigProvider>)
+  createRoot(document.getElementById('root')).render(<ConfigProvider locale={zhCN}>{runtimeFrame ? <RuntimeFramePage /> : <App />}</ConfigProvider>)
 }
 
 async function clearLegacyBrowserState() {
@@ -30,7 +32,7 @@ localJars.onerror = render
 document.head.appendChild(localJars)
 
 // 清理旧版本缓存，避免旧的 /app 页面或过期运行时继续被浏览器提供。
-if ('serviceWorker' in navigator && location.port !== '5173') {
+if (!runtimeFrame && 'serviceWorker' in navigator && location.port !== '5173') {
   clearLegacyBrowserState().catch(() => {})
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})

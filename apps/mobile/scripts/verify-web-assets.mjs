@@ -13,6 +13,8 @@ const requiredFiles = [
   'style/main.css',
   'keypad-canvas.js',
   'touchpad.js',
+  'runtime/j2me/input-mapping.js',
+  'runtime/j2me/touch-layout.js',
   'config/settings.js',
   'bld/main-all.js',
   'mrp-runtime.js',

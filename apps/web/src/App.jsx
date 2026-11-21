@@ -1,6 +1,6 @@
 import { Button, Card, DotLoading, Empty, Input, Popup, SearchBar, TextArea } from 'antd-mobile'
 import { AppstoreOutline, ArrowsAltOutline, CalculatorOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline, ShrinkOutline } from 'antd-mobile-icons'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
 import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
 import { MrpPlayer } from './runtime/MrpPlayer.jsx'
@@ -21,12 +21,9 @@ const TABS = [
 
 const TAB_IDS = new Set(TABS.map((item) => item.id))
 const GAME_KINDS = new Set(['j2me', 'maopao', 'local-revival', 'flash'])
-const RUNTIME_EXIT_POLICIES = Object.freeze({
-  flash: 'dispose',
-  'local-revival': 'dispose',
-  j2me: 'reload',
-  maopao: 'reload',
-})
+const FRAME_RUNTIME_KINDS = new Set(['j2me', 'maopao'])
+const RUNTIME_EXIT_MESSAGE = 'xiaochao:runtime-exit'
+const RUNTIME_READY_MESSAGE = 'xiaochao:runtime-ready'
 const noopCleanup = () => {}
 const FLASH_GAMES = [
   { kind: 'flash', file: 'fruit-madness.swf', name: 'Fruit Madness', vendor: 'Vladimir Belyaev · MIT', desc: '躲避水果并收集松饼', size: 2236139, iconUrl: null, local: false, catalogId: 'fruit-madness' },
@@ -141,10 +138,12 @@ function useServerJars(enabled) {
   useEffect(() => {
     if (!enabled) return
     let alive = true
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
     // The RN package serves a static manifest from APK assets; desktop keeps
     // the Node endpoint so its live catalog and icon extraction still work.
     const endpoint = isEmbeddedHost() ? '/jar-manifest.json' : '/__jars'
-    fetch(endpoint)
+    fetch(endpoint, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error('HTTP ' + r.status)
         return r.json()
@@ -169,10 +168,13 @@ function useServerJars(enabled) {
         })
       })
       .catch((e) => {
-        if (alive) setState({ loading: false, error: String(e.message || e), games: [] })
+        if (alive) setState({ loading: false, error: controller.signal.aborted ? '读取服务器列表超时' : String(e.message || e), games: [] })
       })
+      .finally(() => clearTimeout(timeout))
     return () => {
       alive = false
+      clearTimeout(timeout)
+      controller.abort()
     }
   }, [enabled])
   return enabled ? state : { loading: false, error: null, games: [] }
@@ -206,6 +208,7 @@ function useJavaStore(query, category, page) {
 function useLocalJars(enabled) {
   const [games, setGames] = useState([])
   const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(enabled)
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
@@ -219,6 +222,7 @@ function useLocalJars(enabled) {
       if (!hasLocalJars()) {
         if (n++ < tries) return setTimeout(poll, 250)
         setError('本机存储不可用（LocalJars 未加载）')
+        setLoading(false)
         return
       }
       window.LocalJars.list()
@@ -244,6 +248,7 @@ function useLocalJars(enabled) {
           )
         })
         .catch((e) => { if (alive) setError(String(e.message || e)) })
+        .finally(() => { if (alive) setLoading(false) })
     }
     poll()
     return () => {
@@ -281,7 +286,7 @@ function useLocalJars(enabled) {
     }
   }
 
-  return { games, error, addFiles, refresh }
+  return { games, error, loading, addFiles, refresh }
 }
 
 async function uninstallLocalGame(game) {
@@ -454,6 +459,7 @@ function Library({ kind, onPlay }) {
   const [picked, setPicked] = useState(() => new Set())
   const [removing, setRemoving] = useState(false)
   const [notice, setNotice] = useState(null)
+  const loading = server.loading || local.loading || localFlash.loading
   const javaGames = useMemo(() => {
     if (kind !== 'j2me') return []
     const groups = new Map()
@@ -479,16 +485,19 @@ function Library({ kind, onPlay }) {
     }
   }, [menuGame])
 
-  // 本地榜单：Library 从 player 返回时会重挂载，重新读取 localStorage。
-  useEffect(() => {
+  function refreshHistory() {
     if (kind === 'flash') return
     fetchRecent().then(setRecent)
     fetchPopular().then(setPopular)
-  }, [kind])
+  }
+  useEffect(refreshHistory, [kind])
 
   function handlePlay(g) {
     onPlay(g)
-    if (g.kind !== 'flash') recordPlay(g)
+    if (g.kind !== 'flash') {
+      recordPlay(g)
+      refreshHistory()
+    }
   }
 
   function exitSelection() {
@@ -581,7 +590,7 @@ function Library({ kind, onPlay }) {
       <div className="sectionHeading">
         <h2>{TABS.find((tab) => tab.id === kind)?.label}游戏库</h2>
         <span className="count" role="status">
-          {server.loading || localFlash.loading ? <><DotLoading /> 加载中</> : server.error || localFlash.error ? '部分加载失败' : games.length + ' 款'}
+          {loading ? <><DotLoading /> 加载中</> : server.error || local.error || localFlash.error ? '部分加载失败' : games.length + ' 款'}
         </span>
       </div>
       <div className={kind === 'j2me' ? 'toolbar javaLibraryToolbar' : 'toolbar'}>
@@ -611,7 +620,7 @@ function Library({ kind, onPlay }) {
         <div className="status statusError" role="alert">{kind === 'j2me' ? local.error : localFlash.error}</div>
       )}
       <div className="gameGrid">
-          {games.map((g) => (
+          {(!loading || kind === 'flash') && games.map((g) => (
             <GameCard
               key={gameKey(g)}
               game={g}
@@ -622,7 +631,7 @@ function Library({ kind, onPlay }) {
             />
           ))}
       </div>
-      {!server.error && !localFlash.error && !server.loading && !localFlash.loading && games.length === 0 && <Empty className="emptyPanel" description="没有匹配的游戏" />}
+      {!loading && !server.error && !local.error && !localFlash.error && games.length === 0 && <Empty className="emptyPanel" description="没有匹配的游戏" />}
       {selectMode && <div className="selectBar" aria-label="已选游戏操作">
         <span role="status">已选 {selectedGames.length} 个</span>
         <Button color="danger" size="small" disabled={busy || removing || !selectedGames.length}
@@ -1021,23 +1030,24 @@ function Player({ game, onBack, nativeBackSignal }) {
     const gear = document.getElementById('gear')
     if (gear) gear.click()
   }
-  const exit = () => {
+  const exit = async () => {
     if (exitStartedRef.current) return
     exitStartedRef.current = true
-    try { window.myflushAll && window.myflushAll() } catch (_) {}
+    if (game.kind === 'j2me' && window.myflushAll) {
+      let timer
+      try {
+        await new Promise((resolve) => {
+          timer = window.setTimeout(resolve, 1500)
+          window.myflushAll(resolve)
+        })
+      } catch (_) {} finally { window.clearTimeout(timer) }
+    }
     try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
     try { runtimeCleanupRef.current() } catch (_) {}
     if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
     setConfirming(false)
     onBack()
-    if (RUNTIME_EXIT_POLICIES[game.kind] === 'reload') {
-      // The classic VM installs process-wide listeners and caches globals that
-      // cannot be safely reconstructed inside the SPA realm. Reload after the
-      // library hash is committed so the next game starts from a fresh realm.
-      window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ = (window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0) + 1
-      window.setTimeout(() => window.location.reload(), 0)
-    }
   }
   return (
     <div ref={playerRef} className={`player${game.kind === 'j2me' ? ' j2mePlayer' : ''}${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
@@ -1073,20 +1083,106 @@ function Player({ game, onBack, nativeBackSignal }) {
   )
 }
 
+function useNativeBackRequest() {
+  const [signal, setSignal] = useState(0)
+  const request = useCallback(() => setSignal((value) => value + 1), [])
+  return [signal, request]
+}
+
+export function isRuntimeFrame() {
+  return window.frameElement?.classList.contains('runtimeFrame') && new URLSearchParams(window.location.search).get('runtime-frame') === '1'
+}
+
+export function RuntimeFramePage() {
+  const [route] = useState(() => parseRoute(window.location.hash))
+  const [nativeBackSignal, requestBack] = useNativeBackRequest()
+  const leave = useCallback(() => window.parent.postMessage(RUNTIME_EXIT_MESSAGE, window.location.origin), [])
+
+  useLayoutEffect(() => {
+    const parent = window.parent
+    window.__XIAOCHAO_RN_HOST__ = parent.__XIAOCHAO_RN_HOST__
+    window.__XIAOCHAO_RESPONSIVE_INSETS__ = parent.__XIAOCHAO_RESPONSIVE_INSETS__
+    const cleanup = installResponsiveContract()
+    window.__XIAOCHAO_NATIVE_BACK_REQUEST__ = requestBack
+    parent.postMessage(RUNTIME_READY_MESSAGE, window.location.origin)
+    return () => {
+      delete window.__XIAOCHAO_NATIVE_BACK_REQUEST__
+      delete window.__XIAOCHAO_RN_HOST__
+      cleanup()
+    }
+  }, [requestBack])
+
+  return route.type === 'play' && FRAME_RUNTIME_KINDS.has(route.game.kind)
+    ? <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leave} />
+    : null
+}
+
+function RuntimeFrame({ route, nativeBackSignal, onBack }) {
+  const frame = useRef(null)
+  const lastBackSignal = useRef(nativeBackSignal)
+  const pendingBack = useRef(false)
+  const url = new URL(window.location.href)
+  url.searchParams.set('runtime-frame', '1')
+  url.hash = routeHash(route)
+
+  useLayoutEffect(() => {
+    const syncInsets = () => {
+      const insets = window.__XIAOCHAO_RESPONSIVE_INSETS__
+      if (insets) frame.current?.contentWindow?.__XIAOCHAO_RESPONSIVE_HOST__?.setInsets(insets)
+    }
+    const receive = (event) => {
+      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow) return
+      if (event.data === RUNTIME_EXIT_MESSAGE) onBack()
+      if (event.data === RUNTIME_READY_MESSAGE) {
+        syncInsets()
+        event.source.focus()
+        if (pendingBack.current) {
+          pendingBack.current = false
+          event.source.__XIAOCHAO_NATIVE_BACK_REQUEST__?.()
+        }
+      }
+    }
+    window.addEventListener('message', receive)
+    window.addEventListener('xiaochao:hostinsets', syncInsets)
+    return () => {
+      window.removeEventListener('message', receive)
+      window.removeEventListener('xiaochao:hostinsets', syncInsets)
+    }
+  }, [onBack])
+
+  useEffect(() => {
+    if (lastBackSignal.current === nativeBackSignal) return
+    lastBackSignal.current = nativeBackSignal
+    const requestBack = frame.current?.contentWindow?.__XIAOCHAO_NATIVE_BACK_REQUEST__
+    if (requestBack) requestBack()
+    else pendingBack.current = true
+  }, [nativeBackSignal])
+
+  return <iframe ref={frame} className="runtimeFrame" title={route.game.name} src={url.href} allow="autoplay; fullscreen" />
+}
+
 export default function App() {
   useEffect(() => installResponsiveContract(), [])
   const [route, setRoute] = useState(() => parseRoute(window.location.hash))
-  const [nativeBackSignal, setNativeBackSignal] = useState(0)
+  const [nativeBackSignal, requestBack] = useNativeBackRequest()
   const routeRef = useRef(route)
   const restoringHistory = useRef(false)
+  const libraryScroll = useRef(null)
+  const playing = route.type === 'play'
+
+  useLayoutEffect(() => {
+    if (!playing && libraryScroll.current !== null) {
+      window.scrollTo(0, libraryScroll.current)
+      libraryScroll.current = null
+    }
+  }, [playing])
 
   useEffect(() => {
-    const requestNativeBack = () => setNativeBackSignal((value) => value + 1)
-    window.__XIAOCHAO_NATIVE_BACK_REQUEST__ = requestNativeBack
+    window.__XIAOCHAO_NATIVE_BACK_REQUEST__ = requestBack
     return () => {
-      if (window.__XIAOCHAO_NATIVE_BACK_REQUEST__ === requestNativeBack) delete window.__XIAOCHAO_NATIVE_BACK_REQUEST__
+      if (window.__XIAOCHAO_NATIVE_BACK_REQUEST__ === requestBack) delete window.__XIAOCHAO_NATIVE_BACK_REQUEST__
     }
-  }, [])
+  }, [requestBack])
 
   useEffect(() => { routeRef.current = route }, [route])
 
@@ -1107,10 +1203,11 @@ export default function App() {
         if (!restoringHistory.current) {
           restoringHistory.current = true
           window.history.forward()
-          setNativeBackSignal((value) => value + 1)
+          requestBack()
         }
         return
       }
+      if (current.type === 'library' && next.type === 'play') libraryScroll.current = window.scrollY
       if (restoringHistory.current) restoringHistory.current = false
       setRoute(next)
       if (next.type === 'library') localStorage.setItem('xiaochao-tab', next.tab)
@@ -1121,9 +1218,9 @@ export default function App() {
       window.removeEventListener('popstate', handleLocation)
       window.removeEventListener('hashchange', handleLocation)
     }
-  }, [])
+  }, [requestBack])
 
-  const tab = route.type === 'play' ? route.tab : route.tab
+  const tab = route.tab
 
   function switchTab(id) {
     const next = routeForLibrary(id)
@@ -1133,23 +1230,23 @@ export default function App() {
   }
 
   function startGame(game) {
+    libraryScroll.current = window.scrollY
     const next = routeForGame(game, tab)
     window.history.pushState({ xiaochaoRoute: routeHash(next), xiaochaoGameEntry: true }, '', routeHash(next))
     setRoute(next)
   }
 
-  function leaveGame() {
-    const next = routeForLibrary(route.type === 'play' ? route.tab : tab)
+  const leaveGame = useCallback(() => {
+    const next = routeForLibrary(tab)
     window.history.replaceState({ xiaochaoRoute: routeHash(next) }, '', routeHash(next))
     setRoute(next)
     localStorage.setItem('xiaochao-tab', next.tab)
-  }
+  }, [tab])
 
   const [libraryTick, setLibraryTick] = useState(0)
-  if (route.type === 'play') return <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />
 
-  return (
-    <div className="appShell">
+  return <>
+    <div className="appShell" hidden={playing}>
       <header className="header">
         <div className="brand"><AppstoreOutline aria-hidden="true" /><h1>小潮霸王</h1></div>
         <nav className="tabs" aria-label="游戏库和商城">
@@ -1175,5 +1272,8 @@ export default function App() {
         ))}
       </main>
     </div>
-  )
+    {playing && (FRAME_RUNTIME_KINDS.has(route.game.kind)
+      ? <RuntimeFrame key={routeHash(route)} route={route} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />
+      : <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />)}
+  </>
 }

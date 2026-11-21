@@ -28,14 +28,14 @@ export function PhoneMarkup({ mrp = false }) {
   }
   return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} data-runtime-stage>
     <div id="phone" className="runtime-phone">
-    <div id="editor-layer" className="runtime-editor-layer" style={initialEditorLayerStyle}>
+    <form id="editor-layer" className="runtime-editor-layer" style={initialEditorLayerStyle} onSubmit={(event) => event.preventDefault()} autoComplete="off">
       <div id="textarea-editor" className="textEditor" contentEditable="true" />
       <input id="password-editor" className="textEditor" type="password" />
       <input id="email-editor" className="textEditor" type="email" />
       <input id="number-editor" className="textEditor" type="number" />
       <input id="tel-editor" className="textEditor" type="tel" />
       <input id="url-editor" className="textEditor" type="url" />
-    </div>
+    </form>
     <div id="display-container" data-runtime-control="display">
       <div id="display">
         <canvas id="canvas" tabIndex="-1" onContextMenu={(e) => e.preventDefault()} />
@@ -54,7 +54,7 @@ export function PhoneMarkup({ mrp = false }) {
         </>}
       </div>
     </div>
-    <div id="keypad" onTouchStartCapture={blockRuntimeGesture} onTouchMoveCapture={blockRuntimeGesture} onContextMenuCapture={blockRuntimeGesture} onSelectStartCapture={blockRuntimeGesture} onDragStartCapture={blockRuntimeGesture}>
+    <div id="keypad" onTouchStartCapture={blockRuntimeGesture} onTouchMoveCapture={blockRuntimeGesture} onContextMenuCapture={blockRuntimeGesture} onDragStartCapture={blockRuntimeGesture}>
       <canvas id="keypad-canvas" aria-hidden="true" />
       <div id="nav" data-runtime-control="nav">
         <button id="choice" className="key soft" title="左软键"><KeyIcon as={MinusOutline} /></button>
