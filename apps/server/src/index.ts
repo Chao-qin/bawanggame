@@ -214,7 +214,7 @@ async function sendFile(res: ServerResponse, target: string) {
 }
 
 function manifestInfo(file: string) {
-  return new Promise<{ name: string; vendor: string; icon: string } | null>((done) => {
+  return new Promise<{ name: string; suiteName: string; vendor: string; version: string; icon: string } | null>((done) => {
     yauzl.open(file, { lazyEntries: true }, (err, zip) => {
       if (err || !zip) return done(null)
       zip.readEntry()
@@ -231,7 +231,8 @@ function manifestInfo(file: string) {
               if (i > 0) attrs[line.slice(0, i).trim()] = line.slice(i + 1).trim()
             }
             const midlet = (attrs['MIDlet-1'] ?? '').split(',')
-            done({ name: midlet[0]?.trim() || attrs['MIDlet-Name'] || file.split('/').pop()!.replace(/\.jar$/i, ''), vendor: attrs['MIDlet-Vendor'] ?? '', icon: attrs['MIDlet-Icon'] || midlet[1]?.trim() || '' })
+            const suiteName = attrs['MIDlet-Name'] || midlet[0]?.trim()
+            done({ name: midlet[0]?.trim() || suiteName || file.split('/').pop()!.replace(/\.jar$/i, ''), suiteName, vendor: attrs['MIDlet-Vendor'] ?? '', version: attrs['MIDlet-Version'] ?? '', icon: attrs['MIDlet-Icon'] || midlet[1]?.trim() || '' })
           })
         })
       })
@@ -267,7 +268,7 @@ async function jars(res: ServerResponse) {
   const items = []
   for (const name of names) {
     const info = await manifestInfo(join(JARS, name))
-    if (info) items.push({ file: name, name: info.name, vendor: info.vendor, icon: Boolean(info.icon) })
+    if (info) items.push({ ...info, file: name, icon: Boolean(info.icon) })
   }
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' })
   res.end(JSON.stringify(items))

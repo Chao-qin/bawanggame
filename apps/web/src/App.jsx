@@ -1,5 +1,5 @@
 import { Button, Card, DotLoading, Empty, Input, Popup, SearchBar, TextArea } from 'antd-mobile'
-import { AddOutline, AppstoreOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline } from 'antd-mobile-icons'
+import { AppstoreOutline, ArrowsAltOutline, CalculatorOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline, ShrinkOutline } from 'antd-mobile-icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
 import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
@@ -159,6 +159,8 @@ function useServerJars(enabled) {
             file: g.file,
             name: g.name || g.file,
             vendor: g.vendor || '',
+            suiteName: g.suiteName,
+            version: g.version,
             desc: '',
             size: 0,
             iconUrl: g.icon ? '/__icon?jar=' + encodeURIComponent(g.file) : null,
@@ -231,6 +233,8 @@ function useLocalJars(enabled) {
                 file: info.file,
                 name: info.name || info.file,
                 vendor: info.vendor || '',
+                suiteName: info.suiteName,
+                version: info.version,
                 desc: '',
                 size: info.data ? info.data.size : 0,
                 iconUrl,
@@ -285,8 +289,9 @@ async function uninstallLocalGame(game) {
     await removeLocalFlash(game.file)
   } else {
     if (!hasLocalJars()) throw new Error('浏览器本机存储不可用')
-    await window.LocalJars.remove(game.file)
-    await window.LocalJars.clearData('local:' + game.file)
+    const files = game.localFiles || [game.file]
+    await window.LocalJars.removeGroup(files)
+    for (const file of files) await window.LocalJars.clearData('local:' + file)
   }
 }
 
@@ -344,6 +349,7 @@ function localJarName(name, id) {
 }
 
 function gameKey(game) {
+  if (game.identity) return game.identity
   return (game.local ? 'local:' : '') + game.kind + ':' + game.file
 }
 
@@ -369,7 +375,7 @@ function GameCard({ game, onOpen, selected, selecting, disabled }) {
       </div>
       <div className="cardName">{game.name}</div>
       <div className="cardMeta">
-        {[game.vendor, formatSize(game.size), game.local ? '本机' : ''].filter(Boolean).join(' · ') || '\u00a0'}
+        {[game.vendor, formatSize(game.size), game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机' : ''].filter(Boolean).join(' · ') || '\u00a0'}
       </div>
     </button>
   )
@@ -419,7 +425,7 @@ function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
         }}>
         <div className="optionHead">
           <div className="optionIcon" aria-hidden="true">{(game.name || '?').trim().charAt(0).toUpperCase()}</div>
-          <div className="optionTitle"><strong>{game.name}</strong><span>{game.vendor || (game.local ? '本机游戏' : '在线游戏')}</span></div>
+          <div className="optionTitle"><strong>{game.name}</strong><span>{[game.vendor, game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机游戏' : ''].filter(Boolean).join(' · ')}</span></div>
           <Button fill="none" className="iconButton" onClick={onClose} aria-label="关闭"><CloseOutline aria-hidden="true" /></Button>
         </div>
         <div className="optionBody">
@@ -448,7 +454,18 @@ function Library({ kind, onPlay }) {
   const [picked, setPicked] = useState(() => new Set())
   const [removing, setRemoving] = useState(false)
   const [notice, setNotice] = useState(null)
-  const localGames = kind === 'flash' ? localFlash.games : local.games
+  const javaGames = useMemo(() => {
+    if (kind !== 'j2me') return []
+    const groups = new Map()
+    for (const game of [...local.games, ...server.games]) {
+      const identity = window.LocalJars?.identity?.(game) || gameKey(game)
+      const group = groups.get(identity)
+      if (!group) groups.set(identity, { ...game, identity, localFiles: game.local ? [game.file] : [] })
+      else if (game.local) group.localFiles.push(game.file)
+    }
+    return [...groups.values()]
+  }, [kind, local.games, server.games])
+  const localGames = kind === 'flash' ? localFlash.games : javaGames.filter((game) => game.local)
   const selectedGames = localGames.filter((game) => picked.has(gameKey(game)))
 
   useEffect(() => {
@@ -491,6 +508,11 @@ function Library({ kind, onPlay }) {
   function openGame(game) {
     if (removing) return
     if (!selectMode) {
+      if (game.kind === 'j2me') {
+        const original = (game.local ? local.games : server.games).find((entry) => entry.file === game.file)
+        const identity = original && window.LocalJars?.identity?.(original)
+        game = javaGames.find((entry) => entry.identity === identity) || game
+      }
       setMenuGame(game)
       return
     }
@@ -531,14 +553,13 @@ function Library({ kind, onPlay }) {
   }
 
   const games = useMemo(() => {
-    const revival = kind === 'j2me' ? [{kind: 'local-revival', file: 'local-revival', name: '大宋豪侠 · 本地复活', vendor: '本地服务端', desc: '可移动地图、NPC 和基础战斗', size: 0, local: false}] : []
-    const all = kind === 'flash' ? FLASH_GAMES.concat(localFlash.games) : revival.concat(server.games, local.games)
+    const all = kind === 'flash' ? FLASH_GAMES.concat(localFlash.games) : kind === 'j2me' ? javaGames : server.games
     const q = query.trim().toLowerCase()
     if (!q) return all
     return all.filter(
       (g) => (g.name || '').toLowerCase().includes(q) || (g.vendor || '').toLowerCase().includes(q)
     )
-  }, [kind, server.games, local.games, localFlash.games, query])
+  }, [kind, server.games, javaGames, localFlash.games, query])
 
   function handleUpload(e) {
     const files = Array.from(e.target.files || [])
@@ -563,17 +584,23 @@ function Library({ kind, onPlay }) {
           {server.loading || localFlash.loading ? <><DotLoading /> 加载中</> : server.error || localFlash.error ? '部分加载失败' : games.length + ' 款'}
         </span>
       </div>
-      <div className="toolbar">
+      <div className={kind === 'j2me' ? 'toolbar javaLibraryToolbar' : 'toolbar'}>
         <SearchBar
           className="search"
-          placeholder={'搜索' + (kind === 'j2me' ? ' J2ME' : kind === 'flash' ? ' Flash' : ' 冒泡') + '游戏…'}
+          placeholder={kind === 'j2me' ? '搜索游戏' : kind === 'flash' ? '搜索 Flash 游戏…' : '搜索冒泡游戏…'}
           value={query}
           onChange={setQuery}
         />
         {kind === 'j2me' && (
-          <FilePicker accept=".jar" multiple onChange={handleUpload} disabled={busy || selectMode || removing}>
-            {busy ? '导入中…' : <><AddOutline aria-hidden="true" /> 添加 JAR</>}
+          <FilePicker fill="outline" accept=".jar" multiple onChange={handleUpload} disabled={busy || selectMode || removing}>
+            {busy ? '导入中' : '添加'}
           </FilePicker>
+        )}
+        {kind === 'j2me' && (
+          <Button size="small" fill="outline" disabled={busy || removing || (!selectMode && !localGames.length)} onClick={() => {
+            if (selectMode) exitSelection()
+            else setSelectMode(true)
+          }}>{selectMode ? '取消' : '卸载'}</Button>
         )}
       </div>
       {notice && <div className={notice.failed ? 'status statusError' : 'status statusSuccess'} role={notice.failed ? 'alert' : 'status'}>{notice.text}</div>}
@@ -599,8 +626,8 @@ function Library({ kind, onPlay }) {
       {selectMode && <div className="selectBar" aria-label="已选游戏操作">
         <span role="status">已选 {selectedGames.length} 个</span>
         <Button color="danger" size="small" disabled={busy || removing || !selectedGames.length}
-          onClick={() => removeGames(selectedGames, `卸载所选 ${selectedGames.length} 款游戏？`)}>
-          {removing ? '卸载中…' : '卸载'}
+          onClick={() => removeGames(selectedGames, `卸载所选 ${selectedGames.length} 款游戏？这会删除本机副本及其存档。`)}>
+          {removing ? '卸载中…' : kind === 'j2me' ? '批量卸载' : '卸载'}
         </Button>
         <Button size="small" disabled={removing} onClick={exitSelection}>取消</Button>
       </div>}
@@ -608,18 +635,18 @@ function Library({ kind, onPlay }) {
         game={menuGame}
         onStart={handlePlay}
         onSelect={selectGame}
-        onRemove={(game) => removeGames([game], `卸载「${game.name}」？`)}
+        onRemove={(game) => removeGames([game], game.kind === 'j2me' ? `卸载「${game.name}」的全部本机副本及存档？` : `卸载「${game.name}」？`)}
         onClose={() => setMenuGame(null)}
       />
     </section>
   )
 }
 
-function FilePicker({ children, ...inputProps }) {
+function FilePicker({ children, fill, ...inputProps }) {
   const input = useRef(null)
   return (
     <>
-      <Button className="upload" size="small" disabled={inputProps.disabled} onClick={() => input.current?.click()}>{children}</Button>
+      <Button className="upload" size="small" fill={fill} disabled={inputProps.disabled} onClick={() => input.current?.click()}>{children}</Button>
       <input {...inputProps} type="file" ref={input} hidden />
     </>
   )
@@ -960,8 +987,8 @@ function Player({ game, onBack, nativeBackSignal }) {
           <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
           <span className="runtimeToolbarSpacer" />
           {game.kind === 'j2me' && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={openSettings} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><SetOutline aria-hidden="true" /></Button>}
-          {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton" onClick={() => setInputMappingOpen(true)} aria-label="按键映射" title="按键映射" disabled={runtimeReadyFor !== game.file}>按键</Button>}
-          <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}><span aria-hidden="true">{isFullscreen ? '⤢' : '⛶'}</span></Button>
+          {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => setInputMappingOpen(true)} aria-label="按键映射" title="按键映射" disabled={runtimeReadyFor !== game.file}><CalculatorOutline aria-hidden="true" /></Button>}
+          <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? <ShrinkOutline aria-hidden="true" /> : <ArrowsAltOutline aria-hidden="true" />}</Button>
         </div>}
       </div>
       <div ref={stageRef} className={game.kind === 'flash' ? 'playerStage flashPlayerStage' : 'playerStage'}>

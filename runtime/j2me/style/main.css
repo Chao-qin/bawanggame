@@ -335,6 +335,23 @@ body.fixed-screen #display-container {
   -webkit-text-fill-color: transparent !important;
 }
 
+#keypad .key .keypadIcon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(60%, 24px);
+  height: min(60%, 24px);
+  color: var(--phone-text, #e8ecf2) !important;
+  pointer-events: none;
+}
+
+#keypad .key.down .keypadIcon { color: #081018 !important; }
+#dpad > .key { position: relative; }
+#keypad .key:has(.keypadIcon)::before { display: none; }
+body[data-dpad-layout="mirror"] :is(#left, #right) .keypadIcon { transform: rotate(180deg); }
+body[data-dpad-layout="rotate-cw"] .dir .keypadIcon { transform: rotate(90deg); }
+body[data-dpad-layout="rotate-ccw"] .dir .keypadIcon { transform: rotate(-90deg); }
+
 #keypad.keypad-canvas-mode .key::before,
 #keypad.keypad-canvas-mode #dpad {
   background: transparent !important;
@@ -453,6 +470,10 @@ body.runtime-active #numpad {
   mask: radial-gradient(circle at var(--mx) var(--my), transparent 0 var(--mask-r), #000 calc(var(--mask-r) + 2px));
 }
 
+/* Side controls read as two curved rails around the directional module. */
+#choice, #ret { border-radius: calc(var(--u) * .28) 0 0 calc(var(--u) * .28); }
+#back, #clear { border-radius: 0 calc(var(--u) * .28) calc(var(--u) * .28) 0; }
+
 #choice {
   left: 0;
   top: 0;
@@ -539,8 +560,17 @@ body.runtime-active #numpad {
   overflow: hidden;
 }
 
+#dpad::after {
+  content: "";
+  position: absolute;
+  inset: 16%;
+  border: 1px solid rgba(155, 224, 211, .08);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
 .dir {
-  background: var(--phone-panel);
+  background: transparent;
 }
 
 .dir::before {
@@ -1742,9 +1772,14 @@ body.runtime-active.viewport-landscape #phone {
 body.runtime-active[data-orientation="landscape"] #display-container,
 body.runtime-active.viewport-landscape #display-container {
   position: absolute;
-  inset: 0;
+  --landscape-side: clamp(170px, 26vw, 330px);
+  --landscape-gap: clamp(8px, 1.4vw, 22px);
+  top: 0;
+  bottom: 0;
+  left: calc(var(--landscape-side) + var(--landscape-gap));
+  right: calc(var(--landscape-side) + var(--landscape-gap));
   z-index: 1;
-  width: 100%;
+  width: auto;
   height: auto !important;
   min-width: 0;
   min-height: 0;
@@ -1756,7 +1791,9 @@ body.runtime-active.viewport-landscape #keypad {
   inset: 0;
   z-index: 2;
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  --landscape-side: clamp(170px, 26vw, 330px);
+  --landscape-gap: clamp(8px, 1.4vw, 22px);
+  grid-template-columns: var(--landscape-side) minmax(0, 1fr) var(--landscape-side);
   grid-template-rows: minmax(0, 1fr);
   align-items: center;
   width: 100%;
@@ -1790,16 +1827,16 @@ body.runtime-active.viewport-landscape #nav {
 body.runtime-active[data-orientation="landscape"] #numpad,
 body.runtime-active.viewport-landscape #numpad {
   grid-column: 1;
-  --u: var(--control-unit, clamp(28px, min(14vh, 7vw), 64px));
-  padding: 0 calc(var(--u) * 0.3 + var(--safe-area-left, env(safe-area-inset-left, 0px)));
+  --u: var(--control-unit, clamp(24px, min(12vh, 5vw), 56px));
+  padding: 0 var(--landscape-gap) 0 var(--safe-area-left, env(safe-area-inset-left, 0px));
 }
 
 body.runtime-active[data-orientation="landscape"] #nav,
 body.runtime-active.viewport-landscape #nav {
   grid-column: 3;
-  --u: var(--control-unit, clamp(28px, min(14vh, 7vw), 64px));
+  --u: var(--control-unit, clamp(24px, min(12vh, 5vw), 56px));
   height: calc(var(--u) * 4.6);
-  padding: 0 calc(var(--u) * 0.3 + var(--safe-area-right, env(safe-area-inset-right, 0px)));
+  padding: 0 var(--safe-area-right, env(safe-area-inset-right, 0px)) 0 var(--landscape-gap);
   z-index: 3;
   isolation: isolate;
 }

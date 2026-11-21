@@ -1,4 +1,9 @@
 import React from 'react'
+import { CheckOutline, CloseOutline, DownOutline, LeftOutline, MinusOutline, RightOutline, UndoOutline, UpOutline } from 'antd-mobile-icons'
+
+function KeyIcon({ as: Icon }) {
+  return <Icon className="keypadIcon" aria-hidden="true" />
+}
 
 const initialEditorLayerStyle = {
   position: 'absolute',
@@ -52,9 +57,17 @@ export function PhoneMarkup({ mrp = false }) {
     <div id="keypad" onTouchStartCapture={blockRuntimeGesture} onTouchMoveCapture={blockRuntimeGesture} onContextMenuCapture={blockRuntimeGesture} onSelectStartCapture={blockRuntimeGesture} onDragStartCapture={blockRuntimeGesture}>
       <canvas id="keypad-canvas" aria-hidden="true" />
       <div id="nav" data-runtime-control="nav">
-        <button id="choice" className="key soft" title="左软键" />
-        <div id="dpad"><button id="up" className="key dir" /><button id="left" className="key dir" /><button id="ok" className="key" /><button id="right" className="key dir" /><button id="down" className="key dir" /></div>
-        <button id="back" className="key soft" title="右软键" /><button id="ret" className="key mini" title="挂机键">↩</button><button id="clear" className="key mini" title="清除">C</button>
+        <button id="choice" className="key soft" title="左软键"><KeyIcon as={MinusOutline} /></button>
+        <div id="dpad">
+          <button id="up" className="key dir" aria-label="上"><KeyIcon as={UpOutline} /></button>
+          <button id="left" className="key dir" aria-label="左"><KeyIcon as={LeftOutline} /></button>
+          <button id="ok" className="key" aria-label="确认"><KeyIcon as={CheckOutline} /></button>
+          <button id="right" className="key dir" aria-label="右"><KeyIcon as={RightOutline} /></button>
+          <button id="down" className="key dir" aria-label="下"><KeyIcon as={DownOutline} /></button>
+        </div>
+        <button id="back" className="key soft" title="右软键"><KeyIcon as={MinusOutline} /></button>
+        <button id="ret" className="key mini" title="挂机键"><KeyIcon as={UndoOutline} /></button>
+        <button id="clear" className="key mini" title="清除"><KeyIcon as={CloseOutline} /></button>
       </div>
       <div id="numpad" data-runtime-control="numpad">{[['1','.,?'],['2','abc'],['3','def'],['4','ghi'],['5','jkl'],['6','mno'],['7','pqrs'],['8','tuv'],['9','wxyz'],['*','+'],['0','␣'],['#','⇧']].map(([n, sub]) => <button key={n} id={n === '*' ? 'star' : n === '#' ? 'pound' : `num${n}`} className="key"><b>{n}</b><i>{sub}</i></button>)}</div>
     </div>

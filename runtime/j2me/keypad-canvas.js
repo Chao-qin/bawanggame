@@ -82,10 +82,6 @@
       return {
         unit: unit,
         family: family,
-        mini: {
-          size: parsePx(miniStyle && miniStyle.fontSize, unit * 0.36),
-          weight: (miniStyle && miniStyle.fontWeight) || "600"
-        },
         number: {
           size: parsePx(numberStyle && numberStyle.fontSize, unit * 0.45),
           weight: (numberStyle && numberStyle.fontWeight) || "500"
@@ -97,8 +93,15 @@
       };
     }
 
+    function visualDirection(id) {
+      if (window.TouchLayout && typeof window.TouchLayout.visualDpad === "function") {
+        return window.TouchLayout.visualDpad(id, typeof config !== "undefined" ? config.touchLayout : null);
+      }
+      return id;
+    }
+
     function font(styles, role, size) {
-      var style = styles[role] || styles.mini;
+      var style = styles[role];
       return (style.weight || "400") + " " + Math.max(1, size || style.size) + "px " + styles.family;
     }
 
@@ -127,37 +130,6 @@
       ctx.shadowOffsetY = 0;
     }
 
-    function drawArrow(item, id, color, styles) {
-      if (!item) return;
-      var active = item.node.classList.contains("down");
-      var cx = item.x + item.w / 2, cy = item.y + item.h / 2;
-      var size = Math.max(5, Math.min(styles.unit * 0.22, Math.min(item.w, item.h) * 0.25));
-      ctx.strokeStyle = active ? "#081018" : color.text;
-      ctx.lineWidth = Math.max(2, Math.min(3, styles.unit * 0.1));
-      ctx.lineCap = "butt";
-      ctx.lineJoin = "miter";
-      ctx.beginPath();
-      if (id === "up" || id === "down") {
-        var dy = id === "up" ? 1 : -1;
-        ctx.moveTo(cx - size, cy + dy * size * 0.45);
-        ctx.lineTo(cx, cy - dy * size * 0.45);
-        ctx.lineTo(cx + size, cy + dy * size * 0.45);
-      } else {
-        var dx = id === "left" ? 1 : -1;
-        ctx.moveTo(cx + dx * size * 0.45, cy - size);
-        ctx.lineTo(cx - dx * size * 0.45, cy);
-        ctx.lineTo(cx + dx * size * 0.45, cy + size);
-      }
-      ctx.stroke();
-    }
-
-    function visualDirection(id) {
-      if (window.TouchLayout && typeof window.TouchLayout.visualDpad === "function") {
-        return window.TouchLayout.visualDpad(id, typeof config !== "undefined" ? config.touchLayout : null);
-      }
-      return id;
-    }
-
     function drawDpad(base, color, styles) {
       var dpad = rectFor("dpad", base);
       if (!dpad) return;
@@ -182,8 +154,22 @@
       ctx.clip();
       ["up", "left", "right", "down"].forEach(function (id) {
         var item = rectFor(id, base);
-        paintButton(item, color, 0, "dir");
-        drawArrow(item, visualDirection(id), color, styles);
+        if (!item) return;
+        var active = item.node.classList.contains("down");
+        ctx.fillStyle = active ? "rgba(74,120,194,.65)" : "rgba(61,77,91,.22)";
+        roundedRect(ctx, item.x, item.y, item.w, item.h, Math.min(item.w, item.h) * .24);
+        ctx.fill();
+        var cx0 = item.x + item.w / 2, cy0 = item.y + item.h / 2;
+        var size = Math.min(item.w, item.h) * .2;
+        ctx.strokeStyle = active ? "#081018" : color.text;
+        ctx.lineWidth = Math.max(2, styles.unit * .09);
+        ctx.lineCap = "square";
+        ctx.beginPath();
+        if (visualDirection(id) === "up") { ctx.moveTo(cx0-size, cy0+size*.35); ctx.lineTo(cx0, cy0-size*.35); ctx.lineTo(cx0+size, cy0+size*.35); }
+        else if (visualDirection(id) === "down") { ctx.moveTo(cx0-size, cy0-size*.35); ctx.lineTo(cx0, cy0+size*.35); ctx.lineTo(cx0+size, cy0-size*.35); }
+        else if (visualDirection(id) === "left") { ctx.moveTo(cx0+size*.35, cy0-size); ctx.lineTo(cx0-size*.35, cy0); ctx.lineTo(cx0+size*.35, cy0+size); }
+        else { ctx.moveTo(cx0-size*.35, cy0-size); ctx.lineTo(cx0+size*.35, cy0); ctx.lineTo(cx0-size*.35, cy0+size); }
+        ctx.stroke();
       });
       var ok = rectFor("ok", base);
       if (ok) {
@@ -200,33 +186,39 @@
       ctx.shadowOffsetY = 0;
     }
 
-    function drawTextButton(item, text, color, styles, role, kind) {
-      if (!item) return;
-      paintButton(item, color, Math.min(item.w, item.h) * 0.18, kind);
-      drawTextLabel(item, text, color, styles, role);
-    }
-
-    function drawTextLabel(item, text, color, styles, role) {
-      if (!item) return;
-      ctx.fillStyle = color.text;
-      ctx.font = font(styles, role || "mini");
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text, item.x + item.w / 2, item.y + item.h / 2);
-    }
-
     function drawSoft(item, color) {
       if (!item) return;
-      paintButton(item, color, Math.min(item.w, item.h) * 0.18, "soft");
-      ctx.strokeStyle = color.text;
-      ctx.globalAlpha = 0.75;
-      ctx.lineWidth = Math.max(2, item.h * 0.06);
+      paintButton(item, color, Math.min(item.w, item.h) * 0.24, "soft");
+    }
+
+    function drawFeatureGlyph(item, id, color, styles) {
+      if (!item) return;
+      var active = item.node.classList.contains("down") || item.node.classList.contains("tap");
+      var stroke = active ? "#081018" : color.text;
+      var cx = item.x + item.w / 2;
+      var cy = item.y + item.h / 2;
+      var size = Math.min(item.w, item.h) * 0.18;
+      ctx.strokeStyle = stroke;
+      ctx.fillStyle = stroke;
+      ctx.lineWidth = Math.max(2, styles.unit * .085);
       ctx.lineCap = "round";
+      ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.moveTo(item.x + item.w * 0.32, item.y + item.h / 2);
-      ctx.lineTo(item.x + item.w * 0.68, item.y + item.h / 2);
+      if (id === "choice" || id === "back") {
+        ctx.moveTo(cx - size * 1.25, cy);
+        ctx.lineTo(cx + size * 1.25, cy);
+      } else if (id === "ret") {
+        ctx.arc(cx, cy, size * 1.25, Math.PI * .15, Math.PI * 1.65, false);
+        ctx.moveTo(cx - size * 1.35, cy - size * .1);
+        ctx.lineTo(cx - size * 1.35, cy - size * .9);
+        ctx.lineTo(cx - size * .55, cy - size * .9);
+      } else {
+        ctx.moveTo(cx - size * 1.2, cy - size * 1.2);
+        ctx.lineTo(cx + size * 1.2, cy + size * 1.2);
+        ctx.moveTo(cx + size * 1.2, cy - size * 1.2);
+        ctx.lineTo(cx - size * 1.2, cy + size * 1.2);
+      }
       ctx.stroke();
-      ctx.globalAlpha = 1;
     }
 
     function drawNumbers(base, color, styles) {
@@ -271,18 +263,12 @@
         : document.body.dataset.viewportOrientation || document.body.dataset.orientation;
       var portrait = orientation === "portrait";
       if (!portrait) drawDpad(canvasRect, color, styles);
-      drawSoft(rectFor("choice", canvasRect), color);
-      drawSoft(rectFor("back", canvasRect), color);
-      drawTextButton(rectFor("ret", canvasRect), "↩", color, styles, "mini", "soft");
-      drawTextButton(rectFor("clear", canvasRect), "C", color, styles, "mini", "soft");
-      if (portrait) {
-        // Paint the d-pad after portrait action slots so its arrows remain visible
-        // where the DOM mask would otherwise cut the soft-key backgrounds away.
-        drawDpad(canvasRect, color, styles);
-        // Keep the action labels readable where the d-pad overlaps their slots.
-        drawTextLabel(rectFor("ret", canvasRect), "↩", color, styles, "mini");
-        drawTextLabel(rectFor("clear", canvasRect), "C", color, styles, "mini");
-      }
+      ["choice", "back", "ret", "clear"].forEach(function (id) {
+        var item = rectFor(id, canvasRect);
+        drawSoft(item, color);
+        drawFeatureGlyph(item, id, color, styles);
+      });
+      if (portrait) drawDpad(canvasRect, color, styles);
       drawNumbers(canvasRect, color, styles);
     }
 
