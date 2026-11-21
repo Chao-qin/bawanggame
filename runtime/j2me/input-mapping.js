@@ -289,6 +289,7 @@
       press: function (source, action) { if (validAction(action)) emit(action, true, source); },
       release: function (source, action) { if (validAction(action)) emit(action, false, source); },
       repeat: function (source, action) { if (validAction(action) && sink.repeat) sink.repeat(action, source); },
+      releaseAll: releaseAll,
       actions: ACTIONS.slice(),
       gamepadBindings: function () { return Object.assign({}, gamepadBindings); },
       keyboardBindings: function () { return Object.assign({}, keyboardBindings); },

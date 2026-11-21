@@ -352,6 +352,15 @@ try {
   const flash = await evaluate(`(() => ({ player: !!document.querySelector('.player'), stage: !!document.querySelector('.playerStage'), runtime: !!document.querySelector('ruffle-player'), reloads: window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0 }))()`)
   console.log('Flash startup:', JSON.stringify(flash))
   requireCheck(flash.player && flash.stage, 'Flash player did not mount')
+  const svgContract = await evaluate(`(() => ({
+    surface: !!document.querySelector('.keyboard-surface'),
+    count: document.querySelectorAll('.keyboard-surface [data-control-id]').length,
+    htmlButtons: document.querySelectorAll('.keyboard-surface button').length,
+    foreignObjects: document.querySelectorAll('.keyboard-surface foreignObject').length,
+    actionPrefix: [...document.querySelectorAll('.keyboard-surface [data-action-id]')].every((node) => node.dataset.actionId.startsWith('flash-key:')),
+  }))()`)
+  requireCheck(svgContract.surface && svgContract.count === 72 && svgContract.htmlButtons === 0 && svgContract.foreignObjects === 0 && svgContract.actionPrefix, `Flash SVG contract invalid: ${JSON.stringify(svgContract)}`)
+  console.log('Flash SVG contract:', JSON.stringify(svgContract))
   await evaluate(`(() => { const player = document.querySelector('ruffle-player'); window.__flashKeyEvents = []; player?.focus(); for (const type of ['keydown', 'keyup']) document.addEventListener(type, (event) => { if (['ArrowRight','ArrowLeft'].includes(event.key)) window.__flashKeyEvents.push([type, event.key]) }, true); return { player: !!player, focused: document.activeElement === player } })()`)
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
@@ -365,34 +374,28 @@ try {
       const toolbar = read('.runtimeToolbar')
       const stage = read('.playerStage')
       const canvas = read('ruffle-player')
-      const controls = read('.flashControls')
+       const controls = read('.keyboard-surface')
       const collapsed = document.querySelector('.runtimeToolbar')?.classList.contains('runtimeToolbarCollapsed')
-      return {toolbar, stage, canvas, controls, controlsDisplay: getComputedStyle(document.querySelector('.flashControls')).display, collapsed, scrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth, viewportHeight: innerHeight}
+       return {toolbar, stage, canvas, controls, controlsDisplay: getComputedStyle(document.querySelector('.keyboard-surface')).display, collapsed, scrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth, viewportHeight: innerHeight}
     })()`)
     console.log(`Flash layout ${width}x${height}:`, JSON.stringify(layout))
     requireCheck(layout.stage && layout.canvas && layout.stage.width > 0 && layout.stage.height > 0, `Flash stage is unstable at ${width}x${height}`)
     requireCheck(layout.scrollWidth <= layout.viewportWidth + 1, `Flash layout overflows horizontally at ${width}x${height}`)
     requireCheck(layout.controlsDisplay !== 'none', `Touch controls are hidden at ${width}x${height}`)
-    if (width > height) requireCheck(layout.stage.height >= height - 2 && layout.stage.left >= 110 && layout.stage.right <= width - 110, 'Landscape Flash stage did not reserve side keypad areas')
-    else requireCheck(layout.stage.width >= width - 2 && layout.controls.top >= layout.stage.bottom - 1, 'Portrait Flash stage/keypad layout is invalid')
-    const keyButton = await evaluate(`(() => { const r=document.querySelector('.flashKey-left').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2} })()`)
-    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [keyButton] })
-    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-    const touchEvents = await evaluate(`window.__flashKeyEvents.slice(-2)`)
-    requireCheck(JSON.stringify(touchEvents) === JSON.stringify([['keydown','ArrowLeft'],['keyup','ArrowLeft']]), `touch keypad did not send a paired key event: ${JSON.stringify(touchEvents)}`)
+     requireCheck(layout.controls.left <= 1 && layout.controls.top <= 1 && layout.controls.right >= width - 1 && layout.controls.bottom >= height - 1, 'SVG keyboard surface does not cover the runtime viewport')
   }
   await evaluate(`document.querySelector('.runtimeToolbarToggle[aria-expanded="false"]')?.click(); true`)
   const fullscreenButton = await evaluate(`(() => { const r=document.querySelector('.runtimeToolbarIconButton[aria-label="进入全屏"]').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2} })()`)
   await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [fullscreenButton] })
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await sleep(250)
-  const fullscreenControls = await evaluate(`({ fullscreen: !!document.fullscreenElement, hidden: getComputedStyle(document.querySelector('.flashControls')).display === 'none', stage: (() => { const r=document.querySelector('.playerStage').getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom} })() })`)
+   const fullscreenControls = await evaluate(`({ fullscreen: !!document.fullscreenElement, hidden: getComputedStyle(document.querySelector('.keyboard-surface')).display === 'none', stage: (() => { const r=document.querySelector('.playerStage').getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom} })() })`)
   console.log('Flash fullscreen:', JSON.stringify(fullscreenControls))
   requireCheck(fullscreenControls.fullscreen && fullscreenControls.hidden && fullscreenControls.stage.left <= 1 && fullscreenControls.stage.top <= 1, 'landscape fullscreen should auto-fit without touch controls')
   requireCheck(await evaluate(`document.activeElement?.matches('ruffle-player')`), 'Flash did not regain keyboard focus when entering fullscreen')
   await evaluate('document.exitFullscreen()')
   await sleep(150)
-  requireCheck(await evaluate(`getComputedStyle(document.querySelector('.flashControls')).display !== 'none'`), 'touch controls did not return after fullscreen exit')
+   requireCheck(await evaluate(`getComputedStyle(document.querySelector('.keyboard-surface')).display !== 'none'`), 'touch controls did not return after fullscreen exit')
   await send('Emulation.setTouchEmulationEnabled', { enabled: false })
   await send('Emulation.clearDeviceMetricsOverride')
   await evaluate(`window.__XIAOCHAO_NATIVE_BACK_REQUEST__?.(); true`)
@@ -407,32 +410,29 @@ try {
   await navigate('#/play/j2me/layout-probe.jar?tab=j2me&name=Layout%20Probe', 800)
   await waitFor("document.querySelector('.runtimeFrame')?.contentDocument?.querySelector('#phone')", 'J2ME runtime markup')
   await waitFor("!![...document.querySelector('.runtimeFrame').contentDocument.styleSheets].find((sheet) => sheet.href?.includes('/style/main.css'))", 'J2ME runtime stylesheet')
-  for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
-    if (height > width) {
-      console.log(`SKIP: synthetic J2ME portrait geometry requires a game fixture (${width}x${height})`)
-      continue
-    }
+   for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
     const layout = await evaluate(`(() => {
       const frame = document.querySelector('.runtimeFrame')
       const doc = frame.contentDocument
       doc.body.dataset.orientation = '${width > height ? 'landscape' : 'portrait'}'
-      const keypad = doc.querySelector('#keypad')
-      keypad.className = 'keypad-4'
-      const read = (selector) => {
-        const node = doc.querySelector(selector)
-        const r = node.getBoundingClientRect()
-        return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height}
+      const surface = doc.querySelector('.keyboard-surface')
+      const rect = surface?.getBoundingClientRect()
+      const keys = [...(surface?.querySelectorAll('[data-control-id]') || [])]
+      return {
+        surface: !!surface,
+        rect: rect && {left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,width:rect.width,height:rect.height},
+        keyCount: keys.length,
+        numericKeys: keys.filter((node) => /^key-|^(num|star|pound)/.test(node.dataset.controlId)).length,
+        buttons: surface?.querySelectorAll('button').length || 0,
+        scrollWidth:doc.documentElement.scrollWidth,
       }
-      const nav = read('#nav'), numpad = read('#numpad'), display = read('#display-container')
-      const overlaps = (a,b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1
-      return {nav, numpad, display, scrollWidth:doc.documentElement.scrollWidth, navColumn:frame.contentWindow.getComputedStyle(doc.querySelector('#nav')).gridColumnStart, numpadColumn:frame.contentWindow.getComputedStyle(doc.querySelector('#numpad')).gridColumnStart, navDisplay:overlaps(nav,display), numpadDisplay:overlaps(numpad,display)}
     })()`)
     console.log(`J2ME layout ${width}x${height}:`, JSON.stringify(layout))
     requireCheck(layout.scrollWidth <= width + 1, `J2ME runtime overflows horizontally at ${width}x${height}`)
-    requireCheck(!layout.navDisplay && !layout.numpadDisplay, `J2ME controls overlap game surface at ${width}x${height}`)
-    requireCheck(layout.navColumn === '1' && layout.numpadColumn === '3', `J2ME landscape controls are not on the agreed sides at ${width}x${height}`)
-    requireCheck(layout.display.left >= layout.nav.right - 1 && layout.display.right <= layout.numpad.left + 1, `J2ME game surface is not between controls at ${width}x${height}`)
+    requireCheck(layout.surface && layout.rect.width > 0 && layout.rect.height > 0, `J2ME SVG surface missing at ${width}x${height}`)
+    requireCheck(layout.keyCount > 0 && layout.numericKeys >= 12, `J2ME SVG keypad inventory incomplete at ${width}x${height}`)
+    requireCheck(layout.buttons === 0, `HTML buttons remain inside the J2ME SVG keyboard at ${width}x${height}`)
   }
   await send('Emulation.clearDeviceMetricsOverride')
   await evaluate(`(() => {
@@ -575,7 +575,10 @@ try {
     requireCheck(mrp.player && mrp.dialogText && !mrp.bridgeContainsDialog, 'MRP dialog/editor structure is invalid')
   }
 
-  if (jsErrors.length) throw new Error(`browser console errors: ${jsErrors.slice(0, 3).join(' | ')}`)
+  if (jsErrors.length) {
+    console.error('BROWSER ERRORS:', JSON.stringify(jsErrors.slice(0, 20)))
+    throw new Error(`browser console errors: ${jsErrors.slice(0, 3).join(' | ')}`)
+  }
   if (networkWarnings.length) console.log('WARN:', networkWarnings.slice(0, 3).join(' | '))
   console.log('RESULT PASS')
 } catch (error) {

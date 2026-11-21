@@ -48,6 +48,8 @@ export function KeyboardEditor({ gameId, onClose }) {
   useEffect(() => {
     const root = rootRef.current
     if (!root) return undefined
+    window.__XIAOCHAO_KEYBOARD_SESSION__?.releaseAll?.()
+    window.__XIAOCHAO_INPUT_CONTROLLER__?.releaseAll?.()
     const stop = (event) => {
       if (root.contains(event.target)) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' '].includes(event.key)) event.stopPropagation()
@@ -60,6 +62,13 @@ export function KeyboardEditor({ gameId, onClose }) {
   const warnings = layout ? getLayoutWarnings(layout, { emulatorDisplay: { x: .26, y: .16, width: .48, height: .38 }, safeArea: { x: .04, y: .04, width: .92, height: .92 } }) : []
   const selectedControl = layout?.controls.find((control) => control.id === selected)
   const mutate = (next) => { setLayout(next); setDirty(true) }
+  const commitConfig = (next) => {
+    if (!saveKeyboardConfig(next)) return false
+    setConfig(next)
+    window.dispatchEvent(new CustomEvent('xiaochao:keyboardprofilechange', { detail: { runtime, gameId } }))
+    window.__XIAOCHAO_KEYBOARD_SESSION__?.refreshConfig?.(next)
+    return true
+  }
   const step = (field, amount) => {
     if (!selectedControl) return
     const value = Number(selectedControl[field]) + amount
@@ -71,7 +80,10 @@ export function KeyboardEditor({ gameId, onClose }) {
     const next = clone(config)
     next.customLayouts[layout.id] = layout
     next.profileAssignments[profileKey] = { layoutId: layout.id, themeId: resolved.themeId }
-    if (saveKeyboardConfig(next)) { setConfig(next); setDirty(false); announce('键盘布局已保存') }
+    if (commitConfig(next)) {
+      setDirty(false)
+      announce('键盘布局已保存')
+    }
   }
   const clonePreset = () => {
     const next = cloneLayoutForEditing(layout || resolved.layout, { id: `${resolved.layout.id}-custom-${Date.now()}` })
@@ -79,18 +91,26 @@ export function KeyboardEditor({ gameId, onClose }) {
   }
   const restore = () => {
     const next = clone(config)
-    delete next.customLayouts[resolved.layoutId]
     delete next.profileAssignments[profileKey]
-    if (saveKeyboardConfig(next)) { setConfig(next); setDirty(false); announce('已恢复默认布局') }
+    if (commitConfig(next)) {
+      setDirty(false)
+      announce('已恢复默认布局')
+    }
   }
   const clearExplicit = () => {
     const next = clearExplicitProfileAssignment(config, runtime, orientation)
-    if (saveKeyboardConfig(next)) { setConfig(next); setDirty(false); announce('已清除显式配置') }
+    if (commitConfig(next)) {
+      setDirty(false)
+      announce('已清除显式配置')
+    }
   }
   const clearMigrated = () => {
     if (!gameId) return announce('当前没有游戏迁移覆盖')
     const next = clearMigratedPerGameOverride(config, gameId, runtime)
-    if (saveKeyboardConfig(next)) { setConfig(next); setDirty(false); announce('已清除迁移覆盖') }
+    if (commitConfig(next)) {
+      setDirty(false)
+      announce('已清除迁移覆盖')
+    }
   }
   const onKeyDown = (event) => {
     if (!selectedControl) return

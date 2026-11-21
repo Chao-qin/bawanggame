@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ACTION_CATALOG, createCustomFlashAction } from './actions.js'
+import { createCustomFlashAction } from './actions.js'
 import { createFlashKeyboardAdapter } from './FlashKeyboardAdapter.js'
 
 function harness() {
@@ -15,7 +15,7 @@ function harness() {
     document,
     addEventListener(type, listener) { listeners.set(type, listener) },
     removeEventListener(type) { listeners.delete(type) },
-    fire(type) { listeners.get(type)?.() },
+    fire(type, event = {}) { listeners.get(type)?.(event) },
   }
   const target = {
     dispatchEvent(event) { events.push({ type: event.type, key: event.key, code: event.code }) },
@@ -42,8 +42,8 @@ test('dispatches the catalog key/code pair for Flash actions', () => {
 test('reference-counts sources and preserves custom payloads', () => {
   const h = harness()
   const custom = createCustomFlashAction('jump', '!', 'KeyJ')
-  const catalog = { ...ACTION_CATALOG, [custom.actionId]: custom }
-  const adapter = createFlashKeyboardAdapter({ target: h.target, catalog, eventTarget: h.eventTarget })
+  const adapter = createFlashKeyboardAdapter({ target: h.target, eventTarget: h.eventTarget })
+  assert.equal(adapter.registerAction(custom), true)
   adapter.press('a', 'flash-key:Enter')
   adapter.press('b', 'flash-key:Enter')
   adapter.release('a')
@@ -55,6 +55,7 @@ test('reference-counts sources and preserves custom payloads', () => {
     { type: 'keydown', key: '!', code: 'KeyJ' },
     { type: 'keyup', key: '!', code: 'KeyJ' },
   ])
+  assert.equal(adapter.registerAction({ actionId: 'custom:bad', flash: { key: 'a' } }), false)
   adapter.cleanup()
 })
 
@@ -71,4 +72,16 @@ test('blur, fullscreen, and cleanup release all sources', () => {
   adapter.press('d', 'flash-key:Delete')
   adapter.cleanup()
   assert.deepEqual(h.events.slice(-1), [{ type: 'keyup', key: 'Delete', code: 'Delete' }])
+})
+
+test('global pointerup releases a touch source even when SVG capture retargets the event', () => {
+  const h = harness()
+  const adapter = createFlashKeyboardAdapter({ target: h.target, eventTarget: h.eventTarget })
+  adapter.press('pointer:2:flash-key:ArrowLeft', 'flash-key:ArrowLeft')
+  h.eventTarget.fire('pointerup', { pointerId: 2 })
+  assert.deepEqual(h.events, [
+    { type: 'keydown', key: 'ArrowLeft', code: 'ArrowLeft' },
+    { type: 'keyup', key: 'ArrowLeft', code: 'ArrowLeft' },
+  ])
+  adapter.cleanup()
 })

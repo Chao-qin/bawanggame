@@ -1084,7 +1084,12 @@ function Player({ game, onBack, nativeBackSignal }) {
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
-      <InputMappingPopup visible={inputMappingOpen} onClose={() => setInputMappingOpen(false)} />
+      <InputMappingPopup
+        visible={inputMappingOpen}
+        onClose={() => setInputMappingOpen(false)}
+        gameId={game.id || game.file}
+        runtime={game.kind === 'maopao' ? 'mrp' : game.kind}
+      />
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true" aria-label="退出当前游戏？">
           <div className="exitBox">

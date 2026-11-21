@@ -164,7 +164,42 @@ export function resolveProfile(config = {}, { runtime, orientation, gameId } = {
   const layouts = { ...BUILTIN_LAYOUTS, ...(config.customLayouts || {}) }
   const layout = layouts[layoutId] || BUILTIN_LAYOUTS[DEFAULT_PROFILES[validRuntime][validOrientation].layoutId]
   const theme = BUILTIN_THEMES[themeId] || BUILTIN_THEMES.classic
-  return { runtime: validRuntime, orientation: validOrientation, layoutId: layout.id, themeId: theme.id, layout, theme, source: explicit ? 'explicit' : legacy ? 'per-game' : 'default' }
+  const controlOverrides = legacy?.controlOverrides || null
+  const resolvedLayout = controlOverrides ? applyControlOverrides(layout, controlOverrides) : layout
+  return { runtime: validRuntime, orientation: validOrientation, layoutId: layout.id, themeId: theme.id, layout: resolvedLayout, theme, source: explicit ? 'explicit' : legacy ? 'per-game' : 'default' }
+}
+
+function applyControlOverrides(layout, overrides) {
+  const next = clone(layout)
+  const order = overrides.numberSlotOrder || []
+  const actions = overrides.slotActions || {}
+  const dpadLabels = {
+    standard: { up: '↑', right: '→', down: '↓', left: '←' },
+    mirror: { up: '↑', right: '←', down: '↓', left: '→' },
+    'rotate-cw': { up: '←', right: '↑', down: '→', left: '↓' },
+    'rotate-ccw': { up: '→', right: '↓', down: '←', left: '↑' },
+  }[overrides.dpadRotation] || null
+  const sideGroup = overrides.sideGroup
+  const numberControls = next.controls.filter((control) => /^key-(?:[0-9]|star|pound)$/.test(control.id))
+  const numberByAction = new Map(numberControls.map((control) => [control.id.slice(4), control]))
+  order.forEach((number, index) => {
+    const control = numberByAction.get(String(number))
+    if (!control) return
+    const numbersLeft = sideGroup === 'standard'
+    const startX = numbersLeft ? 0.06 : 0.64
+    control.x = startX + (index % 3) * 0.105
+    control.y = 0.58 + Math.floor(index / 3) * 0.105
+  })
+  next.controls.forEach((control) => {
+    const slot = /^key-(star|pound|[0-9])$/.exec(control.id)?.[1]
+    const actionSlot = slot === 'star' || slot === 'pound' ? slot : slot ? `num${slot}` : control.id
+    if (actions[actionSlot]) control.actionId = actions[actionSlot]
+    if (['up', 'down', 'left', 'right'].includes(control.id)) {
+      if (dpadLabels) control.label = dpadLabels[control.id]
+      if (sideGroup === 'standard') control.x += 0.62
+    }
+  })
+  return normalizeLayout(next)
 }
 
 export function clearExplicitAssignment(config, runtime, orientation) {

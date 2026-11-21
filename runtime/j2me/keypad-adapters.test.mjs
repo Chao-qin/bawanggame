@@ -39,7 +39,8 @@ test('J2ME adapter delivers exact MIDP codes and release-all through the SVG bri
 
 test('MRP adapter source contains the SVG bridge and exact c_event mapping', () => {
   assert.match(mrpSource, /getSurface\(\)/)
-  assert.match(mrpSource, /buttons: KEYCODES/)
+  assert.match(mrpSource, /buttons\[control\.id\] = control\.actionId/)
+  assert.match(mrpSource, /actionMap\[control\.id\] = control\.actionId/)
   assert.match(mrpSource, /cEvent\(0, KEYCODES\[action\]\)/)
   assert.match(mrpSource, /cEvent\(1, KEYCODES\[action\]\)/)
   assert.match(mrpSource, /input: inputController/)

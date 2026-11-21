@@ -51,10 +51,18 @@
       repeat: function (action) { if (KEYCODES[action] != null) cEvent(0, KEYCODES[action]); }
     }
   });
+  var unregisterKeyboardRelease = window.__XIAOCHAO_KEYBOARD_SESSION__ &&
+    window.__XIAOCHAO_KEYBOARD_SESSION__.registerInputRelease
+    ? window.__XIAOCHAO_KEYBOARD_SESSION__.registerInputRelease(function () {
+      if (keypadTouchpad) keypadTouchpad.releaseAll();
+      if (inputController && inputController.releaseAll) inputController.releaseAll();
+    })
+    : null;
   window.__XIAOCHAO_INPUT_CONTROLLER__ = inputController;
   window.__XIAOCHAO_INPUT_RESET__ = function () {
     if (inputController) inputController.destroy();
     inputController = null;
+    if (unregisterKeyboardRelease) unregisterKeyboardRelease();
     if (window.__XIAOCHAO_INPUT_CONTROLLER__) delete window.__XIAOCHAO_INPUT_CONTROLLER__;
     delete window.__XIAOCHAO_INPUT_RESET__;
   };
@@ -75,14 +83,23 @@
   function bindTouchpad() {
     var keyboardSession = window.__XIAOCHAO_KEYBOARD_SESSION__;
     var surface = keyboardSession && keyboardSession.getSurface && keyboardSession.getSurface();
+    var buttons = {};
     var actionMap = {};
-    Object.keys(KEYCODES).forEach(function (action) { actionMap[action] = action; });
+    var controls = keyboardSession && keyboardSession.getProfile && keyboardSession.getProfile().layout.controls || [];
+    controls.forEach(function (control) {
+      buttons[control.id] = control.actionId;
+      actionMap[control.id] = control.actionId;
+    });
+    if (!Object.keys(buttons).length) {
+      Object.keys(KEYCODES).forEach(function (action) { buttons[action] = action; actionMap[action] = action; });
+    }
     keypadTouchpad = Touchpad.bind({
       surface: surface,
-      buttons: KEYCODES,
+      buttons: buttons,
       actionMap: actionMap,
       input: inputController,
-      dpadVisual: function (direction) { return TouchLayout.visualDpad(direction, keypadLayout); },
+      onPressedChange: function (ids) { if (keyboardSession) keyboardSession.notifyPressed(new Set(ids)); },
+      dpadVisual: function (direction) { return direction; },
       sink: {
         press: function (code, meta) {
           var action = ACTION_CODES[code];

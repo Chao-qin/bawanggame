@@ -19,7 +19,7 @@ function controlsFor(bindings, action) {
   return Object.keys(bindings || {}).filter((control) => bindings[control] === action).map(controlName).join('、') || '未绑定'
 }
 
-export function InputMappingPopup({ visible, onClose }) {
+export function InputMappingPopup({ visible, onClose, gameId, runtime }) {
   const [controller, setController] = useState(null)
   const [bindings, setBindings] = useState({ keyboard: {}, gamepad: {} })
   const [capturing, setCapturing] = useState('')
@@ -95,7 +95,7 @@ export function InputMappingPopup({ visible, onClose }) {
           </footer>
         </Tabs.Tab>
         <Tabs.Tab title="触屏键位" key="touch">
-          {visible && activeTab === 'touch' && <KeyboardEditor onClose={onClose} />}
+          {visible && activeTab === 'touch' && <KeyboardEditor gameId={gameId} runtime={runtime} onClose={onClose} />}
         </Tabs.Tab>
       </Tabs>
     </section>

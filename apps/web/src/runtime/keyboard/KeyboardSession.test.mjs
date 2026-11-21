@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createKeyboardSession } from './KeyboardSession.js'
+import { createEmptyKeyboardConfig } from './storage.js'
 
 test('registers a surface and exposes bridge state', async () => {
   const session = createKeyboardSession({ timeout: 20 })
@@ -35,5 +36,35 @@ test('pressed and profile subscriptions can be removed', () => {
   unsubscribe()
   session.notifyPressed(new Set(['b']))
   assert.equal(pressed, 1)
+  session.invalidate()
+})
+
+test('resolves persisted runtime assignments and refreshes after migration', () => {
+  const config = createEmptyKeyboardConfig()
+  const custom = { id: 'my-layout', schemaVersion: 1, name: 'Mine', target: {}, controls: [] }
+  config.customLayouts['my-layout'] = custom
+  config.profileAssignments['j2me:portrait'] = { layoutId: 'my-layout', themeId: 'light' }
+  const session = createKeyboardSession({ runtime: 'j2me', orientation: 'portrait', gameId: 'game', config, timeout: 100 })
+  assert.equal(session.getProfile().layoutId, 'my-layout')
+  assert.equal(session.getProfile().themeId, 'light')
+
+  let changed
+  session.subscribeProfile((profile) => { changed = profile })
+  const migrated = createEmptyKeyboardConfig()
+  migrated.perGameOverrides.game = { j2me: { layoutId: 'landscape-split', controlOverrides: {} } }
+  session.refreshConfig(migrated)
+  assert.equal(changed.source, 'per-game')
+  assert.equal(changed.layoutId, 'landscape-split')
+  session.invalidate()
+})
+
+test('releaseAll invokes registered runtime input release callbacks', () => {
+  const session = createKeyboardSession({ timeout: 100 })
+  let released = 0
+  const unregister = session.registerInputRelease(() => { released += 1 })
+  session.releaseAll()
+  unregister()
+  session.releaseAll()
+  assert.equal(released, 1)
   session.invalidate()
 })

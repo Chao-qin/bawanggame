@@ -77,7 +77,6 @@
     var tapMs = fb.tapMs || 240;
 
     var held = {};      // pointerId -> { ids: [], center, startCenter, okTimer, okDown }
-    var reps = {};      // pointerId -> { keyId: timerId }
     var captures = {};  // pointerId -> element used for pointer capture
     var pressedControls = {};
 
@@ -159,21 +158,6 @@
     function setDown(id, keyId, on) {
       var el = keyEl(keyId);
       if (el) el.classList.toggle("down", !!on);
-      var row = reps[id];
-      if (row && row[keyId]) { tclr(row[keyId]); delete row[keyId]; }
-    }
-
-    // ---------- 连发 ----------
-    function startRepeat(id, keyId) {
-      if (fb.keyRepeat === false || !fb.repeatDelay) return;
-        var code = buttons[keyId] || keyId;
-      var tick = function () {
-        var row = reps[id];
-        if (!row || !(keyId in row)) return;
-        input.repeat("pointer:" + id + ":" + (actionMap[keyId] || keyId), actionMap[keyId] || keyId);
-        row[keyId] = tset(tick, fb.repeatInterval || 100);
-      };
-      reps[id][keyId] = tset(tick, fb.repeatDelay);
     }
 
     // ---------- 命中测试 ----------
@@ -200,8 +184,9 @@
         var el = list[i];
         if (!el || !el.closest) continue;
         if (el.closest("#dpad")) continue;
-        var k = el.closest(".key");
-        if (k && k.id in buttons) return k;
+        var k = el.closest("[data-control-id]");
+        var controlId = k && (k.dataset ? k.dataset.controlId : k.id);
+        if (controlId && controlId !== "dpad" && (controlId in buttons || controlId in actionMap)) return k;
       }
       return null;
     }
@@ -238,7 +223,7 @@
         }
       }
       var key = keyAtPoint(x, y);
-      if (key) return { kind: "key", ids: [key.id], center: false };
+      if (key) return { kind: "key", ids: [(key.dataset && key.dataset.controlId) || key.id], center: false };
       return { kind: null, ids: [], center: false };
     }
 
@@ -260,8 +245,6 @@
           cur.okDown = true;
           tap(keyEl("ok"));
           press(code, id, sourceAt, pointerType);
-          if (!reps[id]) reps[id] = {};
-          startRepeat(id, "ok");
         }, okHoldMs());
         return;
       }
@@ -269,8 +252,6 @@
       cur.okDown = true;
       tap(keyEl("ok"));
       press(code, id, sourceAt, pointerType);
-      if (!reps[id]) reps[id] = {};
-      startRepeat(id, "ok");
     }
 
     function endOk(id, sourceAt, pointerType) {
@@ -310,8 +291,6 @@
         setDown(id, keyId, true);
         tap(keyEl(keyId));
         press(buttons[keyId], id, sourceAt, pointerType);
-        if (!reps[id]) reps[id] = {};
-        startRepeat(id, keyId);
       });
       cur.ids = want.slice();
       cur.center = !!next.center;
@@ -335,10 +314,6 @@
       (st0.ids || []).forEach(function (keyId) { setDown(id, keyId, false); release(buttons[keyId], id, sourceAt); });
       if (st0.okDown) { release(buttons.ok, id, sourceAt); st0.okDown = false; }
       delete held[id];
-      if (reps[id]) {
-        Object.keys(reps[id]).forEach(function (k) { tclr(reps[id][k]); });
-        delete reps[id];
-      }
     }
 
     function releaseAll() {

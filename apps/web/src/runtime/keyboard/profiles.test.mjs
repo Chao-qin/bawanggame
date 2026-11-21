@@ -113,3 +113,30 @@ test('saves and loads the migrated slot action override through storage', () => 
   assert.equal(values.has(STORAGE_KEY), true)
   assert.deepEqual(loadKeyboardConfig(storage).perGameOverrides, config.perGameOverrides)
 })
+
+test('materializes migrated side, number order, slot action, and D-pad rotation overrides', () => {
+  const profile = resolveProfile({
+    perGameOverrides: {
+      game: {
+        j2me: {
+          layoutId: 'landscape-split',
+          controlOverrides: {
+            dpadRotation: 'rotate-cw',
+            sideGroup: 'standard',
+            numberSlotOrder: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'star', 'pound'],
+            slotActions: { up: 'num1', num1: 'up' },
+          },
+        },
+      },
+    },
+  }, { runtime: 'j2me', orientation: 'landscape', gameId: 'game' })
+  const up = profile.layout.controls.find((control) => control.id === 'up')
+  const one = profile.layout.controls.find((control) => control.id === 'key-1')
+  const zero = profile.layout.controls.find((control) => control.id === 'key-0')
+  assert.equal(up.label, '←')
+  assert.equal(up.actionId, 'num1')
+  assert.equal(up.x > 0.6, true)
+  assert.equal(one.actionId, 'up')
+  assert.equal(one.x < 0.3, true)
+  assert.equal(zero.x, 0.06)
+})
