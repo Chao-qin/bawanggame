@@ -36,40 +36,40 @@ test('provides explicit Flash key and code pairs for every built-in key', () => 
   const expected = []
   for (let letter = 65; letter <= 90; letter += 1) {
     const code = `Key${String.fromCharCode(letter)}`
-    expected.push([`flash:${code}`, String.fromCharCode(letter + 32), code])
+    expected.push([`flash-key:${code}`, String.fromCharCode(letter + 32), code])
   }
-  for (let digit = 0; digit <= 9; digit += 1) expected.push([`flash:Digit${digit}`, String(digit), `Digit${digit}`])
+  for (let digit = 0; digit <= 9; digit += 1) expected.push([`flash-key:Digit${digit}`, String(digit), `Digit${digit}`])
   expected.push(
-    ['flash:Space', ' ', 'Space'],
-    ['flash:ArrowUp', 'ArrowUp', 'ArrowUp'],
-    ['flash:ArrowDown', 'ArrowDown', 'ArrowDown'],
-    ['flash:ArrowLeft', 'ArrowLeft', 'ArrowLeft'],
-    ['flash:ArrowRight', 'ArrowRight', 'ArrowRight'],
-    ['flash:Enter', 'Enter', 'Enter'],
-    ['flash:Backspace', 'Backspace', 'Backspace'],
-    ['flash:Tab', 'Tab', 'Tab'],
-    ['flash:Escape', 'Escape', 'Escape'],
-    ['flash:Delete', 'Delete', 'Delete'],
+    ['flash-key:Space', ' ', 'Space'],
+    ['flash-key:ArrowUp', 'ArrowUp', 'ArrowUp'],
+    ['flash-key:ArrowDown', 'ArrowDown', 'ArrowDown'],
+    ['flash-key:ArrowLeft', 'ArrowLeft', 'ArrowLeft'],
+    ['flash-key:ArrowRight', 'ArrowRight', 'ArrowRight'],
+    ['flash-key:Enter', 'Enter', 'Enter'],
+    ['flash-key:Backspace', 'Backspace', 'Backspace'],
+    ['flash-key:Tab', 'Tab', 'Tab'],
+    ['flash-key:Escape', 'Escape', 'Escape'],
+    ['flash-key:Delete', 'Delete', 'Delete'],
   )
   for (let functionKey = 1; functionKey <= 12; functionKey += 1) {
     const code = `F${functionKey}`
-    expected.push([`flash:${code}`, code, code])
+    expected.push([`flash-key:${code}`, code, code])
   }
   expected.push(
-    ['flash:ShiftLeft', 'Shift', 'ShiftLeft'],
-    ['flash:ControlLeft', 'Control', 'ControlLeft'],
-    ['flash:AltLeft', 'Alt', 'AltLeft'],
-    ['flash:Minus', '-', 'Minus'],
-    ['flash:Equal', '=', 'Equal'],
-    ['flash:BracketLeft', '[', 'BracketLeft'],
-    ['flash:BracketRight', ']', 'BracketRight'],
-    ['flash:Backslash', '\\', 'Backslash'],
-    ['flash:Semicolon', ';', 'Semicolon'],
-    ['flash:Quote', "'", 'Quote'],
-    ['flash:Comma', ',', 'Comma'],
-    ['flash:Period', '.', 'Period'],
-    ['flash:Slash', '/', 'Slash'],
-    ['flash:Backquote', '`', 'Backquote'],
+    ['flash-key:ShiftLeft', 'Shift', 'ShiftLeft'],
+    ['flash-key:ControlLeft', 'Control', 'ControlLeft'],
+    ['flash-key:AltLeft', 'Alt', 'AltLeft'],
+    ['flash-key:Minus', '-', 'Minus'],
+    ['flash-key:Equal', '=', 'Equal'],
+    ['flash-key:BracketLeft', '[', 'BracketLeft'],
+    ['flash-key:BracketRight', ']', 'BracketRight'],
+    ['flash-key:Backslash', '\\', 'Backslash'],
+    ['flash-key:Semicolon', ';', 'Semicolon'],
+    ['flash-key:Quote', "'", 'Quote'],
+    ['flash-key:Comma', ',', 'Comma'],
+    ['flash-key:Period', '.', 'Period'],
+    ['flash-key:Slash', '/', 'Slash'],
+    ['flash-key:Backquote', '`', 'Backquote'],
   )
 
   assert.deepEqual(Object.keys(FLASH_KEY_CATALOG), expected.map(([id]) => id))
@@ -99,6 +99,7 @@ test('migrates aliases according to the source meaning of back', () => {
   assert.equal(migrateActionId('digit-4', 'touchLayout'), 'num4')
   assert.equal(migrateActionId('back', 'touchLayout'), 'back')
   assert.equal(migrateActionId('back', 'config.keymap'), 'ret')
+  assert.equal(migrateActionId('back', 'config.keymap.back'), 'ret')
   assert.equal(migrateActionId('Escape', 'InputMapping.keyboard'), 'Escape')
   assert.equal(migrateActionId('not-known', 'touchLayout'), 'not-known')
 })
@@ -115,5 +116,15 @@ test('preserves unknown physical bindings as inactive records', () => {
   assert.deepEqual(
     migratePhysicalBinding({ control: 'Escape', actionId: 'back' }),
     { control: 'Escape', actionId: 'back', active: true },
+  )
+  assert.deepEqual(
+    migratePhysicalBinding({ control: 'KeyQ', actionId: 'custom:mine' }, {
+      'custom:mine': createCustomFlashAction('mine', 'q', 'KeyQ'),
+    }),
+    { control: 'KeyQ', actionId: 'custom:mine', active: true },
+  )
+  assert.deepEqual(
+    migratePhysicalBinding({ control: 'KeyW', actionId: 'custom:missing' }, {}),
+    { control: 'KeyW', actionId: null, active: false },
   )
 })

@@ -83,7 +83,7 @@ const flashKeys = [
 ]
 
 export const FLASH_KEY_CATALOG = Object.freeze(Object.fromEntries(flashKeys.map(([code, key]) => {
-  const actionId = `flash:${code}`
+  const actionId = `flash-key:${code}`
   const payload = Object.freeze({ actionId, key, code, runtime: 'flash' })
   entries[actionId] = freezeRecord({
     actionId,
@@ -143,12 +143,12 @@ export function createCustomFlashAction(stableId, key, code) {
   })
 }
 
-export function migratePhysicalBinding(binding) {
+export function migratePhysicalBinding(binding, catalog = binding?.catalog) {
   const control = binding?.control
   const actionId = migrateActionId(binding?.actionId, 'physical')
   if (typeof control !== 'string' || !control || !isActionSupported(actionId, 'j2me') &&
     !isActionSupported(actionId, 'mrp') && !isActionSupported(actionId, 'flash') &&
-    !binding?.catalog?.[actionId]) {
+    !catalog?.[actionId]) {
     return { control, actionId: null, active: false }
   }
   return { control, actionId, active: true }
