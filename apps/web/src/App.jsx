@@ -663,6 +663,7 @@ function FilePicker({ children, fill, ...inputProps }) {
 
 function FlashStore({ onRefreshLibrary }) {
   const local = useLocalFlash(true)
+  const archiveOnline = !isEmbeddedHost() || Boolean(mobileApiBase)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [url, setUrl] = useState('')
@@ -672,35 +673,45 @@ function FlashStore({ onRefreshLibrary }) {
   const [error, setError] = useState('')
   const [archiveQuery, setArchiveQuery] = useState('')
   const [archiveGames, setArchiveGames] = useState([])
-  const [archiveLoading, setArchiveLoading] = useState(false)
+  const [archiveLoading, setArchiveLoading] = useState(archiveOnline)
   const [archiveError, setArchiveError] = useState('')
+  const archiveRequest = useRef(0)
   const added = useMemo(() => new Set(local.games.map((game) => game.dedupeKey)), [local.games])
 
   async function searchArchive(value = archiveQuery) {
+    if (!archiveOnline) return
+    const requestId = ++archiveRequest.current
     setArchiveLoading(true)
     setArchiveError('')
     try {
-      const response = await fetch(`/__flash/catalog?query=${encodeURIComponent(value.trim())}`)
+      const response = await fetch(apiPath(`/__flash/catalog?query=${encodeURIComponent(value.trim())}`))
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
-      setArchiveGames(data.games || [])
+      if (requestId === archiveRequest.current) setArchiveGames(data.games || [])
     } catch (cause) {
-      setArchiveGames([])
-      setArchiveError('Flash 保存计划暂时不可用：' + (cause.message || cause))
+      if (requestId === archiveRequest.current) {
+        setArchiveGames([])
+        setArchiveError('Flash 保存计划暂时不可用：' + (cause.message || cause))
+      }
     } finally {
-      setArchiveLoading(false)
+      if (requestId === archiveRequest.current) setArchiveLoading(false)
     }
   }
+
+  useEffect(() => {
+    searchArchive('')
+    return () => { archiveRequest.current += 1 }
+  }, [])
 
   async function addArchiveGame(game) {
     setBusy(`archive:${game.code}`)
     setError('')
     setMessage('')
     try {
-      const detailResponse = await fetch(`/__flash/detail/${encodeURIComponent(game.code)}`)
+      const detailResponse = await fetch(apiPath(`/__flash/detail/${encodeURIComponent(game.code)}`))
       if (!detailResponse.ok) throw new Error(`详情获取失败（HTTP ${detailResponse.status}）`)
       const detail = (await detailResponse.json()).game || game
-      await addFromUrl(`/__flash/download/${encodeURIComponent(game.code)}`, {
+      await addFromUrl(apiPath(`/__flash/download/${encodeURIComponent(game.code)}`), {
         name: detail.name,
         description: `Flash 保存计划 · SHA-256 ${detail.sha256 || '未提供'}`,
       })
@@ -763,44 +774,44 @@ function FlashStore({ onRefreshLibrary }) {
   }
 
   return <section className="storePage">
-    <div className="storeHero">
-      <div><h2 className="storeHeroTitle">Flash 游戏商城</h2><p className="storeHeroText">游戏下载到当前设备的本机存储，服务器不会保存你的游戏文件。</p></div>
-      <Button className="ghostButton" size="small" fill="outline" type="button" onClick={local.refresh} disabled={local.loading}>刷新本机库</Button>
+    <div className="storeHero flashStoreHero">
+      <div><h2 className="storeHeroTitle">Flash 游戏商城</h2><p className="storeHeroText">搜索并加入可在 Ruffle 中运行的 Flash 游戏。</p></div>
+      <Button className="ghostButton" size="small" fill="outline" type="button" onClick={() => searchArchive()} disabled={!archiveOnline || archiveLoading}>刷新目录</Button>
     </div>
     {(local.error || error) && <div className="status statusError" role="alert">{error || local.error} <Button className="inlineAction" fill="none" type="button" onClick={local.refresh}>重试</Button></div>}
     {message && <div className="status statusSuccess" role="status">{message}</div>}
-    <form className="flashImportPanel" onSubmit={submit}>
-      <h3>添加 Flash 游戏</h3>
-      <p>输入允许跨域读取的 SWF 直链，或选择本地文件。</p>
-      <div className="flashImportFields">
-        <label>游戏名称<Input className="field" placeholder="输入游戏名称" value={name} onChange={setName} aria-required="true" /></label>
-        <label>SWF 直链<Input className="field" type="url" placeholder="https://…" value={url} onChange={setUrl} /></label>
-        <label>游戏说明<TextArea className="field flashDescription" placeholder="选填" rows={2} value={description} onChange={setDescription} /></label>
-        <FilePicker id="flash-file-input" accept=".swf,application/x-shockwave-flash" onChange={(event) => setFile(event.target.files?.[0] || null)}>
-          {file ? file.name : '选择本地 SWF'}
-        </FilePicker>
-        <Button className="downloadButton" color="primary" size="small" type="submit" disabled={busy !== '' || local.loading}>{busy === 'custom' ? '加入中…' : '加入本机'}</Button>
-      </div>
-    </form>
-    <section className="flashImportPanel">
+    <section className="flashArchiveSection">
       <div className="sectionHeading">
-        <div><h3>Flash 保存计划</h3><p>搜索公开保存的 Flash 原件，并导入本机 Flash 库。</p></div>
+        <div><h3>游戏目录</h3><p>从 Flash 保存计划查找游戏并加入本机库。</p></div>
       </div>
-      <form className="flashImportFields" onSubmit={(event) => { event.preventDefault(); searchArchive() }}>
-        <label>搜索作品<Input className="field" placeholder="例如：造梦西游" value={archiveQuery} onChange={setArchiveQuery} /></label>
-        <Button className="downloadButton" color="primary" size="small" type="submit" disabled={archiveLoading}>{archiveLoading ? '搜索中…' : '搜索保存计划'}</Button>
-      </form>
+      {archiveOnline ? <form className="flashImportFields" onSubmit={(event) => { event.preventDefault(); searchArchive() }}>
+        <label>搜索作品<Input className="field" type="search" placeholder="搜索 Flash 游戏" value={archiveQuery} onChange={setArchiveQuery} /></label>
+        <Button className="downloadButton" color="primary" size="small" type="submit" disabled={archiveLoading}>{archiveLoading ? '搜索中…' : '搜索'}</Button>
+      </form> : <div className="status" role="status">当前安装包未配置在线商城服务。</div>}
       {archiveError && <div className="status statusError" role="alert">{archiveError}</div>}
+      {archiveLoading && <div className="status" role="status"><DotLoading /> 正在加载游戏目录…</div>}
+      {archiveOnline && !archiveLoading && !archiveError && archiveGames.length === 0 && <div className="emptyPanel"><strong>{archiveQuery.trim() ? '没有找到匹配的游戏' : '目录暂无游戏'}</strong><span>尝试其他关键词，或稍后刷新目录。</span></div>}
       {archiveGames.length > 0 && <div className="storeGrid archiveGrid">{archiveGames.map((game) => {
         const isAdded = added.has(`url:/__flash/download/${game.code}`) || local.games.some((item) => item.sourceUrl.includes(`/__flash/download/${game.code}`))
         return <Card className="storeCard" bodyClassName="storeCardBody" key={game.code}>
-          <div className="storeIcon">{game.name.charAt(0)}</div>
-          <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">Flash 保存计划 · {game.size ? formatSize(game.size) : '大小未知'}</p><span className="storeInfoDesc">馆藏编号 {game.code}</span></div>
-          <Button className="downloadButton" color="primary" size="small" type="button" onClick={() => addArchiveGame(game)} disabled={busy !== '' || local.loading}>{busy === `archive:${game.code}` ? '下载中…' : isAdded ? '已加入' : '加入本机'}</Button>
+          <div className="flashCover"><img src={game.coverUrl || undefined} alt="" loading="lazy" onError={(event) => { event.currentTarget.hidden = true }} /><span aria-hidden="true">{game.name.charAt(0)}</span></div>
+          <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">Flash 保存计划</p><span className="storeInfoDesc">{game.code}</span></div>
+          <Button className="downloadButton" color="primary" size="small" type="button" onClick={() => addArchiveGame(game)} disabled={busy !== '' || local.loading}>{busy === `archive:${game.code}` ? '下载中…' : isAdded ? '已加入' : '加入'}</Button>
         </Card>
       })}</div>}
     </section>
-    <div className="storeGrid">{FLASH_GAMES.map((game) => {
+    <details className="flashAdvanced">
+      <summary>添加本地或直链 SWF</summary>
+      <p>直链需要允许跨域下载；本地文件只保存在当前设备。</p>
+      <form className="flashImportFields" onSubmit={submit}>
+        <label>游戏名称<Input className="field" placeholder="输入游戏名称" value={name} onChange={setName} aria-required="true" /></label>
+        <label>SWF 直链<Input className="field" type="url" placeholder="https://…" value={url} onChange={setUrl} /></label>
+        <label>游戏说明<TextArea className="field flashDescription" placeholder="选填" rows={2} value={description} onChange={setDescription} /></label>
+        <FilePicker id="flash-file-input" accept=".swf,application/x-shockwave-flash" onChange={(event) => setFile(event.target.files?.[0] || null)}>{file ? file.name : '选择本地 SWF'}</FilePicker>
+        <Button className="downloadButton" color="primary" size="small" type="submit" disabled={busy !== '' || local.loading}>{busy === 'custom' ? '加入中…' : '加入本机'}</Button>
+      </form>
+    </details>
+    <section className="flashBundledSection"><h3>内置游戏</h3><div className="storeGrid">{FLASH_GAMES.map((game) => {
       const key = `catalog:${game.catalogId}`
       const isAdded = added.has(key)
       return <Card className="storeCard" bodyClassName="storeCardBody" key={game.file}>
@@ -808,7 +819,7 @@ function FlashStore({ onRefreshLibrary }) {
         <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">内置目录 · {formatSize(game.size)}</p><span className="storeInfoDesc">{game.desc}</span></div>
         <Button className="downloadButton" color="primary" size="small" type="button" onClick={() => addBundledGame(game)} disabled={busy !== '' || local.loading}>{busy === game.file ? '下载中…' : isAdded ? '已加入' : '加入本机'}</Button>
       </Card>
-    })}</div>
+    })}</div></section>
   </section>
 }
 
@@ -977,6 +988,9 @@ function Player({ game, onBack, nativeBackSignal }) {
       else window.ScreenSetup?.unlockOrientation?.()
       requestRefit(true)
       setIsFullscreen(active)
+      if (active && game.kind === 'flash') {
+        playerRef.current?.querySelector('ruffle-player')?.focus({ preventScroll: true })
+      }
     }
     syncFullscreen()
     const onViewportResize = () => { if (!refitting) requestRefit() }
@@ -1050,7 +1064,7 @@ function Player({ game, onBack, nativeBackSignal }) {
     onBack()
   }
   return (
-    <div ref={playerRef} className={`player${game.kind === 'j2me' ? ' j2mePlayer' : ''}${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
+    <div ref={playerRef} className={`player${game.kind === 'j2me' ? ' j2mePlayer' : ''}${game.kind === 'flash' ? ' flashPlayer' : ''}${game.kind === 'flash' && isFullscreen ? ' flashPlayerFullscreen' : ''}${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
       <div className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <Button className="runtimeToolbarToggle" onClick={() => setToolbarChoice({ landscape: toolbarLandscape, collapsed: !toolbarCollapsed })} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}><MoreOutline aria-hidden="true" /></Button>
         {!toolbarCollapsed && <div className="runtimeToolbarContent">

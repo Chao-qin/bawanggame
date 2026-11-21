@@ -8,6 +8,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path'
 import { URL } from 'node:url'
 import { WebSocketServer, WebSocket } from 'ws'
 import yauzl from 'yauzl'
+import { parseFlashArchiveDetail, parseFlashArchiveGames, type FlashArchiveGame } from './flashCatalog.js'
 
 const PROJECT = resolve(import.meta.dirname, '../../..')
 const PORT = Number(process.env.PORT ?? 8080)
@@ -31,7 +32,6 @@ const MIME: Record<string, string> = {
 type StoreGame = { id: string; name: string; plays: number }
 type StoreCatalog = { games: StoreGame[]; page: number; pages: number; total: number }
 const storeCache = new Map<string, { expires: number; value: StoreCatalog }>()
-type FlashArchiveGame = { code: string; name: string; size: number; sha256: string; detailUrl: string; downloadUrl: string }
 const flashArchiveCache = new Map<string, { expires: number; value: FlashArchiveGame[] }>()
 
 function json(res: ServerResponse, status: number, value: unknown) {
@@ -49,33 +49,10 @@ function htmlText(value: string) {
   return value.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).trim()
 }
 
-function decodeHtml(value: string) {
-  return htmlText(value.replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16))))
-}
-
 async function flashHomesPage(path: string) {
   const response = await fetch(new URL(path, FLASH_HOMES_BASE), { signal: AbortSignal.timeout(15_000) })
   if (!response.ok) throw new Error(`flash.homes HTTP ${response.status}`)
   return response.text()
-}
-
-function parseFlashArchiveGames(html: string): FlashArchiveGame[] {
-  const games: FlashArchiveGame[] = []
-  for (const match of html.matchAll(/href="\/flash\/([A-Z0-9-]+)"[\s\S]*?<span[^>]*data-work-title[^>]*>([\s\S]*?)<\/span>/gi)) {
-    const code = match[1]
-    const name = decodeHtml(match[2].replace(/<mark>|<\/mark>/gi, ''))
-    games.push({ code, name, size: 0, sha256: '', detailUrl: `/flash/${code}`, downloadUrl: `/flash/${code}/download` })
-  }
-  return games
-}
-
-function parseFlashArchiveDetail(html: string, code: string): FlashArchiveGame {
-  const props = html.match(/component-url="[^"]*PlayerStage[^>]*props="([^"]+)"/i)?.[1] ?? ''
-  const decoded = props.replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-  const title = decoded.match(/"title"[^}]*?"([^"}]+)"/)?.[1] ?? decodeHtml(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ?? code)
-  const size = Number(decoded.match(/"size"\s*:\s*\[0,\s*(\d+)\]/)?.[1] ?? html.match(/contentSize":"(\d+)"/)?.[1] ?? 0)
-  const sha256 = decoded.match(/"sha256"[^}]*?"([0-9a-f]{64})"/)?.[1] ?? html.match(/propertyID":"sha256","value":"([0-9a-f]{64})"/)?.[1] ?? ''
-  return { code, name: decodeHtml(title), size, sha256, detailUrl: `/flash/${code}`, downloadUrl: `/flash/${code}/download` }
 }
 
 async function flashArchiveCatalog(query: string) {
