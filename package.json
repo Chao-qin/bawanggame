@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "packageManager": "pnpm@10.20.0",
   "scripts": {
-    "dev": "pnpm --filter @xiaochao/web dev",
+    "dev": "pnpm --parallel --filter @xiaochao/web --filter @xiaochao/server dev",
     "build": "pnpm --filter @xiaochao/web build",
     "start": "pnpm --filter @xiaochao/server start",
     "test": "pnpm --filter @xiaochao/server test",
