@@ -69,6 +69,14 @@ test('releaseAll invokes registered runtime input release callbacks', () => {
   session.invalidate()
 })
 
+test('invalidate releases registered runtime input before disabling the session', () => {
+  const session = createKeyboardSession({ timeout: 100 })
+  let released = 0
+  session.registerInputRelease(() => { released += 1 })
+  session.invalidate()
+  assert.equal(released, 1)
+})
+
 test('profile refresh releases held inputs and keeps the registered surface active', () => {
   const config = createEmptyKeyboardConfig()
   const session = createKeyboardSession({ timeout: 100, config })

@@ -106,8 +106,8 @@ export function createKeyboardSession(options = {}) {
     },
     invalidate() {
       if (invalid) return
-      invalid = true
       session.releaseAll()
+      invalid = true
       surface?.setAttribute?.('aria-disabled', 'true')
       surface = null
       pressedListeners.clear()

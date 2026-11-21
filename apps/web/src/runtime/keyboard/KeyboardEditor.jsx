@@ -80,8 +80,12 @@ export function KeyboardEditor({ gameId, onClose }) {
   const save = () => {
     if (!layout || warnings.some((warning) => warning.type === 'invalid-geometry')) return announce('布局几何无效，无法保存')
     const next = clone(config)
-    next.customLayouts[layout.id] = layout
-    next.profileAssignments[profileKey] = { layoutId: layout.id, themeId: resolved.themeId }
+    const builtIn = Boolean(BUILTIN_LAYOUTS[layout.id])
+    const savedLayout = builtIn
+      ? cloneLayoutForEditing(layout, { id: `${layout.id}-custom-${Date.now()}` })
+      : layout
+    next.customLayouts[savedLayout.id] = savedLayout
+    next.profileAssignments[profileKey] = { layoutId: savedLayout.id, themeId: resolved.themeId }
     if (commitConfig(next)) {
       setDirty(false)
       announce('键盘布局已保存')

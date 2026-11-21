@@ -81,6 +81,7 @@
   function bindTouchpad() {
     var keyboardSession = window.__XIAOCHAO_KEYBOARD_SESSION__;
     var surface = keyboardSession && keyboardSession.getSurface && keyboardSession.getSurface();
+    if (!surface || window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__) return;
     var buttons = {};
     var actionMap = {};
     var controls = keyboardSession && keyboardSession.getProfile && keyboardSession.getProfile().layout.controls || [];

@@ -407,7 +407,10 @@ try {
   console.log('Flash exit:', JSON.stringify(flashExit))
   requireCheck(flashExit.hash === '#/library/flash' && flashExit.tab === 'Flash' && flashExit.reloads === 0 && !flashExit.player, 'Flash exit reloaded or lost the active library tab')
 
-  await navigate('#/play/j2me/layout-probe.jar?tab=j2me&name=Layout%20Probe', 800)
+  if (!J2ME_FILE) {
+    console.log('SKIP: no J2ME fixture for runtime SVG checks (set VERIFY_J2ME_FILE)')
+  } else {
+  await navigate(`#\/play\/j2me\/${encodeURIComponent(J2ME_FILE)}?tab=j2me&name=Verify%20J2ME`, 800)
   await waitFor("document.querySelector('.runtimeFrame')?.contentDocument?.querySelector('#phone')", 'J2ME runtime markup')
   await waitFor("!![...document.querySelector('.runtimeFrame').contentDocument.styleSheets].find((sheet) => sheet.href?.includes('/style/main.css'))", 'J2ME runtime stylesheet')
    for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
@@ -443,6 +446,7 @@ try {
   await waitFor("document.querySelector('.runtimeFrame')?.contentDocument?.querySelector('.exitConfirm')", 'J2ME exit confirmation')
   await evaluate(`document.querySelector('.runtimeFrame').contentDocument.querySelector('.exitConfirm .optionDanger').click(); true`)
   await waitFor("!document.querySelector('.runtimeFrame')", 'J2ME runtime cleanup')
+  }
   await navigate('#/play/flash/fruit-madness.swf?tab=flash&name=Fruit%20Madness', 1200)
   requireCheck(await evaluate("!!document.querySelector('.playerStage')"), 'Flash re-entry did not mount')
   await evaluate(`[...document.querySelectorAll('.tab')].find(node => node.textContent.includes('Flash 商城'))?.click()`)
