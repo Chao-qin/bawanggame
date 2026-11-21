@@ -9,11 +9,27 @@ import {
   normalizeLayout,
   resolveProfile,
 } from './profiles.js'
+import {
+  STORAGE_KEY,
+  createEmptyKeyboardConfig,
+  loadKeyboardConfig,
+  saveKeyboardConfig,
+} from './storage.js'
 
 test('provides immutable built-ins with an exact 72-key game QWERTY inventory', () => {
   const qwerty = BUILTIN_LAYOUTS['qwerty-72']
   assert.equal(qwerty.controls.length, 72)
   assert.equal(new Set(qwerty.controls.map((control) => control.id)).size, 72)
+  const expectedCodes = [
+    ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => `flash-key:Key${letter}`),
+    ...'0123456789'.split('').map((digit) => `flash-key:Digit${digit}`),
+    ...['Minus', 'Equal', 'BracketLeft', 'BracketRight', 'Backslash', 'Semicolon', 'Quote', 'Comma', 'Period', 'Slash', 'Backquote'].map((code) => `flash-key:${code}`),
+    ...['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].map((code) => `flash-key:${code}`),
+    ...['Space', 'Enter', 'Backspace', 'Tab', 'Escape', 'ShiftLeft', 'ControlLeft', 'AltLeft'].map((code) => `flash-key:${code}`),
+    ...Array.from({ length: 12 }, (_, index) => `flash-key:F${index + 1}`),
+    'flash-key:Delete',
+  ]
+  assert.deepEqual(qwerty.controls.map((control) => control.actionId), expectedCodes)
   assert.ok(Object.isFrozen(qwerty))
   assert.ok(Object.isFrozen(qwerty.controls))
   assert.equal(BUILTIN_LAYOUTS['landscape-split'].target.orientation, 'landscape')
@@ -28,7 +44,7 @@ test('normalizes controls and rejects non-finite or non-positive geometry', () =
     schemaVersion: 1,
     name: 'Custom',
     target: { runtime: 'flash', orientation: 'landscape' },
-    controls: [{ id: 'k', actionId: 'flash:KeyA', label: 'A', shape: 'rounded-rect', visible: true, x: 0.1, y: 0.2, width: 0.3, height: 0.1, rotation: 0, z: 2 }],
+    controls: [{ id: 'k', actionId: 'flash-key:KeyA', label: 'A', shape: 'rounded-rect', visible: true, x: 0.1, y: 0.2, width: 0.3, height: 0.1, rotation: 0, z: 2 }],
   }).controls[0]
   assert.deepEqual(
     { x: control.x, y: control.y, width: control.width, height: control.height, z: control.z },
@@ -75,4 +91,25 @@ test('clears explicit and per-game overrides independently', () => {
   assert.ok(noExplicit.perGameOverrides.game.j2me)
   const noGame = clearPerGameOverride(noExplicit, 'game', 'j2me')
   assert.equal(noGame.perGameOverrides.game, undefined)
+})
+
+test('saves and loads the migrated slot action override through storage', () => {
+  const values = new Map()
+  const storage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null },
+    setItem(key, value) { values.set(key, String(value)) },
+  }
+  const config = createEmptyKeyboardConfig()
+  config.perGameOverrides.game = {
+    j2me: {
+      layoutId: 'landscape-split',
+      controlOverrides: {
+        dpadRotation: 'rotate-cw',
+        slotActions: { up: 'up', down: 'down', left: 'left', right: 'right' },
+      },
+    },
+  }
+  assert.equal(saveKeyboardConfig(config, storage), true)
+  assert.equal(values.has(STORAGE_KEY), true)
+  assert.deepEqual(loadKeyboardConfig(storage).perGameOverrides, config.perGameOverrides)
 })

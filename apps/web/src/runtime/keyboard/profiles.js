@@ -38,7 +38,7 @@ const qwertyControls = qwertyCodes.map(([code, label], index) => {
   const column = index % columns
   const width = code === 'Space' ? 0.24 : code.endsWith('Left') ? 0.09 : 0.065
   const x = Math.min(0.96 - width, 0.02 + column * 0.081)
-  return control(`flash-${code}`, `flash:${code}`, label, x, 0.08 + row * 0.14, width, 0.105, 'rounded-rect', { z: index })
+  return control(`flash-${code}`, `flash-key:${code}`, label, x, 0.08 + row * 0.14, width, 0.105, 'rounded-rect', { z: index })
 })
 
 const dpadControls = [
