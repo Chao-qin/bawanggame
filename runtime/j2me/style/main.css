@@ -1696,6 +1696,8 @@ body[data-dpad-layout="rotate-ccw"] #left { grid-area: 3 / 2; }
 
 body.runtime-active[data-orientation="landscape"][data-side-layout="swapped"] #numpad { grid-column: 3 !important; }
 body.runtime-active[data-orientation="landscape"][data-side-layout="swapped"] #nav { grid-column: 1 !important; }
+body.runtime-active[data-orientation="landscape"][data-side-layout="standard"] #numpad { grid-column: 1 !important; }
+body.runtime-active[data-orientation="landscape"][data-side-layout="standard"] #nav { grid-column: 3 !important; }
 
 .layout-note {
   margin: 0;
