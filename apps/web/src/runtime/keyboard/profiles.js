@@ -158,13 +158,13 @@ export function resolveProfile(config = {}, { runtime, orientation, gameId } = {
   const key = `${validRuntime}:${validOrientation}`
   const explicit = config.profileAssignments?.[key]
   const legacy = gameId != null ? config.perGameOverrides?.[gameId]?.[validRuntime] : null
-  const chosen = explicit || legacy || DEFAULT_PROFILES[validRuntime][validOrientation]
+  const chosen = explicit || DEFAULT_PROFILES[validRuntime][validOrientation]
   const layoutId = chosen?.layoutId
   const themeId = chosen?.themeId || DEFAULT_PROFILES[validRuntime][validOrientation].themeId
   const layouts = { ...BUILTIN_LAYOUTS, ...(config.customLayouts || {}) }
   const layout = layouts[layoutId] || BUILTIN_LAYOUTS[DEFAULT_PROFILES[validRuntime][validOrientation].layoutId]
   const theme = BUILTIN_THEMES[themeId] || BUILTIN_THEMES.classic
-  const controlOverrides = legacy?.controlOverrides || null
+  const controlOverrides = !explicit ? legacy?.controlOverrides || null : null
   const resolvedLayout = controlOverrides ? applyControlOverrides(layout, controlOverrides) : layout
   return { runtime: validRuntime, orientation: validOrientation, layoutId: layout.id, themeId: theme.id, layout: resolvedLayout, theme, source: explicit ? 'explicit' : legacy ? 'per-game' : 'default' }
 }
@@ -178,6 +178,12 @@ function applyControlOverrides(layout, overrides) {
     mirror: { up: '↑', right: '←', down: '↓', left: '→' },
     'rotate-cw': { up: '←', right: '↑', down: '→', left: '↓' },
     'rotate-ccw': { up: '→', right: '↓', down: '←', left: '↑' },
+  }[overrides.dpadRotation] || null
+  const dpadActions = {
+    standard: { up: 'up', right: 'right', down: 'down', left: 'left' },
+    mirror: { up: 'up', right: 'left', down: 'down', left: 'right' },
+    'rotate-cw': { up: 'left', right: 'up', down: 'right', left: 'down' },
+    'rotate-ccw': { up: 'right', right: 'down', down: 'left', left: 'up' },
   }[overrides.dpadRotation] || null
   const sideGroup = overrides.sideGroup
   const numberControls = next.controls.filter((control) => /^key-(?:[0-9]|star|pound)$/.test(control.id))
@@ -198,6 +204,10 @@ function applyControlOverrides(layout, overrides) {
     if (action) control.actionId = action
     if (['up', 'down', 'left', 'right'].includes(control.id)) {
       if (dpadLabels) control.label = dpadLabels[control.id]
+      if (dpadActions) {
+        const mappedDirection = dpadActions[control.id]
+        control.actionId = actions[mappedDirection] || mappedDirection
+      }
       if (sideGroup === 'standard') control.x += 0.62
     }
   })

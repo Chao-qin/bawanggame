@@ -5,9 +5,10 @@ import {
 } from './editor-model.js'
 import { BUILTIN_LAYOUTS, BUILTIN_THEMES, DEFAULT_PROFILES, resolveProfile } from './profiles.js'
 import { loadKeyboardConfig, saveKeyboardConfig } from './storage.js'
+import { ACTION_IDS, isActionSupported } from './actions.js'
 
 const profiles = ['flash:portrait', 'flash:landscape', 'j2me:portrait', 'j2me:landscape', 'mrp:portrait', 'mrp:landscape']
-const actions = ['up', 'down', 'left', 'right', 'ok', 'choice', 'back', 'ret', 'clear', 'star', 'pound', ...Array.from({ length: 10 }, (_, i) => `num${i}`)]
+const actions = ACTION_IDS
 const clone = (value) => JSON.parse(JSON.stringify(value))
 const announce = (text) => (typeof window !== 'undefined' && window.dispatchEvent(new CustomEvent('xiaochao:keyboard-editor-status', { detail: text })))
 
@@ -61,6 +62,7 @@ export function KeyboardEditor({ gameId, onClose }) {
 
   const warnings = layout ? getLayoutWarnings(layout, { emulatorDisplay: { x: .26, y: .16, width: .48, height: .38 }, safeArea: { x: .04, y: .04, width: .92, height: .92 } }) : []
   const selectedControl = layout?.controls.find((control) => control.id === selected)
+  const availableActions = actions.filter((actionId) => isActionSupported(actionId, runtime))
   const mutate = (next) => { setLayout(next); setDirty(true) }
   const commitConfig = (next) => {
     if (!saveKeyboardConfig(next)) return false
@@ -163,14 +165,17 @@ export function KeyboardEditor({ gameId, onClose }) {
         <Button label="隐藏或显示控件" onActivate={() => mutate(hideControl(layout, selected))}>显隐</Button>
         <Button label="上移层级" onActivate={() => mutate(reorderControl(layout, selected, selectedControl.z + 1))}>上移</Button>
         <Button label="下移层级" onActivate={() => mutate(reorderControl(layout, selected, selectedControl.z - 1))}>下移</Button>
-        <Button label="更换动作" onActivate={() => { const index = actions.indexOf(selectedControl.actionId); mutate(reassignAction(layout, selected, actions[(index + 1) % actions.length])) }}>动作</Button>
+        <Button label="更换动作" onActivate={() => { const index = availableActions.indexOf(selectedControl.actionId); mutate(reassignAction(layout, selected, availableActions[(index + 1) % availableActions.length])) }}>动作</Button>
       </>}
     </g>
     <g className="keyboardEditorCommands" aria-label="编辑命令">
       <Button label="保存布局" onActivate={save}>保存</Button><Button label="放弃更改" onActivate={() => { setLayout(clone(resolved.layout)); setDirty(false) }}>放弃</Button>
       <Button label="恢复默认" onActivate={restore}>恢复</Button><Button label="清除显式配置" onActivate={clearExplicit}>清显式</Button>
       <Button label="清除迁移覆盖" onActivate={clearMigrated}>清迁移</Button>
-      <Button label="添加控件" onActivate={() => mutate(addControl(layout, { id: `custom-${layout.controls.length + 1}`, actionId: 'custom:control', label: '+', x: .42, y: .62, width: .08, height: .08, z: layout.controls.length }))}>添加</Button>
+      <Button label="添加控件" onActivate={() => {
+        const actionId = availableActions[0] || 'ok'
+        mutate(addControl(layout, { id: `custom-${layout.controls.length + 1}`, actionId, label: '+', x: .42, y: .62, width: .08, height: .08, z: layout.controls.length }))
+      }}>添加</Button>
       <Button label="关闭编辑器" onActivate={onClose}>关闭</Button>
     </g>
   </svg>

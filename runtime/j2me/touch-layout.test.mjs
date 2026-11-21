@@ -112,16 +112,44 @@ test('keeps a valid legacy source until the versioned envelope write succeeds', 
   assert.equal(events.at(-1).detail.profile.gameId, 'game-1')
 })
 
-test('retains unsupported legacy action data without writing a defaulted override', () => {
-  const source = { actions: { choice: 'unsupported-action' } }
+test('migrates supported fields, backs up unsupported fields, then clears source', () => {
+  const source = { dpad: 'mirror', sides: 'unsupported-side', actions: { choice: 'ok', num1: 'up', future: 'custom' } }
   const legacy = new Map([['game-unsupported', source]])
-  let writes = 0
+  let saved
   const profileStorage = {
-    update() { writes++; return true },
+    update(callback) {
+      const next = callback({ perGameOverrides: {}, migrationBackups: [] })
+      saved = next
+      return true
+    },
   }
   const { layout } = createLayout(legacy, profileStorage)
   const adapter = layout.forGame('game-unsupported', 'j2me')
-  assert.equal(adapter.migrate(), false)
-  assert.equal(writes, 0)
-  assert.equal(legacy.get('game-unsupported'), source)
+  assert.equal(adapter.migrate(), true)
+  assert.equal(legacy.has('game-unsupported'), false)
+  const override = saved.perGameOverrides['game-unsupported'].j2me
+  assert.equal(override.controlOverrides.dpadRotation, 'mirror')
+  assert.equal(override.controlOverrides.slotActions.choice, 'ok')
+  assert.equal(override.controlOverrides.slotActions.num1, 'up')
+  assert.equal(override.controlOverrides.slotActions.num2, 'num2')
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.migrationBackups[0].record)), source)
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.migrationBackups[0].unsupported)), {
+    sides: 'unsupported-side',
+    'actions.future': 'custom',
+  })
+})
+
+test('rotated d-pad maps displayed sectors to delivered logical directions', () => {
+  const { layout } = createLayout()
+  const migrated = layout.migrateLegacy({ dpad: 'rotate-cw' }, 'j2me')
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(migrated.override.controlOverrides.slotActions)),
+    {
+      up: 'up', right: 'right', down: 'down', left: 'left', ok: 'ok',
+      choice: 'choice', back: 'back', ret: 'ret', clear: 'clear',
+      star: 'star', pound: 'pound',
+      num0: 'num0', num1: 'num1', num2: 'num2', num3: 'num3', num4: 'num4',
+      num5: 'num5', num6: 'num6', num7: 'num7', num8: 'num8', num9: 'num9',
+    },
+  )
 })

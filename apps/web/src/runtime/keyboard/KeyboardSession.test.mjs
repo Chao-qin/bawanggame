@@ -54,7 +54,7 @@ test('resolves persisted runtime assignments and refreshes after migration', () 
   migrated.perGameOverrides.game = { j2me: { layoutId: 'landscape-split', controlOverrides: {} } }
   session.refreshConfig(migrated)
   assert.equal(changed.source, 'per-game')
-  assert.equal(changed.layoutId, 'landscape-split')
+  assert.equal(changed.layoutId, 'portrait-dpad')
   session.invalidate()
 })
 

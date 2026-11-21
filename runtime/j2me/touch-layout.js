@@ -23,6 +23,10 @@
   function validDpad(value) { return D_PAD_VISUAL[value] ? value : DEFAULT.dpad; }
   function validSides(value) { return value === "standard" || value === "swapped" ? value : DEFAULT.sides; }
   function keyId(value) { return value === "*" ? "star" : value === "#" ? "pound" : String(value); }
+  function actionSlot(value) {
+    var match = /^(?:num)?([0-9])$/.exec(value);
+    return match ? "num" + match[1] : value;
+  }
 
   function normalize(value) {
     var source = value && typeof value === "object" ? value : {};
@@ -36,8 +40,10 @@
     var rawActions = source.actions && typeof source.actions === "object" ? source.actions : {};
     ACTION_SLOTS.forEach(function (slot) {
       var fallback = DEFAULT_ACTIONS[slot] || slot;
-      var action = String(rawActions[slot] || fallback);
-      if (ACTIONS.indexOf(action) < 0) action = DEFAULT_ACTIONS[slot];
+      var numeric = /^num([0-9])$/.exec(slot);
+      var legacyDisplaySlot = numeric ? numeric[1] : slot;
+      var action = String(rawActions[slot] || rawActions[actionSlot(slot)] || rawActions[legacyDisplaySlot] || fallback);
+      if (ACTIONS.indexOf(action) < 0) action = fallback;
       if (!action) action = fallback;
       actions[slot] = action;
     });
@@ -85,7 +91,6 @@
         var source = settings.touchLayout(gameId);
         if (!source || typeof source !== "object" || !Object.keys(source).length) return true;
         var migrated = migrateLegacy(source, runtime);
-        if (Object.keys(migrated.backup).length) return false;
         var bridge = window.KeyboardProfileStorage;
         if (!bridge || typeof bridge.update !== "function") return false;
         var saved = bridge.update(function (config) {
@@ -142,18 +147,22 @@
     });
     var rawActions = source.actions && typeof source.actions === "object" ? source.actions : {};
     Object.keys(rawActions).forEach(function (slot) {
-      if (ACTION_SLOTS.indexOf(slot) < 0) unsupported["actions." + slot] = rawActions[slot];
+      if (ACTION_SLOTS.indexOf(actionSlot(slot)) < 0) unsupported["actions." + slot] = rawActions[slot];
       else if (ACTIONS.indexOf(String(rawActions[slot])) < 0) unsupported["actions." + slot] = rawActions[slot];
     });
     var rawNumbers = Array.isArray(source.numbers) ? source.numbers : [];
-    if (rawNumbers.length !== 12 || rawNumbers.some(function (item) {
+    if (source.numbers != null && (!Array.isArray(source.numbers) || rawNumbers.length !== 12 || rawNumbers.some(function (item) {
       var value = keyId(item);
       return NUMBERS.indexOf(value) < 0;
-    })) unsupported.numbers = rawNumbers;
+    }))) unsupported.numbers = source.numbers;
     if (source.dpad != null && !D_PAD_VISUAL[source.dpad]) unsupported.dpad = source.dpad;
     if (source.sides != null && source.sides !== "standard" && source.sides !== "swapped") unsupported.sides = source.sides;
     var slotActions = {};
-    ACTION_SLOTS.forEach(function (slot) { slotActions[slot] = normalized.actions[slot]; });
+    ACTION_SLOTS.forEach(function (slot) {
+      var numeric = /^num([0-9])$/.exec(slot);
+      var legacySlot = numeric ? numeric[1] : slot;
+      slotActions[slot] = normalized.actions[slot] || normalized.actions[legacySlot];
+    });
     return {
       override: {
         layoutId: runtime === "flash" ? "qwerty-72" : "landscape-split",

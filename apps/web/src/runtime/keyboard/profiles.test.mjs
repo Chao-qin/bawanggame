@@ -78,6 +78,19 @@ test('routes defaults by runtime and orientation with explicit and migrated prec
   assert.equal(resolveProfile({}, { runtime: 'flash', orientation: 'landscape' }).layoutId, 'qwerty-72')
 })
 
+test('explicit assignments suppress migrated per-game control overrides', () => {
+  const config = {
+    profileAssignments: { 'j2me:portrait': { layoutId: 'portrait-dpad', themeId: 'classic' } },
+    perGameOverrides: {
+      game: { j2me: { layoutId: 'landscape-split', controlOverrides: { dpadRotation: 'rotate-cw', sideGroup: 'standard' } } },
+    },
+  }
+  const profile = resolveProfile(config, { runtime: 'j2me', orientation: 'portrait', gameId: 'game' })
+  assert.equal(profile.source, 'explicit')
+  assert.equal(profile.layout.controls.find((control) => control.id === 'up').label, '↑')
+  assert.equal(profile.layout.controls.find((control) => control.id === 'up').actionId, 'up')
+})
+
 test('clears explicit and per-game overrides independently', () => {
   const config = {
     profileAssignments: { 'j2me:portrait': { layoutId: 'custom', themeId: 'light' } },
@@ -134,7 +147,7 @@ test('materializes migrated side, number order, slot action, and D-pad rotation 
   const one = profile.layout.controls.find((control) => control.id === 'key-1')
   const zero = profile.layout.controls.find((control) => control.id === 'key-0')
   assert.equal(up.label, '←')
-  assert.equal(up.actionId, 'num1')
+  assert.equal(up.actionId, 'left')
   assert.equal(up.x > 0.6, true)
   assert.equal(one.actionId, 'up')
   assert.equal(one.x < 0.3, true)

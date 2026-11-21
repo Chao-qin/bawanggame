@@ -27,7 +27,7 @@
     num5: 5, num6: 6, num7: 7, num8: 8, num9: 9
   };
   var layoutId = "mrp:" + (mrpFile || f || "default");
-  var touchLayout = TouchLayout.forGame(layoutId);
+  var touchLayout = TouchLayout.forGame(layoutId, 'mrp');
   var keypadLayout = touchLayout.get();
   window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__ = touchLayout;
 
