@@ -275,6 +275,13 @@
     enqueue(code, pressed, meta || null);
     kick();
   }
+  function inputRepeat(action) {
+    var code = codeOf(action);
+    if (code == null) return;
+    code = mapped(code);
+    var state = S[code];
+    if (state && state.seen) { MIDP.sendKeyRepeat(code); trace(code, "p"); }
+  }
   function bindTouchpad() {
     var keyboardSession = window.__XIAOCHAO_KEYBOARD_SESSION__;
     var surface = keyboardSession && keyboardSession.getSurface && keyboardSession.getSurface();
@@ -295,23 +302,6 @@
       input: inputController,
       onPressedChange: function (ids) { if (keyboardSession) keyboardSession.notifyPressed(new Set(ids)); },
       dpadVisual: function (direction) { return direction; },
-      sink: {
-        press: function (code, meta) {
-          var action = actionOf(code);
-          if (action && inputController) inputController.press("touch:" + action, action, meta);
-        },
-        release: function (code, meta) {
-          var action = actionOf(code);
-          if (action && inputController) inputController.release("touch:" + action, action, meta);
-        },
-        repeat: function (code) {
-          var action = actionOf(code);
-          var rc = mapped(code);
-          var s = S[rc];
-          if (action && inputController) inputController.repeat("touch:" + action, action);
-          else if (s && s.seen) { MIDP.sendKeyRepeat(rc); trace(rc, "p"); }
-        }
-      },
       feedback: {
         vibrate: config.vibrate | 0,
         keyRepeat: String(config.keyRepeat) !== "0",
@@ -339,13 +329,7 @@
         sink: {
           press: function (action, source, meta) { dispatchAction(action, true, source, meta); },
           release: function (action, source, meta) { dispatchAction(action, false, source, meta); },
-          repeat: function (action) {
-            var code = codeOf(action);
-            if (code == null) return;
-            code = mapped(code);
-            var state = S[code];
-            if (state && state.seen) { MIDP.sendKeyRepeat(code); trace(code, "p"); }
-          }
+          repeat: inputRepeat
         }
       });
       if (window.__XIAOCHAO_KEYBOARD_SESSION__ && window.__XIAOCHAO_KEYBOARD_SESSION__.registerInputRelease) {

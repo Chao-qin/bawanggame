@@ -140,3 +140,18 @@ test('materializes migrated side, number order, slot action, and D-pad rotation 
   assert.equal(one.x < 0.3, true)
   assert.equal(zero.x, 0.06)
 })
+
+test('resolves migrated numeric slot names against numeric controls', () => {
+  const profile = resolveProfile({
+    perGameOverrides: {
+      game: {
+        j2me: {
+          layoutId: 'portrait-dpad',
+          controlOverrides: { slotActions: { '1': 'num7', '0': 'num3' } },
+        },
+      },
+    },
+  }, { runtime: 'j2me', orientation: 'portrait', gameId: 'game' })
+  assert.equal(profile.layout.controls.find((control) => control.id === 'key-1').actionId, 'num7')
+  assert.equal(profile.layout.controls.find((control) => control.id === 'key-0').actionId, 'num3')
+})

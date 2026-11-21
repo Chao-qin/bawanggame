@@ -34,8 +34,6 @@
   function cEvent(type, code) {
     if (window.Module && Module._c_event) Module._c_event(type, code, 0);
   }
-  var ACTION_CODES = {};
-  Object.keys(KEYCODES).forEach(function (action) { ACTION_CODES[KEYCODES[action]] = action; });
   var inputController = window.InputMapping && window.InputMapping.create({
     gameId: "mrp:" + (mrpFile || f || "default"),
     keyboard: true,
@@ -100,20 +98,6 @@
       input: inputController,
       onPressedChange: function (ids) { if (keyboardSession) keyboardSession.notifyPressed(new Set(ids)); },
       dpadVisual: function (direction) { return direction; },
-      sink: {
-        press: function (code, meta) {
-          var action = ACTION_CODES[code];
-          if (inputController && action) inputController.press("touch:" + action, action, meta);
-        },
-        release: function (code, meta) {
-          var action = ACTION_CODES[code];
-          if (inputController && action) inputController.release("touch:" + action, action, meta);
-        },
-        repeat: function (code) {
-          var action = ACTION_CODES[code];
-          if (inputController && action) inputController.repeat("touch:" + action, action);
-        }
-      },
       feedback: {
         vibrate: phone ? 24 : 0,
         keyRepeat: REPEAT_DELAY !== 0,

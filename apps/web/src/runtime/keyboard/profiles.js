@@ -193,7 +193,9 @@ function applyControlOverrides(layout, overrides) {
   next.controls.forEach((control) => {
     const slot = /^key-(star|pound|[0-9])$/.exec(control.id)?.[1]
     const actionSlot = slot === 'star' || slot === 'pound' ? slot : slot ? `num${slot}` : control.id
-    if (actions[actionSlot]) control.actionId = actions[actionSlot]
+    const legacyActionSlot = slot && /^[0-9]$/.test(slot) ? slot : null
+    const action = actions[actionSlot] || (legacyActionSlot && actions[legacyActionSlot])
+    if (action) control.actionId = action
     if (['up', 'down', 'left', 'right'].includes(control.id)) {
       if (dpadLabels) control.label = dpadLabels[control.id]
       if (sideGroup === 'standard') control.x += 0.62

@@ -183,6 +183,7 @@
       for (var i = 0; i < list.length; i++) {
         var el = list[i];
         if (!el || !el.closest) continue;
+        if (surface !== document && !(surface.contains && surface.contains(el))) continue;
         if (el.closest("#dpad")) continue;
         var k = el.closest("[data-control-id]");
         var controlId = k && (k.dataset ? k.dataset.controlId : k.id);
@@ -204,6 +205,7 @@
       cr = cr || 0;
       prev = prev || [];
       var pad = surface.querySelector ? surface.querySelector('[data-control-id="dpad"], #dpad') : document.getElementById("dpad");
+      if (pad && surface !== document && !(surface.contains && surface.contains(pad))) pad = null;
       var band = 2, inside = false, gap = 0;
       if (pad) {
         var r = pad.getBoundingClientRect();

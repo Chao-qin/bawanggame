@@ -89,8 +89,8 @@ test('migrates legacy fields into normalized per-game runtime overrides', () => 
   )
 })
 
-test('keeps the legacy source until the versioned envelope write succeeds', () => {
-  const source = { dpad: 'mirror', sides: 'swapped', numbers: ['1'], actions: {} }
+test('keeps a valid legacy source until the versioned envelope write succeeds', () => {
+  const source = { dpad: 'mirror', sides: 'swapped', numbers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'star', '0', 'pound'], actions: {} }
   const legacy = new Map([['game-1', source]])
   let succeeds = false
   const profileStorage = {
@@ -110,4 +110,18 @@ test('keeps the legacy source until the versioned envelope write succeeds', () =
   assert.equal(events.at(-1).type, 'xiaochao:keyboardprofilechange')
   assert.equal(events.at(-1).detail.runtime, 'mrp')
   assert.equal(events.at(-1).detail.profile.gameId, 'game-1')
+})
+
+test('retains unsupported legacy action data without writing a defaulted override', () => {
+  const source = { actions: { choice: 'unsupported-action' } }
+  const legacy = new Map([['game-unsupported', source]])
+  let writes = 0
+  const profileStorage = {
+    update() { writes++; return true },
+  }
+  const { layout } = createLayout(legacy, profileStorage)
+  const adapter = layout.forGame('game-unsupported', 'j2me')
+  assert.equal(adapter.migrate(), false)
+  assert.equal(writes, 0)
+  assert.equal(legacy.get('game-unsupported'), source)
 })

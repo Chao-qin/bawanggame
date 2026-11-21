@@ -85,6 +85,7 @@
         var source = settings.touchLayout(gameId);
         if (!source || typeof source !== "object" || !Object.keys(source).length) return true;
         var migrated = migrateLegacy(source, runtime);
+        if (Object.keys(migrated.backup).length) return false;
         var bridge = window.KeyboardProfileStorage;
         if (!bridge || typeof bridge.update !== "function") return false;
         var saved = bridge.update(function (config) {
