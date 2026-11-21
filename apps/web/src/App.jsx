@@ -663,6 +663,7 @@ function FilePicker({ children, fill, ...inputProps }) {
 
 function FlashStore({ onRefreshLibrary }) {
   const local = useLocalFlash(true)
+  const archiveOnline = !isEmbeddedHost() || Boolean(mobileApiBase)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [url, setUrl] = useState('')
@@ -672,17 +673,18 @@ function FlashStore({ onRefreshLibrary }) {
   const [error, setError] = useState('')
   const [archiveQuery, setArchiveQuery] = useState('')
   const [archiveGames, setArchiveGames] = useState([])
-  const [archiveLoading, setArchiveLoading] = useState(false)
+  const [archiveLoading, setArchiveLoading] = useState(archiveOnline)
   const [archiveError, setArchiveError] = useState('')
   const archiveRequest = useRef(0)
   const added = useMemo(() => new Set(local.games.map((game) => game.dedupeKey)), [local.games])
 
   async function searchArchive(value = archiveQuery) {
+    if (!archiveOnline) return
     const requestId = ++archiveRequest.current
     setArchiveLoading(true)
     setArchiveError('')
     try {
-      const response = await fetch(`/__flash/catalog?query=${encodeURIComponent(value.trim())}`)
+      const response = await fetch(apiPath(`/__flash/catalog?query=${encodeURIComponent(value.trim())}`))
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
       if (requestId === archiveRequest.current) setArchiveGames(data.games || [])
@@ -706,10 +708,10 @@ function FlashStore({ onRefreshLibrary }) {
     setError('')
     setMessage('')
     try {
-      const detailResponse = await fetch(`/__flash/detail/${encodeURIComponent(game.code)}`)
+      const detailResponse = await fetch(apiPath(`/__flash/detail/${encodeURIComponent(game.code)}`))
       if (!detailResponse.ok) throw new Error(`详情获取失败（HTTP ${detailResponse.status}）`)
       const detail = (await detailResponse.json()).game || game
-      await addFromUrl(`/__flash/download/${encodeURIComponent(game.code)}`, {
+      await addFromUrl(apiPath(`/__flash/download/${encodeURIComponent(game.code)}`), {
         name: detail.name,
         description: `Flash 保存计划 · SHA-256 ${detail.sha256 || '未提供'}`,
       })
@@ -774,7 +776,7 @@ function FlashStore({ onRefreshLibrary }) {
   return <section className="storePage">
     <div className="storeHero flashStoreHero">
       <div><h2 className="storeHeroTitle">Flash 游戏商城</h2><p className="storeHeroText">搜索并加入可在 Ruffle 中运行的 Flash 游戏。</p></div>
-      <Button className="ghostButton" size="small" fill="outline" type="button" onClick={() => searchArchive()} disabled={archiveLoading}>刷新目录</Button>
+      <Button className="ghostButton" size="small" fill="outline" type="button" onClick={() => searchArchive()} disabled={!archiveOnline || archiveLoading}>刷新目录</Button>
     </div>
     {(local.error || error) && <div className="status statusError" role="alert">{error || local.error} <Button className="inlineAction" fill="none" type="button" onClick={local.refresh}>重试</Button></div>}
     {message && <div className="status statusSuccess" role="status">{message}</div>}
@@ -782,13 +784,13 @@ function FlashStore({ onRefreshLibrary }) {
       <div className="sectionHeading">
         <div><h3>游戏目录</h3><p>从 Flash 保存计划查找游戏并加入本机库。</p></div>
       </div>
-      <form className="flashImportFields" onSubmit={(event) => { event.preventDefault(); searchArchive() }}>
+      {archiveOnline ? <form className="flashImportFields" onSubmit={(event) => { event.preventDefault(); searchArchive() }}>
         <label>搜索作品<Input className="field" type="search" placeholder="搜索 Flash 游戏" value={archiveQuery} onChange={setArchiveQuery} /></label>
         <Button className="downloadButton" color="primary" size="small" type="submit" disabled={archiveLoading}>{archiveLoading ? '搜索中…' : '搜索'}</Button>
-      </form>
+      </form> : <div className="status" role="status">当前安装包未配置在线商城服务。</div>}
       {archiveError && <div className="status statusError" role="alert">{archiveError}</div>}
       {archiveLoading && <div className="status" role="status"><DotLoading /> 正在加载游戏目录…</div>}
-      {!archiveLoading && !archiveError && archiveGames.length === 0 && <div className="emptyPanel"><strong>{archiveQuery.trim() ? '没有找到匹配的游戏' : '目录暂无游戏'}</strong><span>尝试其他关键词，或稍后刷新目录。</span></div>}
+      {archiveOnline && !archiveLoading && !archiveError && archiveGames.length === 0 && <div className="emptyPanel"><strong>{archiveQuery.trim() ? '没有找到匹配的游戏' : '目录暂无游戏'}</strong><span>尝试其他关键词，或稍后刷新目录。</span></div>}
       {archiveGames.length > 0 && <div className="storeGrid archiveGrid">{archiveGames.map((game) => {
         const isAdded = added.has(`url:/__flash/download/${game.code}`) || local.games.some((item) => item.sourceUrl.includes(`/__flash/download/${game.code}`))
         return <Card className="storeCard" bodyClassName="storeCardBody" key={game.code}>
@@ -986,6 +988,9 @@ function Player({ game, onBack, nativeBackSignal }) {
       else window.ScreenSetup?.unlockOrientation?.()
       requestRefit(true)
       setIsFullscreen(active)
+      if (active && game.kind === 'flash') {
+        playerRef.current?.querySelector('ruffle-player')?.focus({ preventScroll: true })
+      }
     }
     syncFullscreen()
     const onViewportResize = () => { if (!refitting) requestRefit() }
