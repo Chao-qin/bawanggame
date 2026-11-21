@@ -8,10 +8,11 @@ import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
 import { FlashPlayer } from './runtime/FlashPlayer.jsx'
 import { InputMappingPopup } from './runtime/InputMappingPopup.jsx'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
-import { LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
+import { fetchArtwork, validArtwork } from './artwork.js'
+import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
 import { installResponsiveContract } from './responsive.js'
-import { addBundled, addFromFile, addFromUrl, list as listLocalFlash, remove as removeLocalFlash } from './localFlash.js'
+import { addBundled, addFromFile, addFromUrl, fillArtwork, list as listLocalFlash, remove as removeLocalFlash } from './localFlash.js'
 
 const TABS = [
   { id: 'j2me', label: 'J2ME', Icon: AppstoreOutline },
@@ -120,7 +121,7 @@ function useServerGames(kind) {
             vendor: g.vendor || '',
             desc: g.desc || '',
             size: g.size || 0,
-            iconUrl: null,
+            iconUrl: typeof g.iconUrl === 'string' ? g.iconUrl : null,
             local: false,
           })),
         })
@@ -324,7 +325,7 @@ function useLocalFlash(enabled) {
             vendor: record.source === 'remote' ? '本机 · 在线来源' : '本机游戏',
             desc: record.description,
             size: record.size,
-            iconUrl: null,
+            iconUrl: validArtwork(record.artwork) ? URL.createObjectURL(record.artwork) : null,
             local: true,
             source: record.source,
             sourceUrl: record.sourceUrl,
@@ -337,6 +338,10 @@ function useLocalFlash(enabled) {
       })
     return () => { alive = false }
   }, [enabled, tick])
+
+  useEffect(() => () => {
+    for (const game of state.games) if (game.iconUrl) URL.revokeObjectURL(game.iconUrl)
+  }, [state.games])
 
   return {
     ...state,
@@ -395,7 +400,7 @@ function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
           next?.focus()
         }}>
         <div className="optionHead">
-          <div className="optionIcon" aria-hidden="true">{(game.name || '?').trim().charAt(0).toUpperCase()}</div>
+          <GameArtwork src={game.iconUrl} name={game.name} className="optionIcon" />
           <div className="optionTitle"><strong>{game.name}</strong><span>{[game.vendor, game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机游戏' : ''].filter(Boolean).join(' · ')}</span></div>
           <Button fill="none" className="iconButton" onClick={onClose} aria-label="关闭"><CloseOutline aria-hidden="true" /></Button>
         </div>
@@ -438,6 +443,18 @@ function Library({ kind, onPlay }) {
     return [...groups.values()]
   }, [kind, local.games, server.games])
   const localGames = kind === 'flash' ? localFlash.games : javaGames.filter((game) => game.local)
+  const historySources = useMemo(() => {
+    const entries = new Map()
+    for (const game of [...local.games, ...server.games]) {
+      const key = `${game.kind}:${game.file}`
+      if (!entries.has(key)) entries.set(key, game)
+    }
+    return entries
+  }, [local.games, server.games])
+  const withHistoryArtwork = (items) => items.map((item) => {
+    const game = historySources.get(`${item.kind}:${item.file}`)
+    return game ? { ...item, ...game } : item
+  })
   const selectedGames = localGames.filter((game) => picked.has(gameKey(game)))
 
   useEffect(() => {
@@ -579,8 +596,8 @@ function Library({ kind, onPlay }) {
         )}
       </div>
       {notice && <div className={notice.failed ? 'status statusError' : 'status statusSuccess'} role={notice.failed ? 'alert' : 'status'}>{notice.text}</div>}
-      {!selectMode && kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={popular} onOpen={openGame} />}
-      {!selectMode && kind !== 'flash' && <GameRow title="🕘 最近在玩" items={recent} onOpen={openGame} />}
+      {!selectMode && kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={withHistoryArtwork(popular)} onOpen={openGame} />}
+      {!selectMode && kind !== 'flash' && <GameRow title="🕘 最近在玩" items={withHistoryArtwork(recent)} onOpen={openGame} />}
       {server.error && <div className="status statusError" role="alert">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>}
       {(kind === 'j2me' ? local.error : localFlash.error) && (
         <div className="status statusError" role="alert">{kind === 'j2me' ? local.error : localFlash.error}</div>
@@ -634,6 +651,7 @@ function FlashStore({ onRefreshLibrary }) {
   const [description, setDescription] = useState('')
   const [url, setUrl] = useState('')
   const [file, setFile] = useState(null)
+  const [artworkFile, setArtworkFile] = useState(null)
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -674,11 +692,24 @@ function FlashStore({ onRefreshLibrary }) {
     setError('')
     setMessage('')
     try {
+      const suffix = `/__flash/download/${encodeURIComponent(game.code)}`
+      const downloadUrl = new URL(apiPath(suffix), window.location.href).href
+      const installed = local.games.find((item) => item.dedupeKey === `url:${downloadUrl}`)
+      if (installed) {
+        if (!installed.iconUrl && game.coverUrl) {
+          await fillArtwork(installed.file, await fetchArtwork(game.coverUrl))
+          local.refresh()
+          onRefreshLibrary()
+        }
+        setMessage(duplicateMessage(game.name))
+        return
+      }
       const detailResponse = await fetch(apiPath(`/__flash/detail/${encodeURIComponent(game.code)}`))
       if (!detailResponse.ok) throw new Error(`详情获取失败（HTTP ${detailResponse.status}）`)
       const detail = (await detailResponse.json()).game || game
       await addFromUrl(apiPath(`/__flash/download/${encodeURIComponent(game.code)}`), {
         name: detail.name,
+        artwork: await fetchArtwork(detail.coverUrl || game.coverUrl),
         description: `Flash 保存计划 · SHA-256 ${detail.sha256 || '未提供'}`,
       })
       setMessage(`已加入「${detail.name}」，现在可以在 Flash 库中启动。`)
@@ -720,15 +751,19 @@ function FlashStore({ onRefreshLibrary }) {
       if (!name.trim()) throw new Error('请填写游戏名称')
       if (url.trim() && file) throw new Error('SWF 直链和本地文件只能选择一个')
       if (!url.trim() && !file) throw new Error('请填写 SWF 直链或选择本地文件')
-      if (file) await addFromFile(file, { name, description })
-      else await addFromUrl(url, { name, description })
+      const metadata = { name, description, artwork: validArtwork(artworkFile) ? artworkFile : undefined }
+      if (file) await addFromFile(file, metadata)
+      else await addFromUrl(url, metadata)
       setMessage(`已加入「${name.trim()}」，现在可以在 Flash 库中启动。`)
       setName('')
       setDescription('')
       setUrl('')
       setFile(null)
+      setArtworkFile(null)
       const input = document.getElementById('flash-file-input')
       if (input) input.value = ''
+      const artworkInput = document.getElementById('flash-artwork-input')
+      if (artworkInput) artworkInput.value = ''
       local.refresh()
       onRefreshLibrary()
     } catch (cause) {
@@ -760,7 +795,7 @@ function FlashStore({ onRefreshLibrary }) {
       {archiveGames.length > 0 && <div className="storeGrid archiveGrid">{archiveGames.map((game) => {
         const isAdded = added.has(`url:/__flash/download/${game.code}`) || local.games.some((item) => item.sourceUrl.includes(`/__flash/download/${game.code}`))
         return <StoreGameEntry key={game.code}
-          cover={{ src: game.coverUrl, fallback: game.name.charAt(0), onError: (event) => { event.currentTarget.hidden = true } }}
+          cover={{ src: game.coverUrl, fallback: game.name }}
           title={game.name} metadata="Flash 保存计划" description={game.code}
           action={{ onClick: () => addArchiveGame(game), disabled: busy !== '' || local.loading, label: busy === `archive:${game.code}` ? '下载中…' : isAdded ? '已加入' : '加入' }} />
       })}</div>}
@@ -773,6 +808,7 @@ function FlashStore({ onRefreshLibrary }) {
         <label>SWF 直链<Input className="field" type="url" placeholder="https://…" value={url} onChange={setUrl} /></label>
         <label>游戏说明<TextArea className="field flashDescription" placeholder="选填" rows={2} value={description} onChange={setDescription} /></label>
         <FilePicker id="flash-file-input" accept=".swf,application/x-shockwave-flash" onChange={(event) => setFile(event.target.files?.[0] || null)}>{file ? file.name : '选择本地 SWF'}</FilePicker>
+        <FilePicker id="flash-artwork-input" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" onChange={(event) => setArtworkFile(event.target.files?.[0] || null)}>{artworkFile ? artworkFile.name : '选择封面（可选）'}</FilePicker>
         <Button className="downloadButton" color="primary" size="small" type="submit" disabled={busy !== '' || local.loading}>{busy === 'custom' ? '加入中…' : '加入本机'}</Button>
       </form>
     </details>
@@ -823,6 +859,12 @@ function Store({ onRefreshLibrary }) {
       const records = await window.LocalJars.list()
       setInstalled(records)
       if (isInstalled(game, records)) {
+        if (game.iconUrl && records.some((record) => record.sourceId === id && !record.sourceArtwork)) {
+          if (await window.LocalJars.fillArtwork(id, await fetchArtwork(game.iconUrl))) {
+            setInstalled(await window.LocalJars.list())
+            onRefreshLibrary()
+          }
+        }
         setMessage(duplicateMessage(game.name))
         return
       }
@@ -835,7 +877,7 @@ function Store({ onRefreshLibrary }) {
       const blob = await response.blob()
       if (!blob.size) throw new Error('下载内容为空')
       const file = new File([blob], localJarName(game.name, id), { type: 'application/java-archive' })
-      const record = await window.LocalJars.add(file, { sourceId: id })
+      const record = await window.LocalJars.add(file, { sourceId: id, icon: await fetchArtwork(game.iconUrl) })
       setInstalled([...records, record])
       onRefreshLibrary()
     } catch (error) {
@@ -873,7 +915,7 @@ function Store({ onRefreshLibrary }) {
     {store.loading && <div className="status" role="status"><DotLoading /> 正在同步 52java 目录…</div>}
     {!store.loading && !store.error && !store.games.length && <div className="emptyPanel"><strong>{appliedQuery ? '没有匹配的游戏' : '目录暂时为空'}</strong><span>可以调整筛选条件，或稍后刷新目录。</span></div>}
     <div className="storeGrid">{store.games.map((game) => <StoreGameEntry key={game.id}
-      icon={game.iconUrl ? <img src={game.iconUrl} alt="" /> : (game.name || '?').charAt(0)}
+      cover={{ src: game.iconUrl, fallback: game.name }}
       title={game.name} metadata={`52java · ${game.plays.toLocaleString()} 次下载`} description="经典 Java 手机游戏"
       action={{ onClick: () => download(game), disabled: busy !== '', label: busy === String(game.id) ? '下载中…' : isInstalled(game) ? '已加入' : '加入库' }} />)}</div>
     {!store.loading && !store.error && store.games.length > 0 && <div className="storePagination"><span>第 {page} / {store.pages} 页 · {store.total.toLocaleString()} 款</span><div><Button type="button" size="small" fill="outline" className="ghostButton" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button><Button type="button" size="small" fill="outline" className="ghostButton" disabled={page >= store.pages} onClick={() => setPage(page + 1)}>下一页</Button></div></div>}

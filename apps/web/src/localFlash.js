@@ -242,7 +242,7 @@ export async function has(dedupeKey) {
   return key !== undefined
 }
 
-export async function add({ name, description = '', source, sourceUrl = '', blob, dedupeKey }) {
+export async function add({ name, description = '', source, sourceUrl = '', blob, dedupeKey, artwork }) {
   const cleanName = normalizeText(name)
   if (!cleanName) throw flashError('invalid_name', '请输入游戏名称')
   await validateSwf(blob)
@@ -266,6 +266,7 @@ export async function add({ name, description = '', source, sourceUrl = '', blob
           name: cleanName,
           description: normalizeText(description),
           data: blob,
+          artwork,
           size: blob.size,
           addedAt: now,
           updatedAt: now,
@@ -284,6 +285,16 @@ export async function add({ name, description = '', source, sourceUrl = '', blob
 
 export async function remove(id) {
   return transaction('readwrite', (store) => requestValue(store.delete(String(id))))
+}
+
+export async function fillArtwork(id, artwork) {
+  if (!artwork) return
+  return transaction('readwrite', async (store) => {
+    const record = await requestValue(store.get(String(id)))
+    if (validRecord(record) && !record.artwork) {
+      await requestValue(store.put({ ...record, artwork }))
+    }
+  })
 }
 
 export async function addFromFile(file, metadata = {}) {

@@ -140,6 +140,10 @@ var LocalJars = (function () {
     var bytes = await file.arrayBuffer();
     var info = await describe(file.name, bytes);
     if (meta && meta.sourceId != null) info.sourceId = String(meta.sourceId);
+    if (meta && meta.icon instanceof Blob && meta.icon.size && meta.icon.size <= 512 * 1024) {
+      info.icon = meta.icon;
+      info.sourceArtwork = true;
+    }
     if (globalThis.crypto && globalThis.crypto.subtle) {
       var digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
       info.sha256 = Array.from(new Uint8Array(digest), function (byte) {
@@ -245,6 +249,21 @@ var LocalJars = (function () {
       return jar.indexOf(PREFIX) === 0;
     },
     add: add,
+    fillArtwork: function (sourceId, icon) {
+      if (!(icon instanceof Blob) || !icon.size || icon.size > 512 * 1024) return Promise.resolve(false);
+      var updated = false;
+      return run("readwrite", function (store) {
+        var req = store.index("sourceId").getAll(String(sourceId));
+        req.onsuccess = function () {
+          if (req.result.length !== 1 || req.result[0].sourceArtwork) return;
+          var record = req.result[0];
+          record.icon = icon;
+          record.sourceArtwork = true;
+          store.put(record);
+          updated = true;
+        };
+      }).then(function () { return updated; });
+    },
     identity: identity,
     list: list,
     describe: describe,
