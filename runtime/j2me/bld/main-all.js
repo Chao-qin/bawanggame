@@ -931,6 +931,10 @@ Native["com/sun/cldchi/io/ConsoleOutputStream.write.(I)V"] = function(addr, ch) 
 Native["com/sun/cldc/io/ResourceInputStream.open.(Ljava/lang/String;)Ljava/lang/Object;"] = function(addr, nameAddr) {
   var fileName = J2ME.fromStringAddr(nameAddr);
   var data = JARStore.loadFile(fileName);
+  if (!data && fileName === "res/logo.png" && MIDP.manifest["MIDlet-Name"] === "\u4e09\u56fd\u8d75\u4e91\u4f20-\u521d\u51fa\u8305\u5e90" &&
+      MIDP.manifest["MIDlet-Icon"] === "/res/icon.png") {
+    data = JARStore.loadFile("res/icon.png");
+  }
   var objAddr = J2ME.Constants.NULL;
   if (data) {
     objAddr = J2ME.allocObject(CLASSES.java_lang_Object);
@@ -3531,11 +3535,11 @@ var fs = function() {
       if (f.path === openedFile.path) f.dirty = false;
     });
   }
-  function flushAll() {
+  function flushAll(callback) {
     openedFiles.forEach(function(f, fd) {
       if (f.dirty) flush(fd);
     });
-    syncStore();
+    syncStore(typeof callback === "function" ? callback : undefined);
   }
   function flushAllRms() {
     openedFiles.forEach(function(f, fd) {
@@ -3544,10 +3548,7 @@ var fs = function() {
     syncStore();
   }
   
-  myflushAll = function()
-  {
-	  flushAll(); 
-  }
+  myflushAll = flushAll;
   
   window.addEventListener("beforeunload", flushAll);
   function list(path) {
@@ -6775,7 +6776,9 @@ if (typeof module !== "undefined" && module.exports) {
   Native["com/sun/midp/midletsuite/InstallInfo.load.()V"] = function(addr) {
     var self = getHandle(addr);
     self.trusted = 1;
-    console.warn("com/sun/midp/midletsuite/InstallInfo.load.()V incomplete");
+    if (/[?&]debug=1(?:&|$)/.test(location.search)) {
+      console.warn("com/sun/midp/midletsuite/InstallInfo.load.()V incomplete");
+    }
   };
   Native["com/sun/midp/midletsuite/SuiteProperties.load.()[Ljava/lang/String;"] = function(addr) {
     var keys = Object.keys(manifest);

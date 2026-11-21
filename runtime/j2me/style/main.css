@@ -346,6 +346,10 @@ body.fixed-screen #display-container {
 }
 
 #keypad .key.down .keypadIcon { color: #081018 !important; }
+#keypad :is(.soft, .mini) .keypadIcon {
+  width: min(40%, 20px);
+  height: min(40%, 20px);
+}
 #dpad > .key { position: relative; }
 #keypad .key:has(.keypadIcon)::before { display: none; }
 body[data-dpad-layout="mirror"] :is(#left, #right) .keypadIcon { transform: rotate(180deg); }

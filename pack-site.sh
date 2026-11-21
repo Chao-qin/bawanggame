@@ -21,6 +21,8 @@ done
 for file in btroom.js compat.html debug-graphics.js debug-native.js files.js keypad-canvas.js keymap.js panel.js runtime-extras.js screen.js touch-layout.js touchpad.js ui-feedback.js; do
   cp "runtime/j2me/$file" "$DEST/$file"
 done
+mkdir -p "$DEST/runtime/j2me"
+cp runtime/j2me/{input-mapping,touch-layout}.js "$DEST/runtime/j2me/"
 cp runtime/mrp/mrp-runtime.js "$DEST/mrp-runtime.js"
 
 # Ruffle's self-hosted runtime and its offline Flash smoke-test game.

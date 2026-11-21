@@ -197,7 +197,7 @@
       var stroke = active ? "#081018" : color.text;
       var cx = item.x + item.w / 2;
       var cy = item.y + item.h / 2;
-      var size = Math.min(item.w, item.h) * 0.18;
+      var size = Math.min(Math.min(item.w, item.h) * 0.4, 20) * 0.34;
       ctx.strokeStyle = stroke;
       ctx.fillStyle = stroke;
       ctx.lineWidth = Math.max(2, styles.unit * .085);
@@ -266,7 +266,7 @@
       ["choice", "back", "ret", "clear"].forEach(function (id) {
         var item = rectFor(id, canvasRect);
         drawSoft(item, color);
-        drawFeatureGlyph(item, id, color, styles);
+        if (item && !item.node.querySelector('.keypadIcon')) drawFeatureGlyph(item, id, color, styles);
       });
       if (portrait) drawDpad(canvasRect, color, styles);
       drawNumbers(canvasRect, color, styles);

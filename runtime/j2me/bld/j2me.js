@@ -5252,13 +5252,11 @@ var J2ME;
                     release || J2ME.traceWriter && J2ME.traceWriter.writeLn(e.stack);
     
                     if (e && e.constructor && e.constructor.prototype && e.constructor.prototype.classInfo && e.constructor.prototype.classInfo._name) {
-                        var detailMessage = ''
-                        if (e.detailMessage) {
-                            detailMessage = J2ME.fromStringAddr(e.detailMessage);
+                        // At this point the Java exception can still be handled by the MIDlet.
+                        if (/[?&]debug=1(?:&|$)/.test(location.search)) {
+                            var detailMessage = e.detailMessage ? J2ME.fromStringAddr(e.detailMessage) : "";
+                            console.warn("Java exception: " + e.constructor.prototype.classInfo._name + ": " + detailMessage + " at " + mi.implKey + " pc " + opPC);
                         }
-                        console.warn("error occurs at : " + e.constructor.prototype.classInfo._name + " detailMessage: " + detailMessage + " at " + mi.implKey + " pc " + opPC);
-    
-                        //console.error(e); 
                     } else {
                         console.error(e);
                     }
