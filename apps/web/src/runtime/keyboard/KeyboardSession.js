@@ -47,6 +47,7 @@ export function createKeyboardSession(options = {}) {
     refreshConfig(nextConfig) {
       if (invalid) return profile
       config = nextConfig || loadKeyboardConfig()
+      session.releaseAll()
       profile = resolveProfile(config, { runtime, orientation: currentOrientation(), gameId: currentGameId })
       profileListeners.forEach((listener) => listener(profile))
       try { window.__XIAOCHAO_KEYMAP_REBIND__?.() } catch {}

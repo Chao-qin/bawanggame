@@ -68,3 +68,23 @@ test('releaseAll invokes registered runtime input release callbacks', () => {
   assert.equal(released, 1)
   session.invalidate()
 })
+
+test('profile refresh releases held inputs and keeps the registered surface active', () => {
+  const config = createEmptyKeyboardConfig()
+  const session = createKeyboardSession({ timeout: 100, config })
+  const surface = { setAttribute() {} }
+  assert.equal(session.registerSurface(surface).accepted, true)
+
+  let releases = 0
+  session.registerInputRelease(() => { releases += 1 })
+  const nextConfig = createEmptyKeyboardConfig()
+  nextConfig.profileAssignments['j2me:portrait'] = { layoutId: 'landscape-split', themeId: 'classic' }
+  session.refreshConfig(nextConfig)
+
+  assert.equal(releases, 1)
+  assert.equal(session.getSurface(), surface)
+  assert.equal(session.getProfile().layoutId, 'landscape-split')
+  assert.equal(session.registerSurface({ setAttribute() {} }).accepted, false)
+  assert.equal(session.getSurface(), surface)
+  session.invalidate()
+})

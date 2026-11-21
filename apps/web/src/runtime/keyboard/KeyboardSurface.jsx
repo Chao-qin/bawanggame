@@ -24,6 +24,8 @@ export function KeyboardSurface({ session, input, runtime = 'j2me', gameId, orie
   const [pressed, setPressed] = useState(new Set())
   const [activeProfile, setActiveProfile] = useState(profile)
   const pointers = useRef(new Map())
+  const activeProfileRef = useRef(activeProfile)
+  activeProfileRef.current = activeProfile
   const releasePointerId = (pointerId) => {
     let sourceId = pointerId
     let press = pointers.current.get(sourceId)
@@ -103,7 +105,11 @@ export function KeyboardSurface({ session, input, runtime = 'j2me', gameId, orie
   useLayoutEffect(() => {
     if (!session) return undefined
     const unsubscribePressed = session.subscribePressed((next) => setPressed(new Set(next || [])))
-    const unsubscribeProfile = session.subscribeProfile(setActiveProfile)
+    const unsubscribeProfile = session.subscribeProfile((nextProfile) => {
+      releaseAllPointers()
+      activeProfileRef.current = nextProfile
+      setActiveProfile(nextProfile)
+    })
     const node = document.querySelector(`[data-keyboard-session="${session.id}"]`)
     if (node) session.registerSurface(node, profile)
     return () => {
@@ -113,9 +119,9 @@ export function KeyboardSurface({ session, input, runtime = 'j2me', gameId, orie
       unsubscribeProfile?.()
       if (node) session.unregisterSurface(node)
     }
-  }, [profile, session])
+  }, [session])
 
-  const current = activeProfile || profile
+  const current = activeProfileRef.current || profile
   const controls = (current?.layout?.controls || []).filter((control) => control.visible !== false && isActionSupported(control.actionId, runtime))
     .sort((a, b) => a.z - b.z)
   const directionalControls = controls.filter((control) => ['up', 'down', 'left', 'right'].includes(control.id))
