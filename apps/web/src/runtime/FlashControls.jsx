@@ -1,4 +1,5 @@
-export function FlashControls({ surface: KeyboardSurface, ...props }) {
-  if (!KeyboardSurface) return null
-  return <KeyboardSurface {...props} runtime="flash" />
+import { KeyboardSurface } from './keyboard/KeyboardSurface.jsx'
+
+export function FlashControls({ adapter, ...props }) {
+  return <KeyboardSurface {...props} runtime="flash" input={adapter} />
 }

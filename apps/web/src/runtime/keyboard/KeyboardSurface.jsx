@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { isActionSupported } from './actions.js'
 import { resolveProfile } from './profiles.js'
 
@@ -9,19 +9,43 @@ function shapeProps(control) {
   return { x: control.x, y: control.y, width: control.width, height: control.height, rx: control.shape === 'rounded-rect' ? Math.min(control.width, control.height) * 0.18 : 0 }
 }
 
-export function KeyboardSurface({ session, runtime = 'j2me', gameId, orientation }) {
+export function KeyboardSurface({ session, input, runtime = 'j2me', gameId, orientation }) {
   const resolvedOrientation = orientation || (typeof window !== 'undefined' && window.innerWidth > window.innerHeight ? 'landscape' : 'portrait')
   const profile = useMemo(() => session?.getProfile?.() || resolveProfile({}, { runtime, orientation: resolvedOrientation, gameId }), [gameId, orientation, runtime, resolvedOrientation, session])
   const [pressed, setPressed] = useState(new Set())
   const [activeProfile, setActiveProfile] = useState(profile)
+  const pointers = useRef(new Map())
+
+  const pressPointer = (event) => {
+    const actionId = event.currentTarget?.dataset?.actionId
+    if (!input || !actionId || pointers.current.has(event.pointerId)) return
+    event.preventDefault()
+    pointers.current.set(event.pointerId, actionId)
+    input.press(`pointer:${event.pointerId}:${actionId}`, actionId)
+    try { event.currentTarget.setPointerCapture?.(event.pointerId) } catch {}
+    setPressed((current) => new Set(current).add(event.currentTarget.dataset.controlId))
+  }
+  const releasePointer = (event) => {
+    const actionId = pointers.current.get(event.pointerId)
+    if (!actionId) return
+    pointers.current.delete(event.pointerId)
+    input.release(`pointer:${event.pointerId}:${actionId}`)
+    setPressed((current) => {
+      const next = new Set(current)
+      next.delete(event.currentTarget?.dataset?.controlId)
+      return next
+    })
+  }
 
   useLayoutEffect(() => {
     if (!session) return undefined
-    const unsubscribePressed = session.subscribePressed(setPressed)
+    const unsubscribePressed = session.subscribePressed((next) => setPressed(new Set(next || [])))
     const unsubscribeProfile = session.subscribeProfile(setActiveProfile)
     const node = document.querySelector(`[data-keyboard-session="${session.id}"]`)
     if (node) session.registerSurface(node, profile)
     return () => {
+      pointers.current.forEach((actionId, pointerId) => input?.release?.(`pointer:${pointerId}:${actionId}`))
+      pointers.current.clear()
       unsubscribePressed?.()
       unsubscribeProfile?.()
       if (node) session.unregisterSurface(node)
@@ -58,6 +82,10 @@ export function KeyboardSurface({ session, runtime = 'j2me', gameId, orientation
         aria-pressed={isPressed}
         pointerEvents="all"
         className={isPressed ? 'keyboard-key is-pressed' : 'keyboard-key'}
+        onPointerDown={pressPointer}
+        onPointerUp={releasePointer}
+        onPointerCancel={releasePointer}
+        onLostPointerCapture={releasePointer}
       >
         {control.shape === 'circle' ? <circle {...common} /> : <rect {...common} />}
         <text x={control.x + control.width / 2} y={control.y + control.height / 2} textAnchor="middle" dominantBaseline="central">{control.label}</text>
