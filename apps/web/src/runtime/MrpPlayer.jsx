@@ -3,8 +3,10 @@ import { PhoneMarkup } from './PhoneMarkup.jsx'
 import { createRuntimeSession, loadClassic, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
+import { createKeyboardSession } from './keyboard/KeyboardSession.js'
 
 export function MrpPlayer({ game, onExit, onReady }) {
+  const [keyboardSession] = useState(() => createKeyboardSession())
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   useEffect(() => {
@@ -14,10 +16,13 @@ export function MrpPlayer({ game, onExit, onReady }) {
     const styles = ['/style/main.css', '/style/feedback.css']
     let alive = true
     const session = createRuntimeSession()
+    window.__XIAOCHAO_KEYBOARD_SESSION__ = keyboardSession
     window.__XIAOCHAO_RUNTIME_SESSION__ = session
     ;(async () => {
       try {
         await Promise.all(styles.map((src) => loadStyle(src, session)))
+        const keyboardReady = await keyboardSession.ready
+        if (!keyboardReady.available) window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__ = true
         for (const src of ['/config/i18n.js', '/config/settings.js', '/runtime/j2me/touch-layout.js', '/ui-feedback.js', '/keypad-canvas.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/maopao/vmrp_v1.0/vmrp.js']) {
           await loadClassic(src, session)
           if (!alive || !session.active) return
@@ -37,14 +42,17 @@ export function MrpPlayer({ game, onExit, onReady }) {
     return () => {
       alive = false
       session.invalidate()
+      keyboardSession.invalidate()
       try { if (window.Module && window.Module._setEventEnable) window.Module._setEventEnable(false) } catch (_) {}
       try { window.js_stopSound && window.js_stopSound() } catch (_) {}
       document.body.classList.remove('runtime-active')
       window.__XIAOCHAO_RUNTIME_MRP = ''
       window.__XIAOCHAO_RUNTIME_MRP_URL = ''
       if (window.__XIAOCHAO_RUNTIME_SESSION__ === session) delete window.__XIAOCHAO_RUNTIME_SESSION__
+      if (window.__XIAOCHAO_KEYBOARD_SESSION__ === keyboardSession) delete window.__XIAOCHAO_KEYBOARD_SESSION__
+      delete window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__
       cleanupRuntimeArtifacts()
     }
-  }, [game, onExit])
+  }, [game, onExit, keyboardSession])
   return <div className="runtime-view">{loading && !error ? <RuntimeLoading label="正在启动冒泡社区…" /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup mrp /></div>
 }
