@@ -3,11 +3,17 @@ import { PhoneMarkup } from './PhoneMarkup.jsx'
 import { createRuntimeSession, loadClassic, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
+import { createKeyboardSession } from './keyboard/KeyboardSession.js'
+import { createKeyboardProfileStorage } from './keyboard/storage.js'
 
 const styles = ['/style/main.css', '/style/lcdui.css', '/style/feedback.css']
-const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/runtime/j2me/touch-layout.js', '/panel.js', '/keypad-canvas.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/keymap.js']
+const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/runtime/j2me/touch-layout.js', '/panel.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/keymap.js']
 
 export function J2MEPlayer({ game, onExit, onReady }) {
+  const [keyboardSession] = useState(() => createKeyboardSession({
+    runtime: 'j2me',
+    gameId: game.id || game.file,
+  }))
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   function applyRuntimeSettings() {
@@ -32,6 +38,8 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     window.__XIAOCHAO_RUNTIME_JAR = game.local ? `local:${jarFile}` : `jar/${jarFile}`
     let alive = true
     const session = createRuntimeSession()
+    window.__XIAOCHAO_KEYBOARD_SESSION__ = keyboardSession
+    window.KeyboardProfileStorage = createKeyboardProfileStorage()
     window.__XIAOCHAO_RUNTIME_SESSION__ = session
     ;(async () => {
       try {
@@ -39,12 +47,22 @@ export function J2MEPlayer({ game, onExit, onReady }) {
           if (!alive || !session.active) throw new Error('运行时已退出')
         }
         await Promise.all(styles.map((src) => loadStyle(src, session)))
+        const keyboardReady = await keyboardSession.ready
+        if (keyboardReady.available) {
+          window.__XIAOCHAO_KEYBOARD_SESSION__ = keyboardSession
+        } else {
+          window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__ = true
+        }
         for (const src of scripts) {
           await loadClassic(src, session)
           ensureActive()
         }
         if (window.TouchLayout?.forGame && window.config?.gameId) {
-          window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__ = window.TouchLayout.forGame(window.config.gameId)
+          keyboardSession.setGameId(window.config.gameId)
+          const touchLayout = window.TouchLayout.forGame(window.config.gameId, 'j2me')
+          window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__ = touchLayout
+          touchLayout.migrate()
+          keyboardSession.refreshConfig()
         }
         ensureActive()
         const overlayRoot = document.querySelector('.runtime-overlay-root')
@@ -93,6 +111,7 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     return () => {
       alive = false
       session.invalidate()
+      keyboardSession.invalidate()
       try { window.myflushAll && window.myflushAll() } catch (_) {}
       try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
       document.body.classList.remove('runtime-active')
@@ -101,8 +120,11 @@ export function J2MEPlayer({ game, onExit, onReady }) {
       window.__XIAOCHAO_REQUEST_EXIT = null
       window.__XIAOCHAO_J2ME_CTX = null
       if (window.__XIAOCHAO_RUNTIME_SESSION__ === session) delete window.__XIAOCHAO_RUNTIME_SESSION__
+      if (window.__XIAOCHAO_KEYBOARD_SESSION__ === keyboardSession) delete window.__XIAOCHAO_KEYBOARD_SESSION__
+      delete window.KeyboardProfileStorage
+      delete window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__
       cleanupRuntimeArtifacts()
     }
-  }, [game, onExit])
-  return <div className="runtime-view">{loading && !error ? <RuntimeLoading /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup /></div>
+  }, [game, onExit, keyboardSession])
+  return <div className="runtime-view">{loading && !error ? <RuntimeLoading /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup keyboardSession={keyboardSession} /></div>
 }

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, Popup, Tabs } from 'antd-mobile'
+import { KeyboardEditor } from './keyboard/KeyboardEditor.jsx'
 
 const ACTIONS = [
   ['up', '上'], ['down', '下'], ['left', '左'], ['right', '右'], ['ok', '确认'],
@@ -18,13 +19,12 @@ function controlsFor(bindings, action) {
   return Object.keys(bindings || {}).filter((control) => bindings[control] === action).map(controlName).join('、') || '未绑定'
 }
 
-export function InputMappingPopup({ visible, onClose }) {
+export function InputMappingPopup({ visible, onClose, gameId, runtime }) {
   const [controller, setController] = useState(null)
   const [bindings, setBindings] = useState({ keyboard: {}, gamepad: {} })
   const [capturing, setCapturing] = useState('')
   const [connected, setConnected] = useState(false)
   const [activeTab, setActiveTab] = useState('devices')
-  const layoutHost = useRef(null)
 
   useEffect(() => {
     if (!visible) {
@@ -69,16 +69,6 @@ export function InputMappingPopup({ visible, onClose }) {
     if (controller) setBindings((state) => ({ ...state, keyboard: controller.keyboardBindings() }))
   }
 
-  useEffect(() => {
-    const host = layoutHost.current
-    const adapter = window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__
-    if (!visible || activeTab !== 'touch' || !host || !adapter) return
-    controller?.cancelCapture()
-    setCapturing('')
-    host.replaceChildren(window.TouchLayout.renderControls(adapter))
-    return () => host.replaceChildren()
-  }, [visible, activeTab, controller])
-
   return <Popup visible={visible} onMaskClick={onClose} onClose={onClose} position="bottom" bodyClassName="inputMappingSheet">
     <section className="inputMappingPanel" role="dialog" aria-modal="true" aria-label="按键映射">
       <header className="inputMappingHeader">
@@ -104,7 +94,9 @@ export function InputMappingPopup({ visible, onClose }) {
             <Button size="small" fill="outline" onClick={resetGamepad}>恢复手柄默认</Button>
           </footer>
         </Tabs.Tab>
-        <Tabs.Tab title="触屏键位" key="touch"><div ref={layoutHost} className="touchLayoutEditor" /></Tabs.Tab>
+        <Tabs.Tab title="触屏键位" key="touch">
+          {visible && activeTab === 'touch' && <KeyboardEditor gameId={gameId} runtime={runtime} onClose={onClose} />}
+        </Tabs.Tab>
       </Tabs>
     </section>
   </Popup>

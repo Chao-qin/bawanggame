@@ -69,33 +69,34 @@
         holders[source] = true;
         owners[source] = action;
         if (first && sink.press) sink.press(action, source);
-        if (first && source.indexOf("touch:") !== 0) startRepeat(action, source);
+        if (first) startRepeat(action);
         return;
       }
       if (owners[source] !== action) return;
       delete owners[source];
       var held = actionOwners[action];
       if (held) delete held[source];
-      stopRepeat(source);
       if (held && Object.keys(held).length === 0) {
         delete actionOwners[action];
+        stopRepeat(action);
         if (sink.release) sink.release(action, source);
       }
     }
 
-    function startRepeat(action, source) {
+    function startRepeat(action) {
       if (options.repeat === false || !sink.repeat) return;
-      repeatTimers[source] = root.setTimeout(function repeat() {
-        if (owners[source] !== action || destroyed) return;
-        if (sink.repeat) sink.repeat(action, source);
-        repeatTimers[source] = root.setTimeout(repeat, repeatInterval);
+      if (repeatTimers[action]) return;
+      repeatTimers[action] = root.setTimeout(function repeat() {
+        if (!actionOwners[action] || destroyed) { delete repeatTimers[action]; return; }
+        if (sink.repeat) sink.repeat(action, "repeat:" + action);
+        repeatTimers[action] = root.setTimeout(repeat, repeatInterval);
       }, repeatDelay);
     }
 
-    function stopRepeat(source) {
-      if (!repeatTimers[source]) return;
-      root.clearTimeout(repeatTimers[source]);
-      delete repeatTimers[source];
+    function stopRepeat(action) {
+      if (!repeatTimers[action]) return;
+      root.clearTimeout(repeatTimers[action]);
+      delete repeatTimers[action];
     }
 
     function keyboardAction(event) {
@@ -118,7 +119,7 @@
         root.dispatchEvent(new root.CustomEvent("xiaochao:inputbinding", { detail: { action: action, control: capturedKey, kind: "keyboard" } }));
         return;
       }
-      if (target && target.closest && target.closest("input, textarea, select, [contenteditable=true], #panel, #btroom, #files, #mrp-dialog, .inputMappingSheet, .exitConfirm")) return;
+      if (target && target.closest && target.closest("input, textarea, select, [contenteditable=true], [data-keyboard-editor], #panel, #btroom, #files, #mrp-dialog, .inputMappingSheet, .exitConfirm")) return;
       var action = event.key === "*" ? "star" : event.key === "#" ? "pound" : keyboardAction(event);
       if (!validAction(action)) return;
       event.preventDefault();
@@ -288,6 +289,7 @@
       press: function (source, action) { if (validAction(action)) emit(action, true, source); },
       release: function (source, action) { if (validAction(action)) emit(action, false, source); },
       repeat: function (source, action) { if (validAction(action) && sink.repeat) sink.repeat(action, source); },
+      releaseAll: releaseAll,
       actions: ACTIONS.slice(),
       gamepadBindings: function () { return Object.assign({}, gamepadBindings); },
       keyboardBindings: function () { return Object.assign({}, keyboardBindings); },
