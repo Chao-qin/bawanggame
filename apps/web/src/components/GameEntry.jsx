@@ -1,11 +1,18 @@
 import { Button, Card } from 'antd-mobile'
+import { useState } from 'react'
 
 function initialFor(value) {
   return (value || '?').trim().charAt(0).toUpperCase()
 }
 
+export function GameArtwork({ src, name, className = '' }) {
+  const [failed, setFailed] = useState(null)
+  return <span className={`gameArtwork ${className}`} aria-hidden="true">
+    {src && src !== failed ? <img src={src} alt="" onError={() => setFailed(src)} /> : initialFor(name)}
+  </span>
+}
+
 export function LibraryGameEntry({ game, onOpen, selected, selecting, disabled }) {
-  const initial = initialFor(game.name)
   return <button
     type="button"
     className={'card' + (selected ? ' cardSelected' : '')}
@@ -16,9 +23,7 @@ export function LibraryGameEntry({ game, onOpen, selected, selecting, disabled }
     title={game.desc || game.name}
   >
     {selected && <span className="cardCheck" aria-hidden="true">✓</span>}
-    <span className="gameArtwork cardIcon">
-      {game.iconUrl ? <img className="h-full w-full object-contain image-render-pixel" src={game.iconUrl} alt="" /> : initial}
-    </span>
+    <GameArtwork src={game.iconUrl} name={game.name} className="cardIcon" />
     <span className="gameEntryInfo">
       <span className="cardName">{game.name}</span>
       <span className="cardMeta">{[game.vendor, formatSize(game.size), game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机' : ''].filter(Boolean).join(' · ') || '\u00a0'}</span>
@@ -29,7 +34,7 @@ export function LibraryGameEntry({ game, onOpen, selected, selecting, disabled }
 export function RecentGameEntry({ game, onOpen }) {
   const plays = game.plays != null ? game.plays + ' 次游玩' : ''
   return <button type="button" className="miniCard" onClick={() => onOpen(game)} title={game.name}>
-    <span className="gameArtwork cardIcon">{initialFor(game.name)}</span>
+    <GameArtwork src={game.iconUrl} name={game.name} className="cardIcon" />
     <span className="gameEntryInfo">
       <span className="cardName">{game.name}</span>
       {plays && <span className="cardMeta">{plays}</span>}
@@ -40,7 +45,7 @@ export function RecentGameEntry({ game, onOpen }) {
 export function StoreGameEntry({ icon, title, metadata, description, action, cover, className = 'storeCard' }) {
   return <Card className={className} bodyClassName="storeCardBody">
     {cover
-      ? <div className="gameArtwork flashCover"><img src={cover.src || undefined} alt={cover.alt || ''} loading="lazy" onError={cover.onError} /><span aria-hidden="true">{cover.fallback}</span></div>
+      ? <GameArtwork className="flashCover" src={cover.src} name={cover.fallback} />
       : <div className="gameArtwork storeIcon">{icon}</div>}
     <div className="storeInfo">
       <h3 className="storeInfoTitle">{title}</h3>

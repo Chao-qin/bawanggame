@@ -266,7 +266,7 @@
       ["choice", "back", "ret", "clear"].forEach(function (id) {
         var item = rectFor(id, canvasRect);
         drawSoft(item, color);
-        if (item && !item.node.querySelector('.keypadIcon')) drawFeatureGlyph(item, id, color, styles);
+         if (item) drawFeatureGlyph(item, id, color, styles);
       });
       if (portrait) drawDpad(canvasRect, color, styles);
       drawNumbers(canvasRect, color, styles);

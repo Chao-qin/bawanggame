@@ -121,10 +121,10 @@ body.runtime-active #display { flex: 0 1 auto; }
 body.runtime-active #canvas { max-width: 100%; max-height: 100%; }
 body.runtime-active #nav,
 body.runtime-active #numpad { width: 100% !important; }
-body.runtime-active #keypad.keypad-1 { --u: min(36px, 7vw, 5vh); }
-body.runtime-active #keypad.keypad-2 { --u: min(46px, 9vw, 6vh); }
-body.runtime-active #keypad.keypad-3 { --u: min(56px, 11vw, 7vh); }
-body.runtime-active #keypad.keypad-4 { --u: min(66px, 13vw, 8vh); }
+body.runtime-active #keypad.keypad-1 { --u: min(36px, 7vw, 5vh, var(--key-size-limit, 66px)); }
+body.runtime-active #keypad.keypad-2 { --u: min(46px, 9vw, 6vh, var(--key-size-limit, 66px)); }
+body.runtime-active #keypad.keypad-3 { --u: min(56px, 11vw, 7vh, var(--key-size-limit, 66px)); }
+body.runtime-active #keypad.keypad-4 { --u: min(66px, 13vw, 8vh, var(--key-size-limit, 66px)); }
 body.runtime-active #keypad { flex: 0 0 auto; min-height: max-content; min-width: 0; justify-content: flex-start; }
 body.runtime-active #nav { flex: 0 0 auto; height: calc(var(--u) * 4.6); min-height: calc(var(--u) * 4.6); }
 body.runtime-active #numpad { flex: 0 0 auto; grid-template-rows: repeat(4, calc(var(--u) * 0.95)); grid-auto-rows: calc(var(--u) * 0.95); min-height: 0; }
@@ -346,6 +346,7 @@ body.fixed-screen #display-container {
 }
 
 #keypad .key.down .keypadIcon { color: #081018 !important; }
+#keypad.keypad-canvas-mode :is(.soft, .mini) .keypadIcon { visibility: hidden; }
 #keypad :is(.soft, .mini) .keypadIcon {
   width: min(40%, 20px);
   height: min(40%, 20px);
@@ -1757,14 +1758,8 @@ body.runtime-active .runtime-stage {
   padding: 0 var(--safe-area-right, 0px) var(--safe-area-bottom, 0px) var(--safe-area-left, 0px);
 }
 
-body.runtime-active.viewport-short-height #keypad {
-  --u: min(var(--u), 34px);
-}
-
-body.runtime-active.viewport-compact #keypad {
-  --u: min(var(--u), 28px);
-  gap: calc(var(--u) * 0.18);
-}
+body.runtime-active.viewport-short-height #keypad { --key-size-limit: 34px; }
+body.runtime-active.viewport-compact #keypad { --key-size-limit: 28px; gap: calc(var(--u) * 0.18); }
 
 body.runtime-active.viewport-landscape #display-container {
   min-width: 0;

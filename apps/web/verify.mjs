@@ -35,6 +35,7 @@ const chromeExited = new Promise((resolve) => {
   chrome.once('error', resolve)
 })
 let ws
+let inRuntimeFrame = false
 let id = 0
 const pending = new Map()
 const jsErrors = []
@@ -62,6 +63,9 @@ function send(method, params = {}) {
 }
 
 async function evaluate(expression) {
+  if (inRuntimeFrame) {
+    expression = `document.querySelector('.runtimeFrame')?.contentWindow.eval(${JSON.stringify(expression)})`
+  }
   const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
   if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || 'browser evaluation failed')
   return result.result.value
@@ -288,7 +292,16 @@ try {
   for (const [label, route] of UI_ROUTES) {
     await navigate(route, 500)
     if (route.endsWith('/store')) await waitFor("document.querySelector('.storeCard')", 'Java catalog fixture')
-    if (route.endsWith('/flash-store')) await waitFor("document.querySelector('.flashCover')", 'Flash catalog fixture')
+    if (route.endsWith('/flash-store')) {
+      await waitFor("document.querySelector('.flashCover img')", 'Flash catalog fixture')
+      requireCheck(await evaluate(`(() => {
+        const section = document.querySelector('.flashArchiveSection')
+        const form = section.querySelector('.flashImportFields')
+        const grid = section.querySelector('.archiveGrid')
+        return grid.getBoundingClientRect().top > form.getBoundingClientRect().bottom &&
+          getComputedStyle(grid.querySelector('img')).objectFit === 'contain'
+      })()`), 'Flash results touch search or crop the thumbnail')
+    }
     for (const [width, height] of UI_VIEWPORTS) {
       await inspectUiViewport(label, width, height)
     }
@@ -463,19 +476,20 @@ try {
     console.log('SKIP: no J2ME fixture (set VERIFY_J2ME_FILE)')
   } else {
     const route = `#/play/j2me/${encodeURIComponent(J2ME_FILE)}?tab=j2me&name=Verify%20J2ME`
+    inRuntimeFrame = true
     await navigate(route, 2500)
     const j2me = await evaluate(`(() => ({ player: !!document.querySelector('.player'), phone: !!document.querySelector('#phone'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure'), editor: !!document.querySelector('#editor-layer'), states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [] }))()`)
     console.log('J2ME startup:', JSON.stringify(j2me))
     requireCheck(j2me.player && j2me.phone && j2me.editor, 'J2ME player did not mount')
     requireCheck(j2me.states.includes('boot') || j2me.states.includes('failure') || j2me.boot || j2me.failure, 'J2ME startup state was never rendered')
-    const viewports = [[844, 390], [1280, 720], [390, 844], [375, 667]]
+    const viewports = [[844, 390], [1280, 720], [390, 844], [320, 568], [375, 667]]
     for (const [width, height] of viewports) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
       await evaluate(`document.body.dataset.orientation='${width > height ? 'landscape' : 'portrait'}'; window.TouchLayout?.apply(window.TouchLayout.defaults()); window.ScreenSetup?.refit?.(); true`)
       await sleep(100)
       const snapshot = await rectSnapshot()
       console.log(`Viewport ${width}x${height}:`, JSON.stringify(snapshot))
-      if (width === 375) {
+      if (width === 320 || width === 375) {
         const portrait = await evaluate(`(() => {
           const rect = (id) => document.querySelector(id).getBoundingClientRect()
           const canvas = rect('#canvas')
@@ -484,11 +498,17 @@ try {
             headerGap: canvas.top - rect('.runtimeToolbar').bottom,
             leftGap: rect('#ret').top - rect('#choice').bottom,
             rightGap: rect('#clear').top - rect('#back').bottom,
+            navHeight: rect('#nav').height,
+            digitHeight: rect('#numpad .key').height,
+            digitGap: parseFloat(getComputedStyle(document.querySelector('#numpad')).rowGap),
           }
         })()`)
         console.log('J2ME portrait gaps:', JSON.stringify(portrait))
         requireCheck(portrait.canvasHeight > 0 && portrait.headerGap > 0, 'J2ME toolbar overlaps the game canvas')
         requireCheck(portrait.leftGap > 0 && portrait.rightGap > 0, 'J2ME side buttons have no vertical gap')
+        requireCheck(portrait.navHeight > 60 && portrait.digitHeight > 18 && portrait.digitGap > 0, 'J2ME portrait keys collapsed')
+      }
+      if (width === 375) {
         const toolbar = await evaluate(`(() => {
           const toggle = document.querySelector('.runtimeToolbarToggle')
           const buttons = [...document.querySelectorAll('.runtimeToolbar .adm-button')]
@@ -521,17 +541,20 @@ try {
       } else console.log(`SKIP: J2ME geometry not ready at ${width}x${height}`)
     }
     await send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: true })
-    await evaluate(`document.body.dataset.orientation='landscape'; document.body.dataset.sideLayout='standard'; window.ScreenSetup?.refit?.(); true`)
+    await sleep(150)
+    await evaluate(`document.body.dataset.orientation='landscape'; window.TouchLayout.apply({...window.TouchLayout.defaults(), sides:'standard'}); window.ScreenSetup?.refit?.(); true`)
     const standard = await rectSnapshot()
     requireCheck(!standard.navBeforeNumpad, 'standard side layout should keep navigation on the right')
-    await evaluate(`document.body.dataset.sideLayout='swapped'; window.ScreenSetup?.refit?.(); true`)
+    await evaluate(`window.TouchLayout.apply(window.TouchLayout.defaults()); window.ScreenSetup?.refit?.(); true`)
     await send('Emulation.clearDeviceMetricsOverride')
     await clickPlayerBack()
     await sleep(150)
     requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'exit confirmation did not open')
     await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
+    inRuntimeFrame = false
     await sleep(1500)
     requireCheck(await evaluate("!!document.querySelector('.tab')"), 'exit did not return to library')
+    inRuntimeFrame = true
     await navigate(route, 2500)
     const secondEntry = await evaluate(`(() => ({ player: !!document.querySelector('.player'), states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [] }))()`)
     requireCheck(secondEntry.player, 'J2ME second entry did not mount')
@@ -539,6 +562,7 @@ try {
     await clickPlayerBack()
     await sleep(150)
     await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
+    inRuntimeFrame = false
     await sleep(1500)
   }
 
