@@ -308,71 +308,6 @@ body.fixed-screen #display-container {
   user-select: none;
 }
 
-/* The canvas owns the visible keypad. Keep the DOM controls transparent so
-   Touchpad can continue using their stable hit rectangles and accessibility
-   semantics while the renderer owns every painted pixel. */
-#keypad-canvas {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-#keypad.keypad-canvas-mode .key {
-  background: transparent !important;
-  box-shadow: none !important;
-  color: transparent !important;
-  border-color: transparent !important;
-  text-shadow: none !important;
-  -webkit-text-fill-color: transparent !important;
-}
-
-#keypad.keypad-canvas-mode .key * {
-  color: transparent !important;
-  text-shadow: none !important;
-  -webkit-text-fill-color: transparent !important;
-}
-
-#keypad .key .keypadIcon {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: min(60%, 24px);
-  height: min(60%, 24px);
-  color: var(--phone-text, #e8ecf2) !important;
-  pointer-events: none;
-}
-
-#keypad .key.down .keypadIcon { color: #081018 !important; }
-#keypad.keypad-canvas-mode :is(.soft, .mini) .keypadIcon { visibility: hidden; }
-#keypad :is(.soft, .mini) .keypadIcon {
-  width: min(40%, 20px);
-  height: min(40%, 20px);
-}
-#dpad > .key { position: relative; }
-#keypad .key:has(.keypadIcon)::before { display: none; }
-body[data-dpad-layout="mirror"] :is(#left, #right) .keypadIcon { transform: rotate(180deg); }
-body[data-dpad-layout="rotate-cw"] .dir .keypadIcon { transform: rotate(90deg); }
-body[data-dpad-layout="rotate-ccw"] .dir .keypadIcon { transform: rotate(-90deg); }
-
-#keypad.keypad-canvas-mode .key::before,
-#keypad.keypad-canvas-mode #dpad {
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-#keypad.keypad-canvas-mode .key::before {
-  border-color: transparent !important;
-  opacity: 0 !important;
-}
-
-#keypad.keypad-canvas-mode #nav,
-#keypad.keypad-canvas-mode #numpad {
-  position: relative;
-  z-index: 1;
-}
 
 /* 手机壳内部：按键区始终填满可用宽度，不能被旧的桌面 max-width 限制。 */
 body.runtime-active #keypad {
@@ -419,15 +354,6 @@ body.runtime-active #numpad {
 #panel .panel-box,
 #panel .panel-box * {
   touch-action: pan-y !important;
-}
-
-#keypad,
-#keypad * {
-  pointer-events: auto;
-}
-
-#keypad-canvas {
-  pointer-events: none !important;
 }
 
 #keypad input,
@@ -675,14 +601,6 @@ body.runtime-active:not([data-orientation="landscape"]) :is(#choice, #back, #ret
   transform: translateY(1px);
   background: linear-gradient(#4a78c2, #3a62a3) !important;
   box-shadow: 0 1px 0 #0d1015 !important;
-}
-
-#keypad.keypad-canvas-mode .key.down {
-  transform: none !important;
-}
-
-#keypad .key:focus-visible {
-  outline: 0;
 }
 
 .dir.down {
@@ -1767,10 +1685,6 @@ body.runtime-active.viewport-landscape #display-container {
   min-width: 0;
 }
 
-body.runtime-active.viewport-landscape #keypad-canvas {
-  max-width: 100%;
-}
-
 body.runtime-active.keyboard-open .runtimeToolbar {
   transform: translate(-50%, calc(-1 * var(--keyboard-height, 0px)));
 }
@@ -1781,9 +1695,7 @@ body.runtime-active.keyboard-open .runtimeToolbar {
   body.runtime-active #numpad { max-width: 100vw; }
 }
 
-/* Keep landscape controls in a real three-column containing block. The old
-   display:contents composition made #keypad-canvas lose its containing block
-   and allowed #numpad to collapse or escape the viewport in WebViews. */
+/* Keep the stage in a real containing block on landscape WebViews. */
 body.runtime-active[data-orientation="landscape"] .runtime-stage,
 body.runtime-active.viewport-landscape .runtime-stage {
   position: relative;
@@ -1839,12 +1751,6 @@ body.runtime-active.viewport-landscape #keypad {
   pointer-events: none;
 }
 
-body.runtime-active[data-orientation="landscape"] #keypad-canvas,
-body.runtime-active.viewport-landscape #keypad-canvas {
-  z-index: 0;
-  pointer-events: none !important;
-}
-
 body.runtime-active[data-orientation="landscape"] #numpad,
 body.runtime-active.viewport-landscape #numpad,
 body.runtime-active[data-orientation="landscape"] #nav,
@@ -1879,4 +1785,45 @@ body.runtime-active[data-orientation="landscape"] #display,
 body.runtime-active.viewport-landscape #display {
   max-width: 100%;
   max-height: 100%;
+}
+
+/* The runtime keyboard is a transparent stage overlay. Only key groups opt
+   into pointer input so empty stage space still reaches the display. */
+#keypad {
+  pointer-events: none;
+}
+
+.keyboard-surface {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  background: transparent;
+}
+
+.keyboard-key {
+  cursor: pointer;
+  fill: var(--keyboard-key-fill, #39434f);
+  stroke: var(--keyboard-border, #8793a1);
+  stroke-width: 0.006;
+  color: var(--keyboard-text, #fff);
+  outline: none;
+}
+
+.keyboard-key text {
+  fill: currentColor;
+  font-size: 0.028;
+  pointer-events: none;
+  user-select: none;
+}
+
+.keyboard-key.is-pressed {
+  fill: var(--keyboard-pressed, #38a169);
+}
+
+.keyboard-key:focus-visible {
+  stroke: var(--keyboard-focused, #f6c344);
+  stroke-width: 0.012;
 }

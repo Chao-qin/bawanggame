@@ -45,7 +45,7 @@
       press: function (action) {
         if (KEYCODES[action] == null) return;
         cEvent(0, KEYCODES[action]);
-        tapFx(document.getElementById(action));
+        tapFx(document.querySelector('[data-action-id="' + action + '"]'));
       },
       release: function (action) { if (KEYCODES[action] != null) cEvent(1, KEYCODES[action]); },
       repeat: function (action) { if (KEYCODES[action] != null) cEvent(0, KEYCODES[action]); }
@@ -59,6 +59,7 @@
     delete window.__XIAOCHAO_INPUT_RESET__;
   };
   function tapFx(node) {
+    if (!node) return;
     node.classList.add('tap');
     setTimeout(function () { node.classList.remove('tap'); }, 160);
   }
@@ -72,8 +73,15 @@
   var phone = window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 800;
   var keypadTouchpad = null;
   function bindTouchpad() {
+    var keyboardSession = window.__XIAOCHAO_KEYBOARD_SESSION__;
+    var surface = keyboardSession && keyboardSession.getSurface && keyboardSession.getSurface();
+    var actionMap = {};
+    Object.keys(KEYCODES).forEach(function (action) { actionMap[action] = action; });
     keypadTouchpad = Touchpad.bind({
-      buttons: TouchLayout.mapButtons(KEYCODES, keypadLayout),
+      surface: surface,
+      buttons: KEYCODES,
+      actionMap: actionMap,
+      input: inputController,
       dpadVisual: function (direction) { return TouchLayout.visualDpad(direction, keypadLayout); },
       sink: {
         press: function (code, meta) {

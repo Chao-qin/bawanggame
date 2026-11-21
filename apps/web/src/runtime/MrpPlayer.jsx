@@ -23,7 +23,7 @@ export function MrpPlayer({ game, onExit, onReady }) {
         await Promise.all(styles.map((src) => loadStyle(src, session)))
         const keyboardReady = await keyboardSession.ready
         if (!keyboardReady.available) window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__ = true
-        for (const src of ['/config/i18n.js', '/config/settings.js', '/runtime/j2me/touch-layout.js', '/ui-feedback.js', '/keypad-canvas.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/maopao/vmrp_v1.0/vmrp.js']) {
+        for (const src of ['/config/i18n.js', '/config/settings.js', '/runtime/j2me/touch-layout.js', '/ui-feedback.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/maopao/vmrp_v1.0/vmrp.js']) {
           await loadClassic(src, session)
           if (!alive || !session.active) return
         }
@@ -54,5 +54,5 @@ export function MrpPlayer({ game, onExit, onReady }) {
       cleanupRuntimeArtifacts()
     }
   }, [game, onExit, keyboardSession])
-  return <div className="runtime-view">{loading && !error ? <RuntimeLoading label="正在启动冒泡社区…" /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup mrp /></div>
+  return <div className="runtime-view">{loading && !error ? <RuntimeLoading label="正在启动冒泡社区…" /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup mrp keyboardSession={keyboardSession} /></div>
 }

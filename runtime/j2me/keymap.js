@@ -275,9 +275,16 @@
     kick();
   }
   function bindTouchpad() {
-    var buttons = touchButtons();
+    var keyboardSession = window.__XIAOCHAO_KEYBOARD_SESSION__;
+    var surface = keyboardSession && keyboardSession.getSurface && keyboardSession.getSurface();
+    var buttons = BUTTONS;
+    var actionMap = {};
+    Object.keys(BUTTONS).forEach(function (action) { actionMap[action] = action; });
     pad = Touchpad.bind({
+      surface: surface,
       buttons: buttons,
+      actionMap: actionMap,
+      input: inputController,
       dpadVisual: function (direction) { return window.TouchLayout ? TouchLayout.visualDpad(direction, config.touchLayout) : direction; },
       sink: {
         press: function (code, meta) {
