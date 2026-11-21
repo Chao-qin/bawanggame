@@ -1,4 +1,4 @@
-import { Button, Card, DotLoading, Empty, Input, Popup, SearchBar, TextArea } from 'antd-mobile'
+import { Button, DotLoading, Empty, Input, Popup, SearchBar, TextArea } from 'antd-mobile'
 import { AppstoreOutline, ArrowsAltOutline, CalculatorOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline, ShrinkOutline } from 'antd-mobile-icons'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
@@ -7,6 +7,8 @@ import { MrpPlayer } from './runtime/MrpPlayer.jsx'
 import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
 import { FlashPlayer } from './runtime/FlashPlayer.jsx'
 import { InputMappingPopup } from './runtime/InputMappingPopup.jsx'
+import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
+import { LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
 import { installResponsiveContract } from './responsive.js'
 import { addBundled, addFromFile, addFromUrl, list as listLocalFlash, remove as removeLocalFlash } from './localFlash.js'
@@ -362,42 +364,6 @@ function duplicateMessage(name) {
   return `已安装过「${name}」，无需重复安装`
 }
 
-function GameCard({ game, onOpen, selected, selecting, disabled }) {
-  const initial = (game.name || '?').trim().charAt(0).toUpperCase()
-  return (
-    <button
-      type="button"
-      className={'card' + (selected ? ' cardSelected' : '')}
-      aria-pressed={selecting && game.local ? selected : undefined}
-      aria-disabled={disabled || undefined}
-      disabled={disabled}
-      onClick={() => onOpen(game)}
-      title={game.desc || game.name}
-    >
-      {selected && <span className="cardCheck" aria-hidden="true">✓</span>}
-      <div className="cardIcon">
-        {game.iconUrl ? <img className="h-full w-full object-contain image-render-pixel" src={game.iconUrl} alt="" /> : initial}
-      </div>
-      <div className="cardName">{game.name}</div>
-      <div className="cardMeta">
-        {[game.vendor, formatSize(game.size), game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机' : ''].filter(Boolean).join(' · ') || '\u00a0'}
-      </div>
-    </button>
-  )
-}
-
-function MiniCard({ item, onOpen }) {
-  const initial = (item.name || '?').trim().charAt(0).toUpperCase()
-  const meta = item.plays != null ? item.plays + ' 次游玩' : ''
-  return (
-    <button className="miniCard" onClick={() => onOpen(item)} title={item.name}>
-      <div className="cardIcon">{initial}</div>
-      <div className="cardName">{item.name}</div>
-      {meta && <div className="cardMeta">{meta}</div>}
-    </button>
-  )
-}
-
 function GameRow({ title, items, onOpen }) {
   if (!items || items.length === 0) return null
   return (
@@ -405,7 +371,7 @@ function GameRow({ title, items, onOpen }) {
       <h2 className="rowTitle">{title}</h2>
       <div className="rowScroll">
         {items.map((it) => (
-          <MiniCard key={it.kind + ':' + it.file} item={it} onOpen={onOpen} />
+          <RecentGameEntry key={it.kind + ':' + it.file} game={it} onOpen={onOpen} />
         ))}
       </div>
     </section>
@@ -621,7 +587,7 @@ function Library({ kind, onPlay }) {
       )}
       <div className="gameGrid">
           {(!loading || kind === 'flash') && games.map((g) => (
-            <GameCard
+            <LibraryGameEntry
               key={gameKey(g)}
               game={g}
               onOpen={openGame}
@@ -793,11 +759,10 @@ function FlashStore({ onRefreshLibrary }) {
       {archiveOnline && !archiveLoading && !archiveError && archiveGames.length === 0 && <div className="emptyPanel"><strong>{archiveQuery.trim() ? '没有找到匹配的游戏' : '目录暂无游戏'}</strong><span>尝试其他关键词，或稍后刷新目录。</span></div>}
       {archiveGames.length > 0 && <div className="storeGrid archiveGrid">{archiveGames.map((game) => {
         const isAdded = added.has(`url:/__flash/download/${game.code}`) || local.games.some((item) => item.sourceUrl.includes(`/__flash/download/${game.code}`))
-        return <Card className="storeCard" bodyClassName="storeCardBody" key={game.code}>
-          <div className="flashCover"><img src={game.coverUrl || undefined} alt="" loading="lazy" onError={(event) => { event.currentTarget.hidden = true }} /><span aria-hidden="true">{game.name.charAt(0)}</span></div>
-          <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">Flash 保存计划</p><span className="storeInfoDesc">{game.code}</span></div>
-          <Button className="downloadButton" color="primary" size="small" type="button" onClick={() => addArchiveGame(game)} disabled={busy !== '' || local.loading}>{busy === `archive:${game.code}` ? '下载中…' : isAdded ? '已加入' : '加入'}</Button>
-        </Card>
+        return <StoreGameEntry key={game.code}
+          cover={{ src: game.coverUrl, fallback: game.name.charAt(0), onError: (event) => { event.currentTarget.hidden = true } }}
+          title={game.name} metadata="Flash 保存计划" description={game.code}
+          action={{ onClick: () => addArchiveGame(game), disabled: busy !== '' || local.loading, label: busy === `archive:${game.code}` ? '下载中…' : isAdded ? '已加入' : '加入' }} />
       })}</div>}
     </section>
     <details className="flashAdvanced">
@@ -814,11 +779,9 @@ function FlashStore({ onRefreshLibrary }) {
     <section className="flashBundledSection"><h3>内置游戏</h3><div className="storeGrid">{FLASH_GAMES.map((game) => {
       const key = `catalog:${game.catalogId}`
       const isAdded = added.has(key)
-      return <Card className="storeCard" bodyClassName="storeCardBody" key={game.file}>
-        <div className="storeIcon">{game.name.charAt(0)}</div>
-        <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">内置目录 · {formatSize(game.size)}</p><span className="storeInfoDesc">{game.desc}</span></div>
-        <Button className="downloadButton" color="primary" size="small" type="button" onClick={() => addBundledGame(game)} disabled={busy !== '' || local.loading}>{busy === game.file ? '下载中…' : isAdded ? '已加入' : '加入本机'}</Button>
-      </Card>
+      return <StoreGameEntry key={game.file} icon={game.name.charAt(0)} title={game.name}
+        metadata={`内置目录 · ${formatSize(game.size)}`} description={game.desc}
+        action={{ onClick: () => addBundledGame(game), disabled: busy !== '' || local.loading, label: busy === game.file ? '下载中…' : isAdded ? '已加入' : '加入本机' }} />
     })}</div></section>
   </section>
 }
@@ -909,11 +872,10 @@ function Store({ onRefreshLibrary }) {
     {store.error && <div className="status statusError" role="alert">商城目录加载失败：{store.error} <Button className="inlineAction" fill="none" onClick={store.refresh}>重试</Button></div>}
     {store.loading && <div className="status" role="status"><DotLoading /> 正在同步 52java 目录…</div>}
     {!store.loading && !store.error && !store.games.length && <div className="emptyPanel"><strong>{appliedQuery ? '没有匹配的游戏' : '目录暂时为空'}</strong><span>可以调整筛选条件，或稍后刷新目录。</span></div>}
-    <div className="storeGrid">{store.games.map((game) => <Card className="storeCard" bodyClassName="storeCardBody" key={game.id}>
-      <div className="storeIcon">{game.iconUrl ? <img src={game.iconUrl} alt="" /> : (game.name || '?').charAt(0)}</div>
-      <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">52java · {game.plays.toLocaleString()} 次下载</p><span className="storeInfoDesc">经典 Java 手机游戏</span></div>
-      <Button className="downloadButton" color="primary" size="small" onClick={() => download(game)} disabled={busy !== ''}>{busy === String(game.id) ? '下载中…' : isInstalled(game) ? '已加入' : '加入库'}</Button>
-    </Card>)}</div>
+    <div className="storeGrid">{store.games.map((game) => <StoreGameEntry key={game.id}
+      icon={game.iconUrl ? <img src={game.iconUrl} alt="" /> : (game.name || '?').charAt(0)}
+      title={game.name} metadata={`52java · ${game.plays.toLocaleString()} 次下载`} description="经典 Java 手机游戏"
+      action={{ onClick: () => download(game), disabled: busy !== '', label: busy === String(game.id) ? '下载中…' : isInstalled(game) ? '已加入' : '加入库' }} />)}</div>
     {!store.loading && !store.error && store.games.length > 0 && <div className="storePagination"><span>第 {page} / {store.pages} 页 · {store.total.toLocaleString()} 款</span><div><Button type="button" size="small" fill="outline" className="ghostButton" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button><Button type="button" size="small" fill="outline" className="ghostButton" disabled={page >= store.pages} onClick={() => setPage(page + 1)}>下一页</Button></div></div>}
   </section>
 }
@@ -1263,20 +1225,7 @@ export default function App() {
     <div className="appShell" hidden={playing}>
       <header className="header">
         <div className="brand"><AppstoreOutline aria-hidden="true" /><h1>小潮霸王</h1></div>
-        <nav className="tabs" aria-label="游戏库和商城">
-          {TABS.map(({ id, label, Icon }) => (
-            <Button
-              key={id}
-              className={'tab' + (tab === id ? ' tabActive' : '')}
-              fill="none"
-              aria-current={tab === id ? 'page' : undefined}
-              onClick={() => switchTab(id)}
-            >
-              <Icon aria-hidden="true" />
-              <span>{label}</span>
-            </Button>
-          ))}
-        </nav>
+        <PrimaryNavigation items={TABS} activeId={tab} onSelect={switchTab} />
       </header>
       <main className="main">
         {TABS.map((t) => (

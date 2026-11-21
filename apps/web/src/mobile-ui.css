@@ -1,12 +1,23 @@
 :root {
   color-scheme: dark;
-  --ui-background: #0e141e;
-  --ui-surface: #171f2d;
-  --ui-raised: #202b3b;
-  --ui-border: #354254;
+  --ui-background: #10151d;
+  --ui-surface: #19212d;
+  --ui-raised: #232e3e;
+  --ui-border: #384658;
   --ui-text: #f0f4fc;
   --ui-muted: #aebacf;
   --ui-accent: #7ce8ce;
+  --ui-danger: #ff9aa3;
+  --ui-focus: #b8ffe9;
+  --ui-content-width: 1100px;
+  --ui-control-size: 44px;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 12px;
+  --ui-radius-lg: 16px;
 }
 
 body {
@@ -29,7 +40,7 @@ body, :root:root {
 
 .appShell {
   width: 100%;
-  max-width: 1100px;
+  max-width: var(--ui-content-width);
   min-height: 100vh;
   min-height: 100dvh;
   margin-inline: auto;
@@ -48,6 +59,7 @@ body, :root:root {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-width: 0;
   padding-block: calc(14px + var(--safe-area-top, 0px)) 14px;
   border-bottom: 1px solid var(--ui-border);
 }
@@ -69,30 +81,43 @@ body, :root:root {
 .tabs {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
+  gap: var(--ui-space-1);
   padding: 4px;
   border: 1px solid var(--ui-border);
-  border-radius: 16px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
 }
 .tabs .tab {
-  --border-radius: 12px;
+  --border-radius: var(--ui-radius-md);
   --text-color: var(--ui-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--ui-control-size);
+  margin: 0;
   padding: 8px 12px;
   font-size: 13px;
-  white-space: nowrap;
 }
 .tabs .tab > span {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  line-height: 1.2;
+  text-align: center;
 }
-.tabs .tab svg { font-size: 18px; }
+.tabs .tab svg { flex: 0 0 18px; width: 18px; height: 18px; font-size: 18px; }
 .tabs .tabActive {
   background: #263f42;
   color: var(--ui-accent);
   font-weight: 700;
+}
+.tabs .tab:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: -3px;
 }
 
 .sectionHeading, .storeHero {
@@ -106,7 +131,6 @@ body, :root:root {
 .sectionHeading h2, .storeHeroTitle {
   font-size: clamp(23px, 4vw, 30px);
   font-weight: 790;
-  letter-spacing: -.025em;
 }
 .count { color: var(--ui-muted); font-size: 13px; }
 .toolbar, .storeFilters, .storeActions, .storePagination > div {
@@ -117,16 +141,16 @@ body, :root:root {
 .toolbar, .storeFilters { margin: 14px 0 18px; }
 .search {
   --background: var(--ui-raised);
-  --height: 44px;
-  --border-radius: 12px;
+  --height: var(--ui-control-size);
+  --border-radius: var(--ui-radius-md);
   --placeholder-color: var(--ui-muted);
   flex: 1;
   min-width: 0;
 }
 .search .adm-input { --font-size: 16px; }
 .appShell .adm-button, .optionSheet .adm-button, .exitBox .adm-button {
-  --border-radius: 12px;
-  min-height: 44px;
+  --border-radius: var(--ui-radius-md);
+  min-height: var(--ui-control-size);
 }
 .appShell .adm-button-primary, .optionSheet .adm-button-primary {
   background-color: var(--ui-accent);
@@ -134,7 +158,7 @@ body, :root:root {
   font-weight: 700;
 }
 .appShell .adm-button:focus-visible, .optionSheet .adm-button:focus-visible, .player .adm-button:focus-visible {
-  outline: 2px solid var(--ui-accent);
+  outline: 2px solid var(--ui-focus);
   outline-offset: 2px;
 }
 .appShell .upload {
@@ -179,17 +203,21 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
   grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
 }
 .card, .miniCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
-  padding: 13px;
+  min-height: 84px;
+  padding: 10px 12px;
   border: 1px solid var(--ui-border);
-  border-radius: 16px;
+  border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   text-align: left;
 }
 .card:hover, .miniCard:hover, .cardSelected, .card:focus-visible, .miniCard:focus-visible {
   border-color: var(--ui-accent);
 }
-.card { position: relative; }
+.card { position: relative; width: 100%; }
 .cardSelected { box-shadow: inset 0 0 0 1px var(--ui-accent); }
 .card:disabled { opacity: .5; cursor: default; }
 .card:disabled:hover { border-color: var(--ui-border); }
@@ -223,32 +251,36 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
     padding-bottom: 8px;
   }
 }
-.cardIcon, .storeIcon, .optionIcon {
+.gameArtwork, .optionIcon {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   overflow: hidden;
-  border-radius: 13px;
+  border-radius: var(--ui-radius-sm);
   background: linear-gradient(135deg, #294c53, #233247);
   color: var(--ui-accent);
   font-size: 21px;
   font-weight: 800;
 }
-.cardIcon { margin-bottom: 10px; }
-.cardIcon img, .storeIcon img { width: 100%; height: 100%; object-fit: contain; }
+.gameArtwork img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.flashCover img { object-fit: cover; }
+.gameEntryInfo { display: grid; flex: 1 1 auto; min-width: 0; gap: 4px; }
 .cardName, .cardMeta, .optionTitle strong, .storeInfoTitle, .storeInfoDesc {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cardName, .storeInfoTitle { font-size: 14px; font-weight: 700; }
+.cardName, .storeInfoTitle { font-size: 15px; font-weight: 700; }
 .cardMeta, .storeInfoMeta, .storeInfoDesc { margin-top: 4px; color: var(--ui-muted); font-size: 12px; }
+.cardMeta, .storeInfoMeta { line-height: 1.4; }
 .row { margin-block: 16px; }
 .rowTitle { margin-bottom: 8px; font-weight: 700; }
 .rowScroll { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 6px; }
-.miniCard { width: 116px; flex-shrink: 0; }
+.miniCard { width: min(260px, 78vw); min-height: 76px; flex: 0 0 min(260px, 78vw); }
+.miniCard .gameArtwork { width: 48px; height: 48px; font-size: 18px; }
 
 .storePage { min-width: 0; }
 .storeHero { align-items: center; }
@@ -265,9 +297,18 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  min-height: 84px;
+  padding: 10px 12px;
 }
-.storeInfo { flex: 1; min-width: 0; }
+.storeInfo { display: grid; flex: 1 1 auto; min-width: 0; gap: 4px; }
+.storeInfoTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .storeInfoDesc { display: block; }
 .storeCard .downloadButton { flex-shrink: 0; }
 .storePagination { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 18px; color: var(--ui-muted); }
@@ -439,21 +480,9 @@ body.runtime-active[data-orientation="landscape"] .player:not(:has(.flashPlayerS
 .flashArchiveSection .flashImportFields { grid-template-columns: minmax(0, 1fr) auto; }
 .flashCover {
   position: relative;
-  flex: 0 0 132px;
-  width: 132px;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--ui-border);
-  border-radius: 4px;
-  background: #26343a;
-  color: var(--ui-accent);
-  font-size: 28px;
-  font-weight: 700;
 }
 .flashCover img, .flashCover span { position: absolute; inset: 0; width: 100%; height: 100%; }
-.flashCover img { z-index: 1; object-fit: cover; }
+.flashCover img { z-index: 1; }
 .flashCover span { display: grid; place-items: center; }
 .flashAdvanced {
   margin-top: 24px;
@@ -585,15 +614,90 @@ body.runtime-active[data-orientation="landscape"] .player:not(:has(.flashPlayerS
     border-width: 1px 0 0;
     border-radius: 0;
   }
-  .tabs .tab { padding: 7px 0; font-size: clamp(9px, 2.5vw, 12px); }
-  .tabs .tab > span { flex-direction: column; gap: 3px; }
-  .gameGrid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 132px), 1fr)); }
+  .tabs .tab { padding: 7px 0; font-size: 10px; }
+  .tabs .tab {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 4px 2px;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: var(--ui-radius-md);
+  }
+  .tabs .tab > span {
+    flex: 0 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+    white-space: normal;
+  }
+  .gameGrid { grid-template-columns: minmax(0, 1fr); }
   .flashImportFields { grid-template-columns: minmax(0, 1fr); }
   .storeCard .storeCardBody { gap: 8px; }
 }
 
 @media (max-width: 700px) and (max-height: 480px) {
   .appShell { padding-bottom: 24px; }
-  .tabs { position: static; width: 100%; height: auto; border-width: 1px; border-radius: 16px; }
+  .tabs { position: fixed; width: auto; height: var(--library-nav-height); border-width: 1px 0 0; border-radius: 0; }
   .header { flex-wrap: wrap; }
+}
+
+@media (min-width: 768px) {
+  .appShell {
+    padding: 0 max(20px, var(--safe-area-right, 0px)) 32px max(20px, var(--safe-area-left, 0px));
+  }
+  .header {
+    justify-content: space-between;
+  }
+  .tabs {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 4px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-lg);
+  }
+  .tabs .tab { padding: 8px 12px; font-size: 13px; }
+  .tabs .tab > span { flex-direction: row; gap: 6px; }
+  .appShell { padding-bottom: 32px; }
+  .gameGrid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+}
+
+@media (min-width: 701px) and (max-width: 767px) {
+  .appShell { padding-bottom: 32px; }
+  .tabs {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 4px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-lg);
+  }
+  .tabs .tab { padding: 8px 4px; font-size: 11px; }
+  .tabs .tab > span { flex-direction: row; gap: 4px; }
+}
+
+@media (max-width: 420px) {
+  .storeGrid { grid-template-columns: minmax(0, 1fr); }
+  .storeCard .storeCardBody { gap: 10px; }
+  .storeCard .downloadButton { min-width: 72px; }
+  .gameArtwork { width: 56px; height: 56px; }
+}
+
+@media (min-width: 421px) and (max-width: 767px) {
+  .storeGrid { grid-template-columns: minmax(0, 1fr); }
+  .gameArtwork { width: 60px; height: 60px; }
+}
+
+@media (min-width: 768px) {
+  .storeGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+}
+
+@media (max-width: 767px) and (max-height: 480px) {
+  .header { flex-wrap: nowrap; }
+  .header .brand { flex: 0 0 auto; }
+  .header .tabs { flex: 1 1 auto; }
+  .tabs .tab { min-width: 0; padding-inline: 2px; font-size: 10px; }
+  .tabs .tab > span { white-space: normal; text-align: center; }
+  .appShell { padding-bottom: calc(82px + var(--safe-area-bottom, 0px)); }
 }

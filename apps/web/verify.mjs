@@ -11,6 +11,14 @@ const BASE_URL = process.env.VERIFY_BASE_URL || 'http://127.0.0.1:8080/'
 const J2ME_FILE = process.env.VERIFY_J2ME_FILE || ''
 const MRP_FILE = process.env.VERIFY_MRP_FILE || ''
 const PROFILE = `/tmp/xiaochao-verify-${process.pid}`
+const UI_VIEWPORTS = [[320, 568], [365, 708], [390, 844], [430, 932], [844, 390], [667, 375], [1024, 768], [1365, 768]]
+const UI_ROUTES = [
+  ['J2ME library', '#/library/j2me'],
+  ['Maopao library', '#/library/maopao'],
+  ['Flash library', '#/library/flash'],
+  ['Flash store', '#/library/flash-store'],
+  ['Java store', '#/library/store'],
+]
 
 fs.rmSync(PROFILE, { recursive: true, force: true })
 const chrome = spawn(CHROME, [
@@ -34,6 +42,9 @@ const networkWarnings = []
 const optionalShellAssets = /(?:^|\/)(?:manifest\.webmanifest|icon-(?:180|192)\.png)(?:$|\?)/
 function isOptionalShellAsset(url = '') {
   return optionalShellAssets.test(url) || (!MRP_FILE && /\/maopao\/hall\/manifest\.json(?:\?|$)/.test(url))
+}
+function isExpectedProbeFailure(value = '') {
+  return value.includes('layout-probe.jar')
 }
 
 function send(method, params = {}) {
@@ -63,6 +74,96 @@ async function navigate(hash, wait = 1200) {
 
 function requireCheck(condition, message) {
   if (!condition) throw new Error(message)
+}
+
+async function waitFor(predicate, description, attempts = 30) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (await evaluate(`!!(${predicate})`)) return
+    await sleep(100)
+  }
+  throw new Error(`timeout waiting for ${description}`)
+}
+
+async function inspectUiViewport(label, width, height) {
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 768 })
+  await evaluate('window.dispatchEvent(new Event("resize"))')
+  await sleep(140)
+  const snapshot = await evaluate(`(() => {
+    const rect = (node) => {
+      if (!node) return null
+      const r = node.getBoundingClientRect()
+      return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height}
+    }
+    const overlap = (a,b) => !!a && !!b && a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1
+    const nav = document.querySelector('.tabs')
+    const navItems = [...document.querySelectorAll('.tabs .tab')]
+    const shell = document.querySelector('.appShell')
+    const main = document.querySelector('.main')
+    const gameGrid = document.querySelector('.gameGrid')
+    const storeGrid = document.querySelector('.storeGrid')
+    const entries = [...document.querySelectorAll('.card, .miniCard, .storeCard')].slice(0, 40)
+    const overflowNodes = [...document.querySelectorAll('body *')].filter((node) => {
+      const r = node.getBoundingClientRect()
+      return r.width > 0 && r.right > innerWidth + 1
+    }).slice(0, 8).map((node) => ({
+      tag: node.tagName, className: typeof node.className === 'string' ? node.className : '',
+      right: Math.round(node.getBoundingClientRect().right), width: Math.round(node.getBoundingClientRect().width),
+    }))
+    const badEntries = entries.filter((entry) => {
+      const action = entry.querySelector('.downloadButton')
+      const info = entry.querySelector('.storeInfo')
+      return action && info && overlap(rect(action), rect(info))
+    }).length
+    const badBarEntries = entries.filter((entry) => {
+      const artwork = entry.querySelector('.gameArtwork, .cardIcon')
+      const info = entry.querySelector('.gameEntryInfo, .storeInfo')
+      if (!artwork || !info) return false
+      return artwork.getBoundingClientRect().right > info.getBoundingClientRect().left + 1
+        || info.getBoundingClientRect().width < 32
+    }).length
+    const navRect = rect(nav)
+    const shellRect = rect(shell)
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      overflowNodes,
+      nav: navRect, shell: shellRect, main: rect(main),
+      navVisible: !!nav && navRect.width > 0 && navRect.height > 0,
+      navSlots: navItems.map(rect),
+      navPosition: nav ? getComputedStyle(nav).position : 'missing',
+      navOutsideViewport: !!navRect && (navRect.left < -1 || navRect.right > innerWidth + 1 || navRect.top < -1 || navRect.bottom > innerHeight + 1),
+      mainOutsideShell: !!main && !!shellRect && (main.getBoundingClientRect().left < shellRect.left - 1 || main.getBoundingClientRect().right > shellRect.right + 1),
+      gameColumns: gameGrid ? getComputedStyle(gameGrid).gridTemplateColumns.split(' ').length : 0,
+      storeColumns: storeGrid ? getComputedStyle(storeGrid).gridTemplateColumns.split(' ').length : 0,
+      entryCount: entries.length, badEntries, badBarEntries,
+      controls: [...document.querySelectorAll('.toolbar, .storeFilters, .storeActions')].map((node) => {
+        const r = rect(node)
+        const children = [...node.children].filter((child) => getComputedStyle(child).display !== 'none').map(rect)
+        return {childOutside:children.some((child) => child && (child.left < r.left - 1 || child.right > r.right + 1))}
+      })
+    }
+  })()`)
+  console.log(`UI ${label} ${width}x${height}:`, JSON.stringify(snapshot))
+  requireCheck(snapshot.scrollWidth <= width + 1, `${label} has horizontal document overflow at ${width}x${height}`)
+  requireCheck(snapshot.navVisible && !snapshot.navOutsideViewport, `${label} navigation is missing or outside viewport at ${width}x${height}`)
+  if (snapshot.navSlots.length) {
+    const widths = snapshot.navSlots.map((slot) => slot.width)
+    requireCheck(Math.max(...widths) - Math.min(...widths) <= 1, `${label} navigation slots are not equal width at ${width}x${height}`)
+  }
+  requireCheck(!snapshot.mainOutsideShell, `${label} main content escapes shell at ${width}x${height}`)
+  requireCheck(snapshot.badEntries === 0, `${label} entry action overlaps metadata at ${width}x${height}`)
+  requireCheck(snapshot.badBarEntries === 0, `${label} game artwork and information are not arranged as one bar at ${width}x${height}`)
+  requireCheck(snapshot.controls.every((control) => !control.childOutside), `${label} toolbar/filter child escapes its row at ${width}x${height}`)
+  if (width < 768 && height >= 481) {
+    requireCheck(Math.abs(snapshot.nav.bottom - height) < 2, `${label} mobile bottom navigation is not viewport-aligned at ${width}x${height}`)
+  }
+  if (width >= 768) {
+    requireCheck(snapshot.navPosition !== 'fixed', `${label} desktop navigation is fixed over content at ${width}x${height}`)
+    requireCheck(snapshot.nav.top >= snapshot.shell.top - 1 && snapshot.nav.bottom <= snapshot.shell.top + 150, `${label} desktop navigation is not in the header flow at ${width}x${height}`)
+  }
+  if (width <= 420) {
+    if (snapshot.gameColumns) requireCheck(snapshot.gameColumns === 1, `${label} library is not a single-column list at ${width}x${height}`)
+    if (snapshot.storeColumns) requireCheck(snapshot.storeColumns === 1, `${label} store is not a single-column list at ${width}x${height}`)
+  }
 }
 
 async function clickPlayerBack() {
@@ -119,23 +220,36 @@ try {
       clearTimeout(request.timer)
       message.error ? request.reject(new Error(JSON.stringify(message.error))) : request.resolve(message.result)
     }
+    if (message.method === 'Fetch.requestPaused') {
+      const url = message.params.request.url
+      const body = /__52java\/catalog/.test(url)
+        ? JSON.stringify({ games: [{ id: 1, name: '响应式验证游戏标题示例', plays: 12345 }], pages: 1, total: 1, siteUrl: 'https://java.52emu.cn' })
+        : JSON.stringify({ games: [{ code: 'VERIFY-001', name: '响应式验证 Flash 标题示例', coverUrl: '/docs/revival-player.png' }] })
+      send('Fetch.fulfillRequest', {
+        requestId: message.params.requestId,
+        responseCode: 200,
+        responseHeaders: [{ name: 'Content-Type', value: 'application/json; charset=utf-8' }],
+        body: Buffer.from(body).toString('base64'),
+      }).catch((error) => jsErrors.push(`catalog stub: ${error.message}`))
+    }
     if (message.method === 'Runtime.exceptionThrown') {
       const details = message.params.exceptionDetails
-      jsErrors.push(details?.exception?.description || details?.text || 'runtime exception')
+      const text = details?.exception?.description || details?.text || 'runtime exception'
+      if (!isExpectedProbeFailure(text)) jsErrors.push(text)
     }
     if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') {
       const text = (message.params.args || []).map((arg) => arg.value ?? arg.description ?? '').join(' ') || 'console.error'
-      if (!/Failed to load resource|Manifest fetch .*manifest\.webmanifest/.test(text)) jsErrors.push(text)
+      if (!isExpectedProbeFailure(text) && !/Failed to load resource|Manifest fetch .*manifest\.webmanifest/.test(text)) jsErrors.push(text)
     }
     if (message.method === 'Log.entryAdded' && message.params.entry?.level === 'error') {
       const entry = message.params.entry
-      if (!isOptionalShellAsset(entry.url) && !/Failed to load resource|Manifest fetch .*manifest\.webmanifest/.test(entry.text || '')) jsErrors.push(entry.text || 'browser log error')
+      if (!isOptionalShellAsset(entry.url) && !isExpectedProbeFailure(entry.url) && !isExpectedProbeFailure(entry.text) && !/Failed to load resource|Manifest fetch .*manifest\.webmanifest/.test(entry.text || '')) jsErrors.push(entry.text || 'browser log error')
     }
     if (message.method === 'Network.responseReceived' && message.params.response.status >= 400) {
       const response = message.params.response
       const catalogRequest = /\/__52java\/catalog(?:\?|$)/.test(response.url)
       const optionalMrpManifest = !MRP_FILE && /\/maopao\/hall\/manifest\.json(?:\?|$)/.test(response.url)
-      if (isOptionalShellAsset(response.url) || catalogRequest || optionalMrpManifest) networkWarnings.push(`HTTP ${response.status} ${response.url}`)
+      if (isOptionalShellAsset(response.url) || isExpectedProbeFailure(response.url) || catalogRequest || optionalMrpManifest) networkWarnings.push(`HTTP ${response.status} ${response.url}`)
       else jsErrors.push(`HTTP ${response.status} ${response.url}`)
     }
   })
@@ -143,6 +257,12 @@ try {
   await send('Runtime.enable')
   await send('Log.enable')
   await send('Network.enable')
+  await send('Fetch.enable', {
+    patterns: [
+      { urlPattern: '*://*/__52java/catalog*' },
+      { urlPattern: '*://*/__flash/catalog*' },
+    ],
+  })
   const runtimeStateObserver = `
     window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ = []
     new MutationObserver(() => {
@@ -164,6 +284,17 @@ try {
   console.log('Library:', JSON.stringify(library))
   requireCheck(JSON.stringify(library.tabs) === JSON.stringify(['J2ME', '冒泡社区', 'Flash', 'Flash 商城', '52java 商城']), 'library tabs missing')
   requireCheck(library.hasUpload, 'JAR import missing')
+
+  for (const [label, route] of UI_ROUTES) {
+    await navigate(route, 500)
+    if (route.endsWith('/store')) await waitFor("document.querySelector('.storeCard')", 'Java catalog fixture')
+    if (route.endsWith('/flash-store')) await waitFor("document.querySelector('.flashCover')", 'Flash catalog fixture')
+    for (const [width, height] of UI_VIEWPORTS) {
+      await inspectUiViewport(label, width, height)
+    }
+  }
+  await send('Emulation.clearDeviceMetricsOverride')
+  await navigate('#/library/j2me', 350)
 
   await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 720, deviceScaleFactor: 1, mobile: true })
   requireCheck(await evaluate(`[...document.querySelectorAll('.javaLibraryToolbar > button')].length === 2 &&
@@ -259,6 +390,46 @@ try {
   const flashExit = await evaluate(`(() => ({ hash: window.location.hash, tab: document.querySelector('.tabActive')?.textContent.trim() || '', reloads: window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0, player: !!document.querySelector('.player') }))()`)
   console.log('Flash exit:', JSON.stringify(flashExit))
   requireCheck(flashExit.hash === '#/library/flash' && flashExit.tab === 'Flash' && flashExit.reloads === 0 && !flashExit.player, 'Flash exit reloaded or lost the active library tab')
+
+  await navigate('#/play/j2me/layout-probe.jar?tab=j2me&name=Layout%20Probe', 800)
+  await waitFor("document.querySelector('.runtimeFrame')?.contentDocument?.querySelector('#phone')", 'J2ME runtime markup')
+  await waitFor("!![...document.querySelector('.runtimeFrame').contentDocument.styleSheets].find((sheet) => sheet.href?.includes('/style/main.css'))", 'J2ME runtime stylesheet')
+  for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
+    if (height > width) {
+      console.log(`SKIP: synthetic J2ME portrait geometry requires a game fixture (${width}x${height})`)
+      continue
+    }
+    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+    const layout = await evaluate(`(() => {
+      const frame = document.querySelector('.runtimeFrame')
+      const doc = frame.contentDocument
+      doc.body.dataset.orientation = '${width > height ? 'landscape' : 'portrait'}'
+      const keypad = doc.querySelector('#keypad')
+      keypad.className = 'keypad-4'
+      const read = (selector) => {
+        const node = doc.querySelector(selector)
+        const r = node.getBoundingClientRect()
+        return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height}
+      }
+      const nav = read('#nav'), numpad = read('#numpad'), display = read('#display-container')
+      const overlaps = (a,b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1
+      return {nav, numpad, display, scrollWidth:doc.documentElement.scrollWidth, navColumn:frame.contentWindow.getComputedStyle(doc.querySelector('#nav')).gridColumnStart, numpadColumn:frame.contentWindow.getComputedStyle(doc.querySelector('#numpad')).gridColumnStart, navDisplay:overlaps(nav,display), numpadDisplay:overlaps(numpad,display)}
+    })()`)
+    console.log(`J2ME layout ${width}x${height}:`, JSON.stringify(layout))
+    requireCheck(layout.scrollWidth <= width + 1, `J2ME runtime overflows horizontally at ${width}x${height}`)
+    requireCheck(!layout.navDisplay && !layout.numpadDisplay, `J2ME controls overlap game surface at ${width}x${height}`)
+    requireCheck(layout.navColumn === '1' && layout.numpadColumn === '3', `J2ME landscape controls are not on the agreed sides at ${width}x${height}`)
+    requireCheck(layout.display.left >= layout.nav.right - 1 && layout.display.right <= layout.numpad.left + 1, `J2ME game surface is not between controls at ${width}x${height}`)
+  }
+  await send('Emulation.clearDeviceMetricsOverride')
+  await evaluate(`(() => {
+    const frame = document.querySelector('.runtimeFrame')
+    frame?.contentWindow?.__XIAOCHAO_NATIVE_BACK_REQUEST__?.()
+    return true
+  })()`)
+  await waitFor("document.querySelector('.runtimeFrame')?.contentDocument?.querySelector('.exitConfirm')", 'J2ME exit confirmation')
+  await evaluate(`document.querySelector('.runtimeFrame').contentDocument.querySelector('.exitConfirm .optionDanger').click(); true`)
+  await waitFor("!document.querySelector('.runtimeFrame')", 'J2ME runtime cleanup')
   await navigate('#/play/flash/fruit-madness.swf?tab=flash&name=Fruit%20Madness', 1200)
   requireCheck(await evaluate("!!document.querySelector('.playerStage')"), 'Flash re-entry did not mount')
   await evaluate(`[...document.querySelectorAll('.tab')].find(node => node.textContent.includes('Flash 商城'))?.click()`)
@@ -281,6 +452,7 @@ try {
   await sleep(500)
   await evaluate(`window.__XIAOCHAO_NATIVE_BACK_REQUEST__?.(); true`)
   await sleep(100)
+  requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'Local Revival exit confirmation did not open')
   await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
   await sleep(400)
   const localExit = await evaluate(`({ hash: window.location.hash, reloads: window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0 })`)
