@@ -1023,8 +1023,9 @@ function Player({ game, onBack, nativeBackSignal }) {
     cleanupRuntimeArtifacts()
   }, [])
   const requestBack = useCallback(() => {
+    if ((game.kind === 'j2me' || game.kind === 'maopao') && runtimeReadyFor !== game.file) return
     if (!exitStartedRef.current) setConfirming(true)
-  }, [])
+  }, [game.file, game.kind, runtimeReadyFor])
   const toggleFullscreen = async () => {
     try {
       if (fullscreenElement()) await exitFullscreen()
