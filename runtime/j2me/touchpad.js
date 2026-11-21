@@ -28,9 +28,17 @@
   function num(v, dflt) { var n = parseFloat(v); return isFinite(n) ? n : dflt; }
 
   function bind(opts) {
-    var buttons = opts.buttons;
+    var buttons = opts.buttons || {};
+    var surface = opts.surface || document;
+    var actionMap = opts.actionMap || buttons;
+    var input = opts.input || {
+      press: function (source, action) { if (opts.sink) opts.sink.press(action, source); },
+      release: function (source, action) { if (opts.sink) opts.sink.release(action, source); },
+      repeat: function (source, action) { if (opts.sink && opts.sink.repeat) opts.sink.repeat(action, source); }
+    };
+    var onPressedChange = opts.onPressedChange || function () {};
     var dpadVisual = opts.dpadVisual || function (id) { return id; };
-    var sink = opts.sink;
+    var sink = opts.sink || {};
     var fb = opts.feedback || {};
     var timers = opts.timers || {};
     var listeners = [];
@@ -70,10 +78,13 @@
 
     var held = {};      // pointerId -> { ids: [], center, startCenter, okTimer, okDown }
     var reps = {};      // pointerId -> { keyId: timerId }
-    var codeHolders = {}; // 平台码 -> {holderId: 1}（多指同键时只发一次边沿）
     var captures = {};  // pointerId -> element used for pointer capture
+    var pressedControls = {};
 
-    function keyEl(id) { return document.getElementById(id); }
+    function keyEl(id) {
+      if (surface && surface.querySelector) return surface.querySelector('[data-control-id="' + id + '"]') || surface.querySelector("#" + id);
+      return document.getElementById(id);
+    }
 
     function inKeypad(target) {
       return target && target.closest && target.closest("#keypad");
@@ -114,20 +125,21 @@
 
     // ---------- 边沿去重：同一键被多指按住时，只给 sink 一次 press/release ----------
     function press(code, holder, sourceAt, pointerType) {
-      var h = codeHolders[code] || (codeHolders[code] = {});
-      if (h[holder]) return;
-      var firstHolder = Object.keys(h).length === 0;
-      h[holder] = 1;
-      if (firstHolder) haptic(pointerType);
-      sink.press(code, { pointer: true, sourceAt: sourceAt == null ? null : sourceAt });
+      var action = actionMap[code] || code;
+      var source = "pointer:" + holder + ":" + action;
+      if (pressedControls[holder + ":" + code]) return;
+      pressedControls[holder + ":" + code] = true;
+      haptic(pointerType);
+      input.press(source, action, { pointer: true, sourceAt: sourceAt == null ? null : sourceAt });
+      onPressedChange(Object.keys(pressedControls).map(function (key) { return key.split(":").slice(1).join(":"); }));
     }
     function release(code, holder, sourceAt) {
-      var h = codeHolders[code];
-      if (!h || !h[holder]) return;
-      delete h[holder];
-      for (var k in h) return;  // 还有别的指头按着 → 不发 release
-      delete codeHolders[code];
-      sink.release(code, { pointer: true, sourceAt: sourceAt == null ? null : sourceAt });
+      var action = actionMap[code] || code;
+      var key = holder + ":" + code;
+      if (!pressedControls[key]) return;
+      delete pressedControls[key];
+      input.release("pointer:" + holder + ":" + action, action, { pointer: true, sourceAt: sourceAt == null ? null : sourceAt });
+      onPressedChange(Object.keys(pressedControls).map(function (entry) { return entry.split(":").slice(1).join(":"); }));
     }
     function tapKey(code, holder, sourceAt, pointerType) { press(code, holder, sourceAt, pointerType); release(code, holder, sourceAt); }
 
@@ -154,11 +166,11 @@
     // ---------- 连发 ----------
     function startRepeat(id, keyId) {
       if (fb.keyRepeat === false || !fb.repeatDelay) return;
-      var code = buttons[keyId];
+        var code = buttons[keyId] || keyId;
       var tick = function () {
         var row = reps[id];
         if (!row || !(keyId in row)) return;
-        sink.repeat(code);
+        input.repeat("pointer:" + id + ":" + (actionMap[keyId] || keyId), actionMap[keyId] || keyId);
         row[keyId] = tset(tick, fb.repeatInterval || 100);
       };
       reps[id][keyId] = tset(tick, fb.repeatDelay);
@@ -182,7 +194,8 @@
 
     // 穿透查找真正的按键：方向键是圆，元素方框四角压着软键，不能让方框吞掉软键
     function keyAtPoint(x, y) {
-      var list = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)];
+      var list = surface.elementsFromPoint ? surface.elementsFromPoint(x, y) :
+        (document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)]);
       for (var i = 0; i < list.length; i++) {
         var el = list[i];
         if (!el || !el.closest) continue;
@@ -205,7 +218,7 @@
     function hit(x, y, cr, prev) {
       cr = cr || 0;
       prev = prev || [];
-      var pad = document.getElementById("dpad");
+      var pad = surface.querySelector ? surface.querySelector('[data-control-id="dpad"], #dpad') : document.getElementById("dpad");
       var band = 2, inside = false, gap = 0;
       if (pad) {
         var r = pad.getBoundingClientRect();
@@ -331,7 +344,8 @@
     function releaseAll() {
       Object.keys(held).forEach(function (id) { clearHold(id); });
       Object.keys(captures).forEach(releaseCapture);
-      codeHolders = {};
+      pressedControls = {};
+      onPressedChange([]);
     }
 
     // ---------- 指针监听（document 级，支持滑动手势） ----------
@@ -339,16 +353,16 @@
       return opts.exclude && e.target.closest && e.target.closest(opts.exclude);
     }
 
-    listen(document, "pointerdown", function (e) {
+    listen(surface, "pointerdown", function (e) {
       var sourceAt = performance.now();
-      if (excluded(e)) return;
+      if (excluded(e) || (surface !== document && !(e.target && surface.contains && surface.contains(e.target)))) return;
       var prev = held[e.pointerId] && held[e.pointerId].ids || [];
       var h = hit(e.clientX, e.clientY, contactRadius(e), prev);
       if (h.kind === null) return;
       e.preventDefault();
       clearSelection();
       if (onActivate) onActivate(e);
-      var captureTarget = e.target && e.target.setPointerCapture ? e.target : document.getElementById("keypad");
+      var captureTarget = e.target && e.target.setPointerCapture ? e.target : surface;
       if (captureTarget && captureTarget.setPointerCapture) {
         try { captureTarget.setPointerCapture(e.pointerId); captures[e.pointerId] = captureTarget; } catch (_) {}
       }
@@ -356,7 +370,7 @@
       move(e.pointerId, h, sourceAt, e.pointerType);
     });
 
-    listen(document, "pointermove", function (e) {
+    listen(surface, "pointermove", function (e) {
       var cur = held[e.pointerId];
       if (!cur) return;
       var h = hit(e.clientX, e.clientY, contactRadius(e), cur.ids);
@@ -373,8 +387,8 @@
       endOk(e.pointerId);
       clearHold(e.pointerId);
     }
-    listen(document, "pointerup", up);
-    listen(document, "pointercancel", up);
+    listen(surface, "pointerup", up);
+    listen(surface, "pointercancel", up);
     // Android WebView may begin its long-press callout before a bubbling
     // React/document listener runs. Capture non-passive native gestures on
     // the keypad itself, while leaving editor and settings controls alone.
