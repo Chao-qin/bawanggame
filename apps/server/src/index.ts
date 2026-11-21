@@ -14,6 +14,8 @@ const PORT = Number(process.env.PORT ?? 8080)
 const JAVA_BASE = (process.env['52JAVA_BASE_URL'] ?? 'https://java.52emu.cn').replace(/\/$/, '')
 const JAVA_HOSTS = new Set([new URL(JAVA_BASE).hostname, ...(new URL(JAVA_BASE).hostname === 'java.52emu.cn' ? ['d2.52emu.cn'] : [])])
 const JAVA_MAX_BYTES = Number(process.env['52JAVA_MAX_BYTES'] ?? 64 * 1024 * 1024)
+const FLASH_HOMES_BASE = (process.env.FLASH_HOMES_BASE_URL ?? 'https://flash.homes').replace(/\/$/, '')
+const FLASH_MAX_BYTES = Number(process.env.FLASH_MAX_BYTES ?? 128 * 1024 * 1024)
 const JARS = join(PROJECT, 'games', 'jar')
 const WEB = join(PROJECT, 'public')
 const MRP = join(PROJECT, 'maopao-revival', 'vendor', 'vmrp.github.io')
@@ -29,6 +31,8 @@ const MIME: Record<string, string> = {
 type StoreGame = { id: string; name: string; plays: number }
 type StoreCatalog = { games: StoreGame[]; page: number; pages: number; total: number }
 const storeCache = new Map<string, { expires: number; value: StoreCatalog }>()
+type FlashArchiveGame = { code: string; name: string; size: number; sha256: string; detailUrl: string; downloadUrl: string }
+const flashArchiveCache = new Map<string, { expires: number; value: FlashArchiveGame[] }>()
 
 function json(res: ServerResponse, status: number, value: unknown) {
   res.writeHead(status, {
@@ -43,6 +47,45 @@ function json(res: ServerResponse, status: number, value: unknown) {
 
 function htmlText(value: string) {
   return value.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).trim()
+}
+
+function decodeHtml(value: string) {
+  return htmlText(value.replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16))))
+}
+
+async function flashHomesPage(path: string) {
+  const response = await fetch(new URL(path, FLASH_HOMES_BASE), { signal: AbortSignal.timeout(15_000) })
+  if (!response.ok) throw new Error(`flash.homes HTTP ${response.status}`)
+  return response.text()
+}
+
+function parseFlashArchiveGames(html: string): FlashArchiveGame[] {
+  const games: FlashArchiveGame[] = []
+  for (const match of html.matchAll(/href="\/flash\/([A-Z0-9-]+)"[\s\S]*?<span[^>]*data-work-title[^>]*>([\s\S]*?)<\/span>/gi)) {
+    const code = match[1]
+    const name = decodeHtml(match[2].replace(/<mark>|<\/mark>/gi, ''))
+    games.push({ code, name, size: 0, sha256: '', detailUrl: `/flash/${code}`, downloadUrl: `/flash/${code}/download` })
+  }
+  return games
+}
+
+function parseFlashArchiveDetail(html: string, code: string): FlashArchiveGame {
+  const props = html.match(/component-url="[^"]*PlayerStage[^>]*props="([^"]+)"/i)?.[1] ?? ''
+  const decoded = props.replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+  const title = decoded.match(/"title"[^}]*?"([^"}]+)"/)?.[1] ?? decodeHtml(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ?? code)
+  const size = Number(decoded.match(/"size"\s*:\s*\[0,\s*(\d+)\]/)?.[1] ?? html.match(/contentSize":"(\d+)"/)?.[1] ?? 0)
+  const sha256 = decoded.match(/"sha256"[^}]*?"([0-9a-f]{64})"/)?.[1] ?? html.match(/propertyID":"sha256","value":"([0-9a-f]{64})"/)?.[1] ?? ''
+  return { code, name: decodeHtml(title), size, sha256, detailUrl: `/flash/${code}`, downloadUrl: `/flash/${code}/download` }
+}
+
+async function flashArchiveCatalog(query: string) {
+  const key = query.trim()
+  const cached = flashArchiveCache.get(key)
+  if (cached && cached.expires > Date.now()) return cached.value
+  const html = await flashHomesPage(`/flash${key ? `?q=${encodeURIComponent(key)}` : ''}`)
+  const games = parseFlashArchiveGames(html)
+  flashArchiveCache.set(key, { expires: Date.now() + 60_000, value: games })
+  return games
 }
 
 function parseStoreCatalog(html: string, page: number): StoreCatalog {
@@ -312,6 +355,58 @@ const server = createServer(async (req, res) => {
     return storeDownload(res, id)
   }
   if (url.pathname === '/__52java/open') return json(res, 200, { url: JAVA_BASE })
+  if (url.pathname === '/__flash/catalog') {
+    try {
+      const query = (url.searchParams.get('query') || '').trim().slice(0, 120)
+      return json(res, 200, { source: FLASH_HOMES_BASE, games: await flashArchiveCatalog(query) })
+    } catch (error) {
+      console.error('flash.homes catalog error:', error)
+      return json(res, 502, { error: 'flash_catalog_unavailable' })
+    }
+  }
+  const flashDetail = url.pathname.match(/^\/__flash\/detail\/([A-Z0-9-]+)$/i)
+  if (flashDetail) {
+    try {
+      const code = flashDetail[1].toUpperCase()
+      const detail = await flashHomesPage(`/flash/${code}`)
+      return json(res, 200, { source: FLASH_HOMES_BASE, game: parseFlashArchiveDetail(detail, code) })
+    } catch (error) {
+      return json(res, 502, { error: String(error instanceof Error ? error.message : error) })
+    }
+  }
+  const flashDownload = url.pathname.match(/^\/__flash\/download\/([A-Z0-9-]+)$/i)
+  if (flashDownload) {
+    try {
+      const code = flashDownload[1].toUpperCase()
+      const detail = await flashHomesPage(`/flash/${code}`)
+      const game = parseFlashArchiveDetail(detail, code)
+      if (!game.sha256) return json(res, 502, { error: 'flash_hash_unavailable' })
+      const source = new URL(`https://swf.flash.homes/${game.sha256}.swf`)
+      const response = await fetch(source, { signal: AbortSignal.timeout(60_000), redirect: 'follow' })
+      if (!response.ok || !response.body) return json(res, 502, { error: `flash download HTTP ${response.status}` })
+      const length = Number(response.headers.get('content-length') || 0)
+      if (length > FLASH_MAX_BYTES) return json(res, 413, { error: 'flash_too_large' })
+      res.writeHead(200, {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/x-shockwave-flash',
+        ...(length ? { 'Content-Length': String(length) } : {}),
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(game.name)}.swf`,
+        'Cache-Control': 'no-store',
+      })
+      const reader = response.body.getReader()
+      let total = 0
+      while (true) {
+        const part = await reader.read()
+        if (part.done) break
+        total += part.value.byteLength
+        if (total > FLASH_MAX_BYTES) { await reader.cancel(); res.destroy(); return }
+        if (!res.write(Buffer.from(part.value))) await new Promise<void>(resolve => res.once('drain', resolve))
+      }
+      return res.end()
+    } catch (error) {
+      return json(res, 502, { error: String(error instanceof Error ? error.message : error) })
+    }
+  }
   const target = mappedPath(url.pathname === '/' ? '/index.html' : url.pathname)
   if (!target || !(await sendFile(res, target))) res.writeHead(404).end('Not found')
 })

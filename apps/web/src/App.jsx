@@ -661,7 +661,50 @@ function FlashStore({ onRefreshLibrary }) {
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [archiveQuery, setArchiveQuery] = useState('')
+  const [archiveGames, setArchiveGames] = useState([])
+  const [archiveLoading, setArchiveLoading] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
   const added = useMemo(() => new Set(local.games.map((game) => game.dedupeKey)), [local.games])
+
+  async function searchArchive(value = archiveQuery) {
+    setArchiveLoading(true)
+    setArchiveError('')
+    try {
+      const response = await fetch(`/__flash/catalog?query=${encodeURIComponent(value.trim())}`)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      setArchiveGames(data.games || [])
+    } catch (cause) {
+      setArchiveGames([])
+      setArchiveError('Flash 保存计划暂时不可用：' + (cause.message || cause))
+    } finally {
+      setArchiveLoading(false)
+    }
+  }
+
+  async function addArchiveGame(game) {
+    setBusy(`archive:${game.code}`)
+    setError('')
+    setMessage('')
+    try {
+      const detailResponse = await fetch(`/__flash/detail/${encodeURIComponent(game.code)}`)
+      if (!detailResponse.ok) throw new Error(`详情获取失败（HTTP ${detailResponse.status}）`)
+      const detail = (await detailResponse.json()).game || game
+      await addFromUrl(`/__flash/download/${encodeURIComponent(game.code)}`, {
+        name: detail.name,
+        description: `Flash 保存计划 · SHA-256 ${detail.sha256 || '未提供'}`,
+      })
+      setMessage(`已加入「${detail.name}」，现在可以在 Flash 库中启动。`)
+      local.refresh()
+      onRefreshLibrary()
+    } catch (cause) {
+      if (cause.code === 'already_exists') setMessage(duplicateMessage(game.name))
+      else setError(cause.message || String(cause))
+    } finally {
+      setBusy('')
+    }
+  }
 
   async function addBundledGame(game) {
     setBusy(game.file)
@@ -730,6 +773,24 @@ function FlashStore({ onRefreshLibrary }) {
         <Button className="downloadButton" color="primary" size="small" type="submit" disabled={busy !== '' || local.loading}>{busy === 'custom' ? '加入中…' : '加入本机'}</Button>
       </div>
     </form>
+    <section className="flashImportPanel">
+      <div className="sectionHeading">
+        <div><h3>Flash 保存计划</h3><p>搜索公开保存的 Flash 原件，并导入本机 Flash 库。</p></div>
+      </div>
+      <form className="flashImportFields" onSubmit={(event) => { event.preventDefault(); searchArchive() }}>
+        <label>搜索作品<Input className="field" placeholder="例如：造梦西游" value={archiveQuery} onChange={setArchiveQuery} /></label>
+        <Button className="downloadButton" color="primary" size="small" type="submit" disabled={archiveLoading}>{archiveLoading ? '搜索中…' : '搜索保存计划'}</Button>
+      </form>
+      {archiveError && <div className="status statusError" role="alert">{archiveError}</div>}
+      {archiveGames.length > 0 && <div className="storeGrid archiveGrid">{archiveGames.map((game) => {
+        const isAdded = added.has(`url:/__flash/download/${game.code}`) || local.games.some((item) => item.sourceUrl.includes(`/__flash/download/${game.code}`))
+        return <Card className="storeCard" bodyClassName="storeCardBody" key={game.code}>
+          <div className="storeIcon">{game.name.charAt(0)}</div>
+          <div className="storeInfo"><h3 className="storeInfoTitle">{game.name}</h3><p className="storeInfoMeta">Flash 保存计划 · {game.size ? formatSize(game.size) : '大小未知'}</p><span className="storeInfoDesc">馆藏编号 {game.code}</span></div>
+          <Button className="downloadButton" color="primary" size="small" type="button" onClick={() => addArchiveGame(game)} disabled={busy !== '' || local.loading}>{busy === `archive:${game.code}` ? '下载中…' : isAdded ? '已加入' : '加入本机'}</Button>
+        </Card>
+      })}</div>}
+    </section>
     <div className="storeGrid">{FLASH_GAMES.map((game) => {
       const key = `catalog:${game.catalogId}`
       const isAdded = added.has(key)
