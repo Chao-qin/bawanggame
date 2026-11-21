@@ -903,9 +903,9 @@ body.runtime-active.settings-open .panel-box {
 
 /* Runtime landscape shell: keep both keyboard groups beside the game. */
 body.runtime-active[data-orientation="landscape"] .runtime-stage {
-  --control-unit: clamp(28px, min(14vh, 7vw), 64px);
+  --control-unit: clamp(30px, min(12vh, 6vw), 46px);
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(132px, 25vw) minmax(0, 1fr) minmax(132px, 25vw);
   grid-template-rows: minmax(0, 1fr);
   align-items: center;
   justify-items: center;
@@ -937,26 +937,45 @@ body.runtime-active[data-orientation="landscape"] #keypad {
 body.runtime-active[data-orientation="landscape"] #numpad,
 body.runtime-active[data-orientation="landscape"] #nav {
   grid-row: 1;
-  width: 100% !important;
-  max-width: none;
-  min-width: 0;
+  width: min(25vw, 42vh, 180px) !important;
+  max-width: min(25vw, 42vh, 180px);
+  min-width: 132px;
   box-sizing: border-box;
   align-self: center;
 }
 
 body.runtime-active[data-orientation="landscape"] #numpad {
-  grid-column: 1 !important;
+  grid-column: 3 !important;
   --u: var(--control-unit);
-  padding-left: calc(var(--u) * 0.3 + env(safe-area-inset-left, 0px));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(30px, calc(var(--u) * 0.95)));
+  grid-auto-rows: minmax(30px, calc(var(--u) * 0.95));
+  gap: 4px;
+  padding-right: max(4px, env(safe-area-inset-right, 0px));
 }
 
 body.runtime-active[data-orientation="landscape"] #nav {
-  grid-column: 3 !important;
+  grid-column: 1 !important;
   --u: var(--control-unit);
   height: calc(var(--u) * 4.6);
-  padding-right: calc(var(--u) * 0.3 + env(safe-area-inset-right, 0px));
+  min-height: calc(var(--u) * 4.6);
+  padding-left: max(4px, env(safe-area-inset-left, 0px));
   z-index: 3;
   isolation: isolate;
+}
+
+body.runtime-active[data-orientation="landscape"] #numpad .key {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 30px;
+  gap: 2px;
+  border-radius: 6px;
+}
+
+body.runtime-active[data-orientation="landscape"] #numpad i {
+  min-width: 0;
+  font-size: 9px;
 }
 
 body.runtime-active[data-orientation="landscape"] #display {
@@ -984,6 +1003,20 @@ body.runtime-active[data-orientation="landscape"] #choice { left: calc(var(--u) 
 body.runtime-active[data-orientation="landscape"] #back { right: calc(var(--u) * 0.25); top: calc(var(--u) * 0.25); }
 body.runtime-active[data-orientation="landscape"] #ret { left: calc(var(--u) * 0.25); bottom: calc(var(--u) * 0.25); }
 body.runtime-active[data-orientation="landscape"] #clear { right: calc(var(--u) * 0.25); bottom: calc(var(--u) * 0.25); }
+
+@media (orientation: landscape) and (max-height: 400px) {
+  body.runtime-active[data-orientation="landscape"] .runtime-stage {
+    --control-unit: clamp(24px, min(9vh, 5vw), 36px);
+    grid-template-columns: minmax(112px, 25vw) minmax(0, 1fr) minmax(112px, 25vw);
+  }
+
+  body.runtime-active[data-orientation="landscape"] #numpad,
+  body.runtime-active[data-orientation="landscape"] #nav {
+    width: min(25vw, 44vh, 160px) !important;
+    max-width: min(25vw, 44vh, 160px);
+    min-width: 112px;
+  }
+}
 
 /* Fullscreen keeps the stage in the viewport and lets the user choose which
    dimension is authoritative for the virtual phone. */
