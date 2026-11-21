@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createCustomFlashAction } from './actions.js'
 import { createFlashKeyboardAdapter } from './FlashKeyboardAdapter.js'
+import { createKeyboardSession } from './KeyboardSession.js'
 
 function harness() {
   const events = []
@@ -84,4 +85,41 @@ test('global pointerup releases a touch source even when SVG capture retargets t
     { type: 'keyup', key: 'ArrowLeft', code: 'ArrowLeft' },
   ])
   adapter.cleanup()
+})
+
+test('rejects persisted custom actions without an explicit Flash key/code mapping', () => {
+  const h = harness()
+  const adapter = createFlashKeyboardAdapter({ target: h.target, eventTarget: h.eventTarget })
+  assert.equal(adapter.press('pointer:1:custom:jump', 'custom:jump'), false)
+  assert.deepEqual(h.events, [])
+  adapter.cleanup()
+})
+
+test('exposes the surface press/release contract and rejects presses after cleanup', () => {
+  const h = harness()
+  const adapter = createFlashKeyboardAdapter({ target: h.target, eventTarget: h.eventTarget })
+  const input = adapter.getInput()
+  assert.equal(input.press('pointer:1:flash-key:Enter', 'flash-key:Enter'), true)
+  input.release('pointer:1:flash-key:Enter')
+  assert.deepEqual(h.events.map(({ type }) => type), ['keydown', 'keyup'])
+  adapter.cleanup()
+  assert.equal(input.press('late', 'flash-key:Enter'), false)
+})
+
+test('Flash teardown invalidates its session and re-entry gets a fresh ready surface', async () => {
+  const first = createKeyboardSession({ runtime: 'flash', gameId: 'game-one', timeout: 100 })
+  const firstSurface = { setAttribute() {} }
+  assert.equal(first.registerSurface(firstSurface, first.getProfile()).accepted, true)
+  assert.equal((await first.ready).available, true)
+  first.invalidate()
+  assert.equal(first.active, false)
+  assert.equal(first.getSurface(), null)
+  assert.equal((await first.ready).available, true)
+
+  const second = createKeyboardSession({ runtime: 'flash', gameId: 'game-one', timeout: 100 })
+  const secondSurface = { setAttribute() {} }
+  assert.notEqual(first.id, second.id)
+  assert.equal(second.registerSurface(secondSurface, second.getProfile()).accepted, true)
+  assert.equal((await second.ready).surface, secondSurface)
+  second.invalidate()
 })

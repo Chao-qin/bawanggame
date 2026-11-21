@@ -16,17 +16,18 @@ export function createFlashKeyboardAdapter({ target, catalog = ACTION_CATALOG, e
   const counts = new Map()
   const actionCatalog = { ...catalog }
 
+  let active = true
   const releaseAll = () => {
     for (const actionId of counts.keys()) {
       const payload = actionCatalog[actionId]?.flash
-      if (payload) dispatch(target, 'keyup', payload)
+      if (payload && target) dispatch(target, 'keyup', payload)
     }
     sources.clear()
     counts.clear()
   }
 
   const press = (sourceId, actionId) => {
-    if (!target || sources.has(sourceId)) return false
+    if (!active || !target || sources.has(sourceId)) return false
     const payload = actionCatalog[actionId]?.flash
     if (!payload) return false
     sources.set(sourceId, actionId)
@@ -44,7 +45,7 @@ export function createFlashKeyboardAdapter({ target, catalog = ACTION_CATALOG, e
     if (count > 0) counts.set(actionId, count)
     else {
       counts.delete(actionId)
-      dispatch(target, 'keyup', actionCatalog[actionId].flash)
+      if (target) dispatch(target, 'keyup', actionCatalog[actionId].flash)
     }
     return true
   }
@@ -79,9 +80,12 @@ export function createFlashKeyboardAdapter({ target, catalog = ACTION_CATALOG, e
     release,
     releasePointer,
     releaseAll,
+    getInput() { return { press, release, releasePointer, releaseAll } },
     get heldSources() { return sources.size },
     get heldActions() { return counts.size },
     cleanup() {
+      if (!active) return
+      active = false
       releaseAll()
       eventTarget.removeEventListener?.('blur', onBlur)
       eventTarget.removeEventListener?.('pointerup', onPointerEnd, true)

@@ -4,8 +4,10 @@ import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
 import { get as getLocalFlash } from '../localFlash.js'
 import { FlashControls } from './FlashControls.jsx'
 import { createFlashKeyboardAdapter } from './keyboard/FlashKeyboardAdapter.js'
+import { createKeyboardSession } from './keyboard/KeyboardSession.js'
 
 export function FlashPlayer({ game, onCleanupReady, onExit }) {
+  const [keyboardSession] = useState(() => createKeyboardSession({ runtime: 'flash', gameId: game.id || game.file }))
   const hostRef = useRef(null)
   const [playerElement, setPlayerElement] = useState(null)
   const [keyboardAdapter, setKeyboardAdapter] = useState(null)
@@ -25,6 +27,8 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
       cleaned = true
       alive = false
       session.invalidate()
+      keyboardSession.releaseAll()
+      keyboardSession.invalidate()
       keyboardAdapter?.cleanup()
       keyboardAdapter = null
       setKeyboardAdapter(null)
@@ -57,6 +61,7 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
 
         player = ruffle.createPlayer()
         keyboardAdapter = createFlashKeyboardAdapter({ target: player })
+        keyboardSession.registerInputRelease(keyboardAdapter.releaseAll)
         setKeyboardAdapter(keyboardAdapter)
         player.tabIndex = 0
         player.style.display = 'block'
@@ -91,12 +96,12 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
     return () => {
       cleanup()
     }
-  }, [game.file, game.local, onCleanupReady])
+  }, [game.file, game.local, onCleanupReady, keyboardSession])
 
   return <div className="runtime-view flashRuntimeView">
     {loading && !error ? <RuntimeLoading label="正在启动 Flash 播放器…" /> : null}
     {error ? <RuntimeFailure message={error} onAction={canReturn ? onExit : undefined} actionLabel={canReturn ? '返回 Flash 库' : undefined} /> : null}
     <div ref={hostRef} className="flashRuffleHost" />
-    <FlashControls target={playerElement} adapter={keyboardAdapter} />
+    <FlashControls target={playerElement} adapter={keyboardAdapter} session={keyboardSession} gameId={game.id || game.file} />
   </div>
 }
