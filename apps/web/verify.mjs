@@ -360,6 +360,21 @@ try {
       canvas.width<=host.width+1 && canvas.left>=host.left-1 && canvas.right<=host.right+1
   })()`), 'keyboard canvas did not recover inside the resized host')
 
+  for (const [width, height] of [[320, 568], [390, 844]]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+    await evaluate('window.dispatchEvent(new Event("resize")); true')
+    await sleep(180)
+    requireCheck(await evaluate(`(() => {
+      const host=document.querySelector('.keyboardCanvas').getBoundingClientRect()
+      const canvas=document.querySelector('.keyboardCanvas canvas').getBoundingClientRect()
+      return document.documentElement.scrollWidth <= innerWidth + 1 &&
+        host.left >= -1 && host.right <= innerWidth + 1 &&
+        canvas.left >= host.left - 1 && canvas.right <= host.right + 1 &&
+        canvas.top >= host.top - 1 && canvas.bottom <= host.bottom + 1
+    })()`), `keyboard canvas overflows at ${width}x${height}`)
+  }
+  await send('Emulation.clearDeviceMetricsOverride')
+
   await evaluate("window.location.hash = '#/library/j2me'; true")
   await waitFor("document.querySelector('.tab[aria-current=page]')?.textContent.includes('J2ME')", 'library after keyboard test')
   await evaluate('history.back(); true')
