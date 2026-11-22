@@ -112,10 +112,11 @@ function useServerGames(kind) {
       })
       .then((data) => {
         if (!alive) return
+        if (!data || !Array.isArray(data.games)) throw new Error('冒泡游戏目录响应格式错误')
         setState({
           loading: false,
           error: null,
-          games: (Array.isArray(data) ? data : data?.games || []).map((g) => ({
+          games: data.games.map((g) => ({
             kind,
             file: g.file,
             name: g.name || g.file,
