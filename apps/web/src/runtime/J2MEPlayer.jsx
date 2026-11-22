@@ -9,7 +9,7 @@ import { createKeyboardProfileStorage } from './keyboard/storage.js'
 const styles = ['/style/main.css', '/style/lcdui.css', '/style/feedback.css']
 const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/runtime/j2me/touch-layout.js', '/panel.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/keymap.js']
 
-export function J2MEPlayer({ game, onExit, onReady }) {
+export function J2MEPlayer({ game, onExit, onReady, onError }) {
   const [keyboardSession] = useState(() => createKeyboardSession({
     runtime: 'j2me',
     gameId: game.id || game.file,
@@ -88,7 +88,6 @@ export function J2MEPlayer({ game, onExit, onReady }) {
         applyRuntimeSettings()
         ensureActive()
         window.ScreenSetup?.setOrientation?.(window.config?.orientation)
-        window.ScreenSetup?.refit?.()
         ensureActive()
         window.__XIAOCHAO_RUNTIME_EXTRAS_INIT__?.()
         ensureActive()
@@ -107,6 +106,7 @@ export function J2MEPlayer({ game, onExit, onReady }) {
           cleanupRuntimeArtifacts()
           setLoading(false)
           setError(e.message || String(e))
+          onError?.()
         }
       }
     })()

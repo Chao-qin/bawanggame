@@ -1,0 +1,23 @@
+[data-keyboard-surface] .keyboard-key > rect,
+[data-keyboard-surface] .keyboard-key > circle {
+  fill: var(--keyboard-key-fill, #39434f);
+  stroke: var(--keyboard-border, #8793a1);
+  stroke-width: 5;
+}
+
+[data-keyboard-surface] .keyboard-key > text {
+  fill: var(--keyboard-text, #fff);
+  stroke: none;
+  font-size: 32px;
+}
+
+[data-keyboard-surface] .keyboard-key.is-pressed > rect,
+[data-keyboard-surface] .keyboard-key.is-pressed > circle {
+  fill: var(--keyboard-pressed, #38a169);
+}
+
+[data-keyboard-surface] .keyboard-key:focus-visible > rect,
+[data-keyboard-surface] .keyboard-key:focus-visible > circle {
+  stroke: var(--keyboard-focused, #f6c344);
+  stroke-width: 12;
+}

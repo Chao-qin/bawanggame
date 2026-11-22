@@ -926,6 +926,7 @@ function Player({ game, onBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(fullscreenElement()))
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
+  const [runtimeFailedFor, setRuntimeFailedFor] = useState('')
   const [toolbarLandscape, setToolbarLandscape] = useState(() => window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
   const [toolbarChoice, setToolbarChoice] = useState(null)
   const [inputMappingOpen, setInputMappingOpen] = useState(false)
@@ -1015,17 +1016,18 @@ function Player({ game, onBack, nativeBackSignal }) {
   useEffect(() => {
     if (nativeBackSignal === lastNativeBackSignal.current) return
     lastNativeBackSignal.current = nativeBackSignal
+    if ((game.kind === 'j2me' || game.kind === 'maopao') && runtimeReadyFor !== game.file && runtimeFailedFor !== game.file) return
     setConfirming(true)
-  }, [nativeBackSignal])
+  }, [game.file, game.kind, nativeBackSignal, runtimeFailedFor, runtimeReadyFor])
   useEffect(() => () => {
     runtimeCleanupRef.current()
     if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
   }, [])
   const requestBack = useCallback(() => {
-    if ((game.kind === 'j2me' || game.kind === 'maopao') && runtimeReadyFor !== game.file) return
+    if ((game.kind === 'j2me' || game.kind === 'maopao') && runtimeReadyFor !== game.file && runtimeFailedFor !== game.file) return
     if (!exitStartedRef.current) setConfirming(true)
-  }, [game.file, game.kind, runtimeReadyFor])
+  }, [game.file, game.kind, runtimeFailedFor, runtimeReadyFor])
   const toggleFullscreen = async () => {
     try {
       if (fullscreenElement()) await exitFullscreen()
@@ -1082,7 +1084,7 @@ function Player({ game, onBack, nativeBackSignal }) {
         </div>}
       </div>
       <div ref={stageRef} className={game.kind === 'flash' ? 'playerStage flashPlayerStage' : 'playerStage'}>
-        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
+        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} onError={() => setRuntimeFailedFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} onError={() => setRuntimeFailedFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
       <InputMappingPopup
