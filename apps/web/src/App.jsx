@@ -1,6 +1,6 @@
 import { Button, DotLoading, Empty, Input, Popup, SearchBar, TextArea } from 'antd-mobile'
 import { AppstoreOutline, ArrowsAltOutline, CalculatorOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline, ShrinkOutline } from 'antd-mobile-icons'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
 import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
 import { MrpPlayer } from './runtime/MrpPlayer.jsx'
@@ -13,6 +13,8 @@ import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from '
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
 import { installResponsiveContract } from './responsive.js'
 import { addBundled, addFromFile, addFromUrl, fillArtwork, list as listLocalFlash, remove as removeLocalFlash } from './localFlash.js'
+
+const KeyboardTestPage = lazy(() => import('./keyboard/KeyboardTestPage.jsx').then((module) => ({ default: module.KeyboardTestPage })))
 
 const TABS = [
   { id: 'j2me', label: 'J2ME', Icon: AppstoreOutline },
@@ -56,6 +58,7 @@ function routeForGame(game, tab) {
 }
 
 function routeHash(route) {
+  if (route.type === 'keyboard-test') return '#/test/keyboard'
   if (route.type === 'play') {
     const params = new URLSearchParams()
     params.set('tab', route.tab)
@@ -80,6 +83,7 @@ function parseRoute(hash = '') {
   const value = String(hash || '').replace(/^#\/?/, '')
   const [path, queryString = ''] = value.split('?')
   const parts = path.split('/')
+  if (parts[0] === 'test' && parts[1] === 'keyboard') return { type: 'keyboard-test' }
   if (parts[0] === 'play' && parts[1] && parts[2]) {
     const kind = decodeRoutePart(parts[1])
     const file = decodeRoutePart(parts[2])
@@ -1187,6 +1191,7 @@ export default function App() {
   const restoringHistory = useRef(false)
   const libraryScroll = useRef(null)
   const playing = route.type === 'play'
+  const keyboardTest = route.type === 'keyboard-test'
 
   useLayoutEffect(() => {
     if (!playing && libraryScroll.current !== null) {
@@ -1264,7 +1269,7 @@ export default function App() {
   const [libraryTick, setLibraryTick] = useState(0)
 
   return <>
-    <div className="appShell" hidden={playing}>
+    <div className="appShell" hidden={playing || keyboardTest}>
       <header className="header">
         <div className="brand"><AppstoreOutline aria-hidden="true" /><h1>小潮霸王</h1></div>
         <PrimaryNavigation items={TABS} activeId={tab} onSelect={switchTab} />
@@ -1277,6 +1282,7 @@ export default function App() {
         ))}
       </main>
     </div>
+    {keyboardTest && <Suspense fallback={null}><KeyboardTestPage /></Suspense>}
     {playing && (FRAME_RUNTIME_KINDS.has(route.game.kind)
       ? <RuntimeFrame key={routeHash(route)} route={route} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />
       : <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />)}

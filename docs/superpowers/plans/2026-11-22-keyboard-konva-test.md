@@ -221,7 +221,7 @@ git commit -m "feat: add keyboard layout test route"
 
 - [ ] **Step 1: Add a test-route smoke flow**
 
-Navigate directly to `#/test/keyboard`, assert the page is mounted, iterate all six layouts, and assert rendered key counts match the layout contract. Verify category/layout selection updates the visible active layout. Navigate to `#/library/j2me`, verify its normal tab is rendered, use browser back/forward to return to the test route, and verify an unknown hash still falls back to the library. Open the existing sample Flash play route `#/play/flash/sample-game.swf?tab=flash&name=Star%20Catcher`, assert the player stage mounts, then exercise its existing back/exit path and assert it returns to the Flash library without normalizing to the keyboard test route.
+Navigate directly to `#/test/keyboard`, assert the page is mounted, iterate all six layouts, and assert rendered key counts match the layout contract. Verify category/layout selection updates the visible active layout. Navigate to `#/library/j2me`, verify its normal tab is rendered, use browser back/forward to return to the test route, and verify an unknown hash renders the existing library fallback using the saved tab. Open the existing sample Flash play route `#/play/flash/sample-game.swf?tab=flash&name=Star%20Catcher`, assert the player stage mounts, then exercise its existing back/exit path and assert it returns to the Flash library without normalizing to the keyboard test route.
 
 - [ ] **Step 2: Verify pointer lifecycle**
 
@@ -246,10 +246,10 @@ echo "$VITE_PID"
 Keep that terminal open so `VITE_PID` remains available for cleanup. In a second terminal, run from the repository root using the same selected port:
 
 ```bash
-VERIFY_BASE_URL="http://127.0.0.1:5174/" node apps/web/verify.mjs
+VERIFY_KEYBOARD_ONLY=1 VERIFY_BASE_URL="http://127.0.0.1:5174/" node apps/web/verify.mjs
 ```
 
-Expected: `RESULT PASS`; existing runtime fixture skips are reported as skips if optional fixtures are absent. Back in the launch terminal, stop only the recorded PID using `kill -TERM "$VITE_PID"`, verify `ps -p "$VITE_PID"` shows it exited, then verify `lsof -nP -iTCP:5174 -sTCP:LISTEN` reports no listener. Do not stop any process that was already listening before the test.
+Expected: `RESULT PASS`. The full legacy harness can run without `VERIFY_KEYBOARD_ONLY=1`, but J2ME/MRP runtime checks require the local backend and optional fixtures. Back in the launch terminal, stop only the recorded PID using `kill -TERM "$VITE_PID"`, verify `ps -p "$VITE_PID"` shows it exited, then verify `lsof -nP -iTCP:5174 -sTCP:LISTEN` reports no listener. Do not stop any process that was already listening before the test.
 
 - [ ] **Step 5: Run final checks**
 

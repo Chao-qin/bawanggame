@@ -1,6 +1,7 @@
 /* Deterministic browser smoke checks for the React shell and runtime players.
  * Optional fixtures:
  *   VERIFY_J2ME_FILE=game.jar VERIFY_MRP_FILE=game.mrp node verify.mjs
+ *   VERIFY_KEYBOARD_ONLY=1 runs the keyboard test route checks without backend runtime fixtures.
  */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -289,6 +290,92 @@ try {
   requireCheck(JSON.stringify(library.tabs) === JSON.stringify(['J2ME', '冒泡社区', 'Flash', 'Flash 商城', '52java 商城']), 'library tabs missing')
   requireCheck(library.hasUpload, 'JAR import missing')
 
+  await navigate('#/test/keyboard')
+  await waitFor("document.querySelector('.keyboardCanvas[data-layout-id=\"full-size\"]')", 'keyboard test route')
+  const keyboardLayouts = [
+    ['full-size', 104], ['tkl', 87], ['75-percent', 82], ['60-percent', 61],
+  ]
+  for (const [layoutId, keyCount] of keyboardLayouts) {
+    await evaluate(`(() => {
+      const button = [...document.querySelectorAll('.keyboardLayouts button')].find((item) => item.getAttribute('aria-pressed') !== 'true' && item.textContent.includes('${layoutId === 'full-size' ? '全尺寸' : layoutId === 'tkl' ? 'TKL' : layoutId === '75-percent' ? '75%' : '60%'}'))
+      button?.click()
+      return true
+    })()`)
+    await waitFor(`document.querySelector('.keyboardCanvas')?.dataset.layoutId === '${layoutId}'`, `${layoutId} keyboard layout`)
+    requireCheck(await evaluate(`Number(document.querySelector('.keyboardCanvas')?.dataset.keyCount) === ${keyCount}`), `${layoutId} key count mismatch`)
+  }
+  await evaluate(`document.querySelector('#keyboard-category-controller').click(); true`)
+  await waitFor("document.querySelector('.keyboardCanvas')?.dataset.layoutId === 'dpad-abxy'", 'D-pad controller')
+  requireCheck(await evaluate("Number(document.querySelector('.keyboardCanvas')?.dataset.keyCount) === 8"), 'D-pad controller key count mismatch')
+  await evaluate(`[...document.querySelectorAll('.keyboardLayouts button')].find((button) => button.textContent.includes('数字键盘')).click(); true`)
+  requireCheck(await evaluate("document.querySelector('.keyboardCanvas')?.dataset.layoutId === 'numpad' && Number(document.querySelector('.keyboardCanvas')?.dataset.keyCount) === 17"), 'numeric controller key count mismatch')
+
+  await evaluate(`document.querySelector('#keyboard-category-physical').click(); true`)
+  await waitFor("document.querySelector('.keyboardCanvas')?.dataset.layoutId === 'full-size'", 'full-size keyboard reset')
+  const escapePoint = await evaluate(`(() => {
+    const host = document.querySelector('.keyboardCanvas').getBoundingClientRect()
+    const scale = Math.min(host.width / 27.5, host.height / 6)
+    return {x:host.left + (host.width - 27.5 * scale) / 2 + 0.5 * scale, y:host.top + (host.height - 6 * scale) / 2 + 0.5 * scale}
+  })()`)
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: escapePoint.x, y: escapePoint.y })
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: escapePoint.x, y: escapePoint.y, button: 'left', buttons: 1, clickCount: 1 })
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.includes('Esc') && document.querySelector('.keyboardLastEvent')?.textContent.includes('按下 · Escape')"), 'physical keyboard press was not reflected')
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5, button: 'left', buttons: 1 })
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.includes('Esc')"), 'pointer leaving the key released it before pointerup')
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 5, y: 5, button: 'left', buttons: 0, clickCount: 1 })
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.trim() === '无' && document.querySelector('.keyboardLastEvent')?.textContent.includes('抬起 · Escape')"), 'physical keyboard release was not reflected')
+
+  await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
+  const touchPoints = await evaluate(`(() => {
+    const host = document.querySelector('.keyboardCanvas').getBoundingClientRect()
+    const scale = Math.min(host.width / 27.5, host.height / 6)
+    const offsetX = (host.width - 27.5 * scale) / 2
+    const offsetY = (host.height - 6 * scale) / 2
+    return [
+      {x:host.left + offsetX + 0.5 * scale, y:host.top + offsetY + 0.5 * scale, id:11},
+      {x:host.left + offsetX + 2.5 * scale, y:host.top + offsetY + 0.5 * scale, id:12},
+    ]
+  })()`)
+  await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints })
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.includes('Esc') && document.querySelector('.keyboardHeldValues')?.textContent.includes('F1')"), 'simultaneous touch pointers did not press both keys')
+  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [touchPoints[1]] })
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.trim() === 'Esc'"), 'ending one touch did not preserve the other key')
+  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.trim() === '无'"), 'final touch end left a key held')
+  await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...touchPoints[0], id: 13 }] })
+  await evaluate("window.dispatchEvent(new Event('blur')); true")
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.trim() === '无'"), 'window blur left a touch key held')
+  await send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] })
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false })
+
+  await evaluate(`document.querySelector('.keyboardCanvas').style.width = '0px'; true`)
+  await sleep(150)
+  requireCheck(await evaluate("!document.querySelector('.keyboardCanvas canvas')"), 'zero-width host mounted a Konva stage')
+  await evaluate("document.querySelector('.keyboardCanvas').style.width = ''; true")
+  await waitFor("!!document.querySelector('.keyboardCanvas canvas')", 'Konva stage after host resize')
+  requireCheck(await evaluate(`(() => {
+    const host=document.querySelector('.keyboardCanvas').getBoundingClientRect()
+    const canvas=document.querySelector('.keyboardCanvas canvas').getBoundingClientRect()
+    return Number(document.querySelector('.keyboardCanvas').dataset.keyCount)===104 &&
+      canvas.width<=host.width+1 && canvas.left>=host.left-1 && canvas.right<=host.right+1
+  })()`), 'keyboard canvas did not recover inside the resized host')
+
+  await evaluate("window.location.hash = '#/library/j2me'; true")
+  await waitFor("document.querySelector('.tab[aria-current=page]')?.textContent.includes('J2ME')", 'library after keyboard test')
+  await evaluate('history.back(); true')
+  await waitFor("document.querySelector('.keyboardCanvas[data-layout-id=\"full-size\"]')", 'browser back to keyboard test')
+  await evaluate("window.location.hash = '#/unknown'; true")
+  await sleep(250)
+  await waitFor("!document.querySelector('.keyboardCanvas') && document.querySelector('.appShell')?.hidden === false", 'unknown hash library fallback')
+  requireCheck(await evaluate("!!document.querySelector('.tab[aria-current=page]')"), 'unknown hash did not render the library fallback')
+  await navigate('#/play/flash/sample-game.swf?tab=flash&name=Star%20Catcher', 800)
+  await waitFor("!!document.querySelector('.playerStage')", 'sample Flash play route')
+  await evaluate("window.__XIAOCHAO_NATIVE_BACK_REQUEST__?.(); true")
+  await waitFor("!!document.querySelector('.exitConfirm')", 'Flash exit dialog from keyboard route check')
+  await evaluate("document.querySelector('.exitConfirm .optionDanger')?.click(); true")
+  await waitFor("location.hash === '#/library/flash' && !document.querySelector('.playerStage')", 'Flash library after play route')
+
+  if (!process.env.VERIFY_KEYBOARD_ONLY) {
   for (const [label, route] of UI_ROUTES) {
     await navigate(route, 500)
     if (route.endsWith('/store')) await waitFor("document.querySelector('.storeCard')", 'Java catalog fixture')
@@ -573,6 +660,7 @@ try {
     const mrp = await evaluate(`(() => ({ player: !!document.querySelector('.player'), dialogText: !!document.querySelector('#mrp-dialog-text'), bridgeContainsDialog: !!document.querySelector('#editor-layer #mrp-dialog-text'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure') }))()`)
     console.log('MRP startup:', JSON.stringify(mrp))
     requireCheck(mrp.player && mrp.dialogText && !mrp.bridgeContainsDialog, 'MRP dialog/editor structure is invalid')
+  }
   }
 
   if (jsErrors.length) throw new Error(`browser console errors: ${jsErrors.slice(0, 3).join(' | ')}`)
