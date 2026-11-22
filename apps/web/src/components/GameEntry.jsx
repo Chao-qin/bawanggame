@@ -12,14 +12,6 @@ export function GameArtwork({ src, name, className = '' }) {
   </span>
 }
 
-export function MrpArtwork({ src, name, className = '' }) {
-  const [failed, setFailed] = useState(false)
-  const showImage = src && !failed
-  return <span className={`gameArtwork mrpArtwork ${className}`} aria-label={showImage ? undefined : '暂无游戏封面'}>
-    <span aria-hidden="true">{showImage ? <img src={src} alt="" onError={() => setFailed(true)} /> : 'MRP'}</span>
-  </span>
-}
-
 export function LibraryGameEntry({ game, onOpen, selected, selecting, disabled }) {
   return <button
     type="button"
@@ -31,7 +23,7 @@ export function LibraryGameEntry({ game, onOpen, selected, selecting, disabled }
     title={game.desc || game.name}
   >
     {selected && <span className="cardCheck" aria-hidden="true">✓</span>}
-    {game.kind === 'maopao' ? <MrpArtwork src={game.iconUrl} name={game.name} className="cardIcon" /> : <GameArtwork src={game.iconUrl} name={game.name} className="cardIcon" />}
+    <GameArtwork src={game.iconUrl} name={game.name} className="cardIcon" />
     <span className="gameEntryInfo">
       <span className="cardName">{game.name}</span>
       <span className="cardMeta">{[game.vendor, formatSize(game.size), game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机' : ''].filter(Boolean).join(' · ') || '\u00a0'}</span>

@@ -31,9 +31,6 @@
 !games/jar/.keep
 !games/flash/
 !games/flash/**
-!maopao-revival/
-!maopao-revival/hall/
-!maopao-revival/hall/manifest.json
 !start.sh
 !turnserver.conf
 **/node_modules

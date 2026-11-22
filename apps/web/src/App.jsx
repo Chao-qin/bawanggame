@@ -7,10 +7,9 @@ import { MrpPlayer } from './runtime/MrpPlayer.jsx'
 import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
 import { FlashPlayer } from './runtime/FlashPlayer.jsx'
 import { InputMappingPopup } from './runtime/InputMappingPopup.jsx'
-import { createRuntimeBackGate } from './runtime/runtimeBackGate.js'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
 import { fetchArtwork, validArtwork } from './artwork.js'
-import { GameArtwork, LibraryGameEntry, MrpArtwork, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
+import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
 import { installResponsiveContract } from './responsive.js'
 import { addBundled, addFromFile, addFromUrl, fillArtwork, list as listLocalFlash, remove as removeLocalFlash } from './localFlash.js'
@@ -105,27 +104,24 @@ function useServerGames(kind) {
     if (kind !== 'maopao') return
     let alive = true
     setState({ loading: true, error: null, games: [] })
-    fetch('/__mrp/catalog')
+    fetch('/maopao/hall/manifest.json')
       .then((r) => {
         if (!r.ok) throw new Error('HTTP ' + r.status)
         return r.json()
       })
       .then((data) => {
         if (!alive) return
-        if (!data || !Array.isArray(data.games)) throw new Error('冒泡游戏目录响应格式错误')
         setState({
           loading: false,
           error: null,
-          games: data.games.map((g) => ({
+          games: data.map((g) => ({
             kind,
             file: g.file,
             name: g.name || g.file,
             vendor: g.vendor || '',
             desc: g.desc || '',
             size: g.size || 0,
-            iconUrl: typeof g.artworkUrl === 'string' ? g.artworkUrl : null,
-            available: g.available === true,
-            availabilityReason: g.availabilityReason || null,
+            iconUrl: typeof g.iconUrl === 'string' ? g.iconUrl : null,
             local: false,
           })),
         })
@@ -404,13 +400,12 @@ function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
           next?.focus()
         }}>
         <div className="optionHead">
-          {game.kind === 'maopao' ? <MrpArtwork src={game.iconUrl} name={game.name} className="optionIcon" /> : <GameArtwork src={game.iconUrl} name={game.name} className="optionIcon" />}
+          <GameArtwork src={game.iconUrl} name={game.name} className="optionIcon" />
           <div className="optionTitle"><strong>{game.name}</strong><span>{[game.vendor, game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机游戏' : ''].filter(Boolean).join(' · ')}</span></div>
           <Button fill="none" className="iconButton" onClick={onClose} aria-label="关闭"><CloseOutline aria-hidden="true" /></Button>
         </div>
         <div className="optionBody">
-          {game.availabilityReason && <span className="optionAvailability">{game.availabilityReason}</span>}
-          <Button className="optionButton" color="primary" disabled={game.kind === 'maopao' && game.available === false} onClick={() => { onStart(game); onClose() }}>启动</Button>
+          <Button className="optionButton" color="primary" onClick={() => { onStart(game); onClose() }}>启动</Button>
           {game.local && <Button className="optionButton" onClick={() => { onSelect(game); onClose() }}>选择</Button>}
           {game.local && <Button className="optionButton optionDanger" color="danger" fill="outline" onClick={() => { onRemove(game); onClose() }}>卸载</Button>}
         </div>
@@ -931,21 +926,16 @@ function Player({ game, onBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(fullscreenElement()))
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
-  const [runtimeFailedFor, setRuntimeFailedFor] = useState('')
   const [toolbarLandscape, setToolbarLandscape] = useState(() => window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
   const [toolbarChoice, setToolbarChoice] = useState(null)
   const [inputMappingOpen, setInputMappingOpen] = useState(false)
   const toolbarCollapsed = toolbarChoice?.landscape === toolbarLandscape ? toolbarChoice.collapsed : toolbarLandscape
   const playerRef = useRef(null)
   const stageRef = useRef(null)
-  const backGateRef = useRef(null)
+  const lastNativeBackSignal = useRef(nativeBackSignal)
   const runtimeCleanupRef = useRef(noopCleanup)
   const exitStartedRef = useRef(false)
   const settingsReady = game.kind === 'j2me' && runtimeReadyFor === game.file
-  const runtimePhase = game.kind === 'j2me' || game.kind === 'maopao'
-    ? runtimeReadyFor === game.file ? 'ready' : runtimeFailedFor === game.file ? 'failed' : 'starting'
-    : 'ready'
-  if (!backGateRef.current) backGateRef.current = createRuntimeBackGate(nativeBackSignal)
   const registerRuntimeCleanup = useCallback((cleanup) => {
     runtimeCleanupRef.current = typeof cleanup === 'function' ? cleanup : noopCleanup
   }, [])
@@ -1023,17 +1013,16 @@ function Player({ game, onBack, nativeBackSignal }) {
     }
   }, [])
   useEffect(() => {
-    const gate = backGateRef.current
-    gate.setPhase(runtimePhase)
-    if (gate.observe(nativeBackSignal)) setConfirming(true)
-  }, [nativeBackSignal, runtimePhase])
+    if (nativeBackSignal === lastNativeBackSignal.current) return
+    lastNativeBackSignal.current = nativeBackSignal
+    setConfirming(true)
+  }, [nativeBackSignal])
   useEffect(() => () => {
     runtimeCleanupRef.current()
     if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
   }, [])
   const requestBack = useCallback(() => {
-    if (!backGateRef.current.canRequest()) return
     if (!exitStartedRef.current) setConfirming(true)
   }, [])
   const toggleFullscreen = async () => {
@@ -1092,15 +1081,10 @@ function Player({ game, onBack, nativeBackSignal }) {
         </div>}
       </div>
       <div ref={stageRef} className={game.kind === 'flash' ? 'playerStage flashPlayerStage' : 'playerStage'}>
-        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} onError={() => setRuntimeFailedFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} onError={() => setRuntimeFailedFor(game.file)} />}
+        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
-      <InputMappingPopup
-        visible={inputMappingOpen}
-        onClose={() => setInputMappingOpen(false)}
-        gameId={game.id || game.file}
-        runtime={game.kind === 'maopao' ? 'mrp' : game.kind}
-      />
+      <InputMappingPopup visible={inputMappingOpen} onClose={() => setInputMappingOpen(false)} />
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true" aria-label="退出当前游戏？">
           <div className="exitBox">

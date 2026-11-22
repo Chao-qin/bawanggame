@@ -352,20 +352,6 @@ try {
   const flash = await evaluate(`(() => ({ player: !!document.querySelector('.player'), stage: !!document.querySelector('.playerStage'), runtime: !!document.querySelector('ruffle-player'), reloads: window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0 }))()`)
   console.log('Flash startup:', JSON.stringify(flash))
   requireCheck(flash.player && flash.stage, 'Flash player did not mount')
-  const svgContract = await evaluate(`(() => ({
-    surface: !!document.querySelector('.keyboard-surface'),
-    count: document.querySelectorAll('.keyboard-surface [data-control-id]').length,
-    htmlButtons: document.querySelectorAll('.keyboard-surface button').length,
-    foreignObjects: document.querySelectorAll('.keyboard-surface foreignObject').length,
-    actionPrefix: [...document.querySelectorAll('.keyboard-surface [data-action-id]')].every((node) => node.dataset.actionId.startsWith('flash-key:')),
-    shapeFill: getComputedStyle(document.querySelector('.keyboard-key rect')).fill,
-    shapeStroke: getComputedStyle(document.querySelector('.keyboard-key rect')).stroke,
-    labelFill: getComputedStyle(document.querySelector('.keyboard-key text')).fill,
-    labelHeight: document.querySelector('.keyboard-key text')?.getBoundingClientRect().height || 0,
-  }))()`)
-  requireCheck(svgContract.surface && svgContract.count === 72 && svgContract.htmlButtons === 0 && svgContract.foreignObjects === 0 && svgContract.actionPrefix, `Flash SVG contract invalid: ${JSON.stringify(svgContract)}`)
-  requireCheck(svgContract.shapeFill === 'rgb(57, 67, 79)' && svgContract.shapeStroke === 'rgb(135, 147, 161)' && svgContract.labelFill === 'rgb(255, 255, 255)' && svgContract.labelHeight > 4, `Flash SVG colors or labels invalid: ${JSON.stringify(svgContract)}`)
-  console.log('Flash SVG contract:', JSON.stringify(svgContract))
   await evaluate(`(() => { const player = document.querySelector('ruffle-player'); window.__flashKeyEvents = []; player?.focus(); for (const type of ['keydown', 'keyup']) document.addEventListener(type, (event) => { if (['ArrowRight','ArrowLeft'].includes(event.key)) window.__flashKeyEvents.push([type, event.key]) }, true); return { player: !!player, focused: document.activeElement === player } })()`)
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
@@ -379,28 +365,34 @@ try {
       const toolbar = read('.runtimeToolbar')
       const stage = read('.playerStage')
       const canvas = read('ruffle-player')
-       const controls = read('.keyboard-surface')
+      const controls = read('.flashControls')
       const collapsed = document.querySelector('.runtimeToolbar')?.classList.contains('runtimeToolbarCollapsed')
-       return {toolbar, stage, canvas, controls, controlsDisplay: getComputedStyle(document.querySelector('.keyboard-surface')).display, collapsed, scrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth, viewportHeight: innerHeight}
+      return {toolbar, stage, canvas, controls, controlsDisplay: getComputedStyle(document.querySelector('.flashControls')).display, collapsed, scrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth, viewportHeight: innerHeight}
     })()`)
     console.log(`Flash layout ${width}x${height}:`, JSON.stringify(layout))
     requireCheck(layout.stage && layout.canvas && layout.stage.width > 0 && layout.stage.height > 0, `Flash stage is unstable at ${width}x${height}`)
     requireCheck(layout.scrollWidth <= layout.viewportWidth + 1, `Flash layout overflows horizontally at ${width}x${height}`)
     requireCheck(layout.controlsDisplay !== 'none', `Touch controls are hidden at ${width}x${height}`)
-     requireCheck(layout.controls.left <= 1 && layout.controls.top <= 1 && layout.controls.right >= width - 1 && layout.controls.bottom >= height - 1, 'SVG keyboard surface does not cover the runtime viewport')
+    if (width > height) requireCheck(layout.stage.height >= height - 2 && layout.stage.left >= 110 && layout.stage.right <= width - 110, 'Landscape Flash stage did not reserve side keypad areas')
+    else requireCheck(layout.stage.width >= width - 2 && layout.controls.top >= layout.stage.bottom - 1, 'Portrait Flash stage/keypad layout is invalid')
+    const keyButton = await evaluate(`(() => { const r=document.querySelector('.flashKey-left').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2} })()`)
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [keyButton] })
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    const touchEvents = await evaluate(`window.__flashKeyEvents.slice(-2)`)
+    requireCheck(JSON.stringify(touchEvents) === JSON.stringify([['keydown','ArrowLeft'],['keyup','ArrowLeft']]), `touch keypad did not send a paired key event: ${JSON.stringify(touchEvents)}`)
   }
   await evaluate(`document.querySelector('.runtimeToolbarToggle[aria-expanded="false"]')?.click(); true`)
   const fullscreenButton = await evaluate(`(() => { const r=document.querySelector('.runtimeToolbarIconButton[aria-label="进入全屏"]').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2} })()`)
   await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [fullscreenButton] })
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await sleep(250)
-   const fullscreenControls = await evaluate(`({ fullscreen: !!document.fullscreenElement, hidden: getComputedStyle(document.querySelector('.keyboard-surface')).display === 'none', stage: (() => { const r=document.querySelector('.playerStage').getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom} })() })`)
+  const fullscreenControls = await evaluate(`({ fullscreen: !!document.fullscreenElement, hidden: getComputedStyle(document.querySelector('.flashControls')).display === 'none', stage: (() => { const r=document.querySelector('.playerStage').getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom} })() })`)
   console.log('Flash fullscreen:', JSON.stringify(fullscreenControls))
   requireCheck(fullscreenControls.fullscreen && fullscreenControls.hidden && fullscreenControls.stage.left <= 1 && fullscreenControls.stage.top <= 1, 'landscape fullscreen should auto-fit without touch controls')
   requireCheck(await evaluate(`document.activeElement?.matches('ruffle-player')`), 'Flash did not regain keyboard focus when entering fullscreen')
   await evaluate('document.exitFullscreen()')
   await sleep(150)
-   requireCheck(await evaluate(`getComputedStyle(document.querySelector('.keyboard-surface')).display !== 'none'`), 'touch controls did not return after fullscreen exit')
+  requireCheck(await evaluate(`getComputedStyle(document.querySelector('.flashControls')).display !== 'none'`), 'touch controls did not return after fullscreen exit')
   await send('Emulation.setTouchEmulationEnabled', { enabled: false })
   await send('Emulation.clearDeviceMetricsOverride')
   await evaluate(`window.__XIAOCHAO_NATIVE_BACK_REQUEST__?.(); true`)
@@ -412,35 +404,35 @@ try {
   console.log('Flash exit:', JSON.stringify(flashExit))
   requireCheck(flashExit.hash === '#/library/flash' && flashExit.tab === 'Flash' && flashExit.reloads === 0 && !flashExit.player, 'Flash exit reloaded or lost the active library tab')
 
-  if (!J2ME_FILE) {
-    console.log('SKIP: no J2ME fixture for runtime SVG checks (set VERIFY_J2ME_FILE)')
-  } else {
-  await navigate(`#\/play\/j2me\/${encodeURIComponent(J2ME_FILE)}?tab=j2me&name=Verify%20J2ME`, 800)
+  await navigate('#/play/j2me/layout-probe.jar?tab=j2me&name=Layout%20Probe', 800)
   await waitFor("document.querySelector('.runtimeFrame')?.contentDocument?.querySelector('#phone')", 'J2ME runtime markup')
   await waitFor("!![...document.querySelector('.runtimeFrame').contentDocument.styleSheets].find((sheet) => sheet.href?.includes('/style/main.css'))", 'J2ME runtime stylesheet')
-   for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
+  for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
+    if (height > width) {
+      console.log(`SKIP: synthetic J2ME portrait geometry requires a game fixture (${width}x${height})`)
+      continue
+    }
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
     const layout = await evaluate(`(() => {
       const frame = document.querySelector('.runtimeFrame')
       const doc = frame.contentDocument
       doc.body.dataset.orientation = '${width > height ? 'landscape' : 'portrait'}'
-      const surface = doc.querySelector('.keyboard-surface')
-      const rect = surface?.getBoundingClientRect()
-      const keys = [...(surface?.querySelectorAll('[data-control-id]') || [])]
-      return {
-        surface: !!surface,
-        rect: rect && {left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,width:rect.width,height:rect.height},
-        keyCount: keys.length,
-        numericKeys: keys.filter((node) => /^key-|^(num|star|pound)/.test(node.dataset.controlId)).length,
-        buttons: surface?.querySelectorAll('button').length || 0,
-        scrollWidth:doc.documentElement.scrollWidth,
+      const keypad = doc.querySelector('#keypad')
+      keypad.className = 'keypad-4'
+      const read = (selector) => {
+        const node = doc.querySelector(selector)
+        const r = node.getBoundingClientRect()
+        return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height}
       }
+      const nav = read('#nav'), numpad = read('#numpad'), display = read('#display-container')
+      const overlaps = (a,b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1
+      return {nav, numpad, display, scrollWidth:doc.documentElement.scrollWidth, navColumn:frame.contentWindow.getComputedStyle(doc.querySelector('#nav')).gridColumnStart, numpadColumn:frame.contentWindow.getComputedStyle(doc.querySelector('#numpad')).gridColumnStart, navDisplay:overlaps(nav,display), numpadDisplay:overlaps(numpad,display)}
     })()`)
     console.log(`J2ME layout ${width}x${height}:`, JSON.stringify(layout))
     requireCheck(layout.scrollWidth <= width + 1, `J2ME runtime overflows horizontally at ${width}x${height}`)
-    requireCheck(layout.surface && layout.rect.width > 0 && layout.rect.height > 0, `J2ME SVG surface missing at ${width}x${height}`)
-    requireCheck(layout.keyCount > 0 && layout.numericKeys >= 12, `J2ME SVG keypad inventory incomplete at ${width}x${height}`)
-    requireCheck(layout.buttons === 0, `HTML buttons remain inside the J2ME SVG keyboard at ${width}x${height}`)
+    requireCheck(!layout.navDisplay && !layout.numpadDisplay, `J2ME controls overlap game surface at ${width}x${height}`)
+    requireCheck(layout.navColumn === '1' && layout.numpadColumn === '3', `J2ME landscape controls are not on the agreed sides at ${width}x${height}`)
+    requireCheck(layout.display.left >= layout.nav.right - 1 && layout.display.right <= layout.numpad.left + 1, `J2ME game surface is not between controls at ${width}x${height}`)
   }
   await send('Emulation.clearDeviceMetricsOverride')
   await evaluate(`(() => {
@@ -451,7 +443,6 @@ try {
   await waitFor("document.querySelector('.runtimeFrame')?.contentDocument?.querySelector('.exitConfirm')", 'J2ME exit confirmation')
   await evaluate(`document.querySelector('.runtimeFrame').contentDocument.querySelector('.exitConfirm .optionDanger').click(); true`)
   await waitFor("!document.querySelector('.runtimeFrame')", 'J2ME runtime cleanup')
-  }
   await navigate('#/play/flash/fruit-madness.swf?tab=flash&name=Fruit%20Madness', 1200)
   requireCheck(await evaluate("!!document.querySelector('.playerStage')"), 'Flash re-entry did not mount')
   await evaluate(`[...document.querySelectorAll('.tab')].find(node => node.textContent.includes('Flash 商城'))?.click()`)
@@ -487,54 +478,36 @@ try {
     const route = `#/play/j2me/${encodeURIComponent(J2ME_FILE)}?tab=j2me&name=Verify%20J2ME`
     inRuntimeFrame = true
     await navigate(route, 2500)
-    const j2me = await evaluate(`(() => {
-      const surface = document.querySelector('.keyboard-surface')
-      const key = surface?.querySelector('[data-action-id="num1"]')
-      const rect = (node) => { if (!node) return null; const r=node.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height} }
-      const keyShape = key?.querySelector('rect, circle')
-      const keyLabel = key?.querySelector('text')
-      return {
-        player: !!document.querySelector('.player'),
-        phone: !!document.querySelector('#phone'),
-        boot: !!document.querySelector('.runtimeBoot'),
-        failure: !!document.querySelector('.runtimeFailure'),
-        editor: !!document.querySelector('#editor-layer'),
-        exitConfirm: !!document.querySelector('.exitConfirm'),
-        surface: rect(surface),
-        key: rect(key),
-        keyFill: keyShape ? getComputedStyle(keyShape).fill : null,
-        keyStroke: keyShape ? getComputedStyle(keyShape).stroke : null,
-        keyTextFill: keyLabel ? getComputedStyle(keyLabel).fill : null,
-        keyTextHeight: keyLabel?.getBoundingClientRect().height || 0,
-        keyCount: surface?.querySelectorAll('[data-control-id]').length || 0,
-        htmlButtons: surface?.querySelectorAll('button').length || 0,
-        states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [],
-      }
-    })()`)
+    const j2me = await evaluate(`(() => ({ player: !!document.querySelector('.player'), phone: !!document.querySelector('#phone'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure'), editor: !!document.querySelector('#editor-layer'), states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [] }))()`)
     console.log('J2ME startup:', JSON.stringify(j2me))
     requireCheck(j2me.player && j2me.phone && j2me.editor, 'J2ME player did not mount')
-    requireCheck(!j2me.exitConfirm, 'J2ME showed an exit confirmation immediately after startup')
-    requireCheck(j2me.surface?.width > 0 && j2me.surface?.height > 0 && j2me.keyCount >= 12 && j2me.htmlButtons === 0, 'J2ME SVG keyboard is missing or collapsed')
-    requireCheck(j2me.key?.width >= 24 && j2me.key?.height >= 24, 'J2ME SVG numeric key is too small')
-    requireCheck(j2me.keyFill === 'rgb(57, 67, 79)' && j2me.keyStroke === 'rgb(135, 147, 161)' && j2me.keyTextFill === 'rgb(255, 255, 255)' && j2me.keyTextHeight > 4, 'J2ME SVG key colors or labels are invalid')
     requireCheck(j2me.states.includes('boot') || j2me.states.includes('failure') || j2me.boot || j2me.failure, 'J2ME startup state was never rendered')
     const viewports = [[844, 390], [1280, 720], [390, 844], [320, 568], [375, 667]]
     for (const [width, height] of viewports) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
       await evaluate(`document.body.dataset.orientation='${width > height ? 'landscape' : 'portrait'}'; window.TouchLayout?.apply(window.TouchLayout.defaults()); window.ScreenSetup?.refit?.(); true`)
       await sleep(100)
-      const snapshot = await evaluate(`(() => {
-        const surface=document.querySelector('.keyboard-surface'), key=surface?.querySelector('[data-action-id="num1"]')
-        const bounds=(node)=>{if(!node)return null;const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}}
-        const shape=key?.querySelector('rect,circle'), label=key?.querySelector('text')
-        return {surface:bounds(surface),key:bounds(key),keyFill:shape?getComputedStyle(shape).fill:null,keyStroke:shape?getComputedStyle(shape).stroke:null,keyTextFill:label?getComputedStyle(label).fill:null,keyTextHeight:label?.getBoundingClientRect().height||0,count:surface?.querySelectorAll('[data-control-id]').length||0,buttons:surface?.querySelectorAll('button').length||0,exit:!!document.querySelector('.exitConfirm'),scrollWidth:document.documentElement.scrollWidth}
-      })()`)
-      console.log(`J2ME SVG ${width}x${height}:`, JSON.stringify(snapshot))
-      requireCheck(snapshot.surface?.width > 0 && snapshot.surface?.height > 0 && snapshot.count >= 12 && snapshot.buttons === 0, `J2ME SVG keyboard invalid at ${width}x${height}`)
-      requireCheck(snapshot.key?.width >= 24 && snapshot.key?.height >= 24, `J2ME numeric key too small at ${width}x${height}`)
-      requireCheck(snapshot.keyFill === 'rgb(57, 67, 79)' && snapshot.keyStroke === 'rgb(135, 147, 161)' && snapshot.keyTextFill === 'rgb(255, 255, 255)' && snapshot.keyTextHeight > 4, `J2ME key colors or labels invalid at ${width}x${height}`)
-      requireCheck(!snapshot.exit, `J2ME shows an exit confirmation at ${width}x${height}`)
-      requireCheck(snapshot.scrollWidth <= width + 1, `J2ME runtime overflows at ${width}x${height}`)
+      const snapshot = await rectSnapshot()
+      console.log(`Viewport ${width}x${height}:`, JSON.stringify(snapshot))
+      if (width === 320 || width === 375) {
+        const portrait = await evaluate(`(() => {
+          const rect = (id) => document.querySelector(id).getBoundingClientRect()
+          const canvas = rect('#canvas')
+          return {
+            canvasHeight: canvas.height,
+            headerGap: canvas.top - rect('.runtimeToolbar').bottom,
+            leftGap: rect('#ret').top - rect('#choice').bottom,
+            rightGap: rect('#clear').top - rect('#back').bottom,
+            navHeight: rect('#nav').height,
+            digitHeight: rect('#numpad .key').height,
+            digitGap: parseFloat(getComputedStyle(document.querySelector('#numpad')).rowGap),
+          }
+        })()`)
+        console.log('J2ME portrait gaps:', JSON.stringify(portrait))
+        requireCheck(portrait.canvasHeight > 0 && portrait.headerGap > 0, 'J2ME toolbar overlaps the game canvas')
+        requireCheck(portrait.leftGap > 0 && portrait.rightGap > 0, 'J2ME side buttons have no vertical gap')
+        requireCheck(portrait.navHeight > 60 && portrait.digitHeight > 18 && portrait.digitGap > 0, 'J2ME portrait keys collapsed')
+      }
       if (width === 375) {
         const toolbar = await evaluate(`(() => {
           const toggle = document.querySelector('.runtimeToolbarToggle')
@@ -577,35 +550,6 @@ try {
     await clickPlayerBack()
     await sleep(150)
     requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'exit confirmation did not open')
-    const continueBefore = await evaluate(`(() => {
-      const canvas = document.querySelector('#canvas')
-      let frames = null
-      try { frames = window.MIDP && window.MIDP.frames } catch (error) { frames = String(error) }
-      return {canvas: !!canvas, width: canvas?.width || 0, height: canvas?.height || 0, frames}
-    })()`)
-    console.log('J2ME continue before:', JSON.stringify(continueBefore))
-    const continueClicked = await evaluate(`(() => {
-      const button = document.querySelector('.exitConfirm .optionButton')
-      if (!button) return false
-      button.click()
-      return true
-    })()`)
-    requireCheck(continueClicked, 'Continue button was not found')
-    await waitFor("!document.querySelector('.exitConfirm')", 'Continue to dismiss the exit confirmation')
-    await sleep(350)
-    const continueAfter = await evaluate(`(() => {
-      const canvas = document.querySelector('#canvas')
-      let frames = null
-      try { frames = window.MIDP && window.MIDP.frames } catch (error) { frames = String(error) }
-      return {player: !!document.querySelector('.player'), dialog: !!document.querySelector('.exitConfirm'), canvas: !!canvas, width: canvas?.width || 0, height: canvas?.height || 0, frames}
-    })()`)
-    console.log('J2ME continue:', JSON.stringify({before: continueBefore, after: continueAfter}))
-    requireCheck(continueBefore.canvas && continueBefore.width > 0 && continueBefore.height > 0 && Number.isFinite(continueBefore.frames), 'J2ME runtime frame counter was not active before Continue')
-    requireCheck(continueAfter.player && !continueAfter.dialog && continueAfter.canvas && continueAfter.width > 0 && continueAfter.height > 0, 'Continue stopped or unmounted the J2ME runtime')
-    requireCheck(continueAfter.frames > continueBefore.frames, 'J2ME frame counter did not advance after Continue; runtime may be frozen')
-    await clickPlayerBack()
-    await sleep(150)
-    requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'exit confirmation did not reopen after Continue')
     await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
     inRuntimeFrame = false
     await sleep(1500)
@@ -631,10 +575,7 @@ try {
     requireCheck(mrp.player && mrp.dialogText && !mrp.bridgeContainsDialog, 'MRP dialog/editor structure is invalid')
   }
 
-  if (jsErrors.length) {
-    console.error('BROWSER ERRORS:', JSON.stringify(jsErrors.slice(0, 20)))
-    throw new Error(`browser console errors: ${jsErrors.slice(0, 3).join(' | ')}`)
-  }
+  if (jsErrors.length) throw new Error(`browser console errors: ${jsErrors.slice(0, 3).join(' | ')}`)
   if (networkWarnings.length) console.log('WARN:', networkWarnings.slice(0, 3).join(' | '))
   console.log('RESULT PASS')
 } catch (error) {

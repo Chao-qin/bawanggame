@@ -3,14 +3,10 @@ import { createRuntimeSession, loadClassic } from './loadScript.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
 import { get as getLocalFlash } from '../localFlash.js'
 import { FlashControls } from './FlashControls.jsx'
-import { createFlashKeyboardAdapter } from './keyboard/FlashKeyboardAdapter.js'
-import { createKeyboardSession } from './keyboard/KeyboardSession.js'
 
 export function FlashPlayer({ game, onCleanupReady, onExit }) {
-  const [keyboardSession] = useState(() => createKeyboardSession({ runtime: 'flash', gameId: game.id || game.file }))
   const hostRef = useRef(null)
   const [playerElement, setPlayerElement] = useState(null)
-  const [keyboardAdapter, setKeyboardAdapter] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [canReturn, setCanReturn] = useState(false)
@@ -20,18 +16,12 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
     let player = null
     let objectUrl = ''
     let cleaned = false
-    let keyboardAdapter = null
     const session = createRuntimeSession()
     const cleanup = () => {
       if (cleaned) return
       cleaned = true
       alive = false
       session.invalidate()
-      keyboardSession.releaseAll()
-      keyboardSession.invalidate()
-      keyboardAdapter?.cleanup()
-      keyboardAdapter = null
-      setKeyboardAdapter(null)
       player?.remove()
       player = null
       if (objectUrl) {
@@ -60,9 +50,6 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
         if (!ruffle) throw new Error('Ruffle 播放器未初始化')
 
         player = ruffle.createPlayer()
-        keyboardAdapter = createFlashKeyboardAdapter({ target: player })
-        keyboardSession.registerInputRelease(keyboardAdapter.releaseAll)
-        setKeyboardAdapter(keyboardAdapter)
         player.tabIndex = 0
         player.style.display = 'block'
         player.style.position = 'absolute'
@@ -96,12 +83,12 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
     return () => {
       cleanup()
     }
-  }, [game.file, game.local, onCleanupReady, keyboardSession])
+  }, [game.file, game.local, onCleanupReady])
 
   return <div className="runtime-view flashRuntimeView">
     {loading && !error ? <RuntimeLoading label="正在启动 Flash 播放器…" /> : null}
     {error ? <RuntimeFailure message={error} onAction={canReturn ? onExit : undefined} actionLabel={canReturn ? '返回 Flash 库' : undefined} /> : null}
     <div ref={hostRef} className="flashRuffleHost" />
-    <FlashControls target={playerElement} adapter={keyboardAdapter} session={keyboardSession} gameId={game.id || game.file} />
+    <FlashControls target={playerElement} />
   </div>
 }

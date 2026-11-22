@@ -27,13 +27,15 @@
     num5: 5, num6: 6, num7: 7, num8: 8, num9: 9
   };
   var layoutId = "mrp:" + (mrpFile || f || "default");
-  var touchLayout = TouchLayout.forGame(layoutId, 'mrp');
+  var touchLayout = TouchLayout.forGame(layoutId);
   var keypadLayout = touchLayout.get();
   window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__ = touchLayout;
 
   function cEvent(type, code) {
     if (window.Module && Module._c_event) Module._c_event(type, code, 0);
   }
+  var ACTION_CODES = {};
+  Object.keys(KEYCODES).forEach(function (action) { ACTION_CODES[KEYCODES[action]] = action; });
   var inputController = window.InputMapping && window.InputMapping.create({
     gameId: "mrp:" + (mrpFile || f || "default"),
     keyboard: true,
@@ -43,29 +45,20 @@
       press: function (action) {
         if (KEYCODES[action] == null) return;
         cEvent(0, KEYCODES[action]);
-        tapFx(document.querySelector('[data-action-id="' + action + '"]'));
+        tapFx(document.getElementById(action));
       },
       release: function (action) { if (KEYCODES[action] != null) cEvent(1, KEYCODES[action]); },
       repeat: function (action) { if (KEYCODES[action] != null) cEvent(0, KEYCODES[action]); }
     }
   });
-  var unregisterKeyboardRelease = window.__XIAOCHAO_KEYBOARD_SESSION__ &&
-    window.__XIAOCHAO_KEYBOARD_SESSION__.registerInputRelease
-    ? window.__XIAOCHAO_KEYBOARD_SESSION__.registerInputRelease(function () {
-      if (keypadTouchpad) keypadTouchpad.releaseAll();
-      if (inputController && inputController.releaseAll) inputController.releaseAll();
-    })
-    : null;
   window.__XIAOCHAO_INPUT_CONTROLLER__ = inputController;
   window.__XIAOCHAO_INPUT_RESET__ = function () {
     if (inputController) inputController.destroy();
     inputController = null;
-    if (unregisterKeyboardRelease) unregisterKeyboardRelease();
     if (window.__XIAOCHAO_INPUT_CONTROLLER__) delete window.__XIAOCHAO_INPUT_CONTROLLER__;
     delete window.__XIAOCHAO_INPUT_RESET__;
   };
   function tapFx(node) {
-    if (!node) return;
     node.classList.add('tap');
     setTimeout(function () { node.classList.remove('tap'); }, 160);
   }
@@ -79,26 +72,23 @@
   var phone = window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 800;
   var keypadTouchpad = null;
   function bindTouchpad() {
-    var keyboardSession = window.__XIAOCHAO_KEYBOARD_SESSION__;
-    var surface = keyboardSession && keyboardSession.getSurface && keyboardSession.getSurface();
-    if (!surface || window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__) return;
-    var buttons = {};
-    var actionMap = {};
-    var controls = keyboardSession && keyboardSession.getProfile && keyboardSession.getProfile().layout.controls || [];
-    controls.forEach(function (control) {
-      buttons[control.id] = control.actionId;
-      actionMap[control.id] = control.actionId;
-    });
-    if (!Object.keys(buttons).length) {
-      Object.keys(KEYCODES).forEach(function (action) { buttons[action] = action; actionMap[action] = action; });
-    }
     keypadTouchpad = Touchpad.bind({
-      surface: surface,
-      buttons: buttons,
-      actionMap: actionMap,
-      input: inputController,
-      onPressedChange: function (ids) { if (keyboardSession) keyboardSession.notifyPressed(new Set(ids)); },
-      dpadVisual: function (direction) { return direction; },
+      buttons: TouchLayout.mapButtons(KEYCODES, keypadLayout),
+      dpadVisual: function (direction) { return TouchLayout.visualDpad(direction, keypadLayout); },
+      sink: {
+        press: function (code, meta) {
+          var action = ACTION_CODES[code];
+          if (inputController && action) inputController.press("touch:" + action, action, meta);
+        },
+        release: function (code, meta) {
+          var action = ACTION_CODES[code];
+          if (inputController && action) inputController.release("touch:" + action, action, meta);
+        },
+        repeat: function (code) {
+          var action = ACTION_CODES[code];
+          if (inputController && action) inputController.repeat("touch:" + action, action);
+        }
+      },
       feedback: {
         vibrate: phone ? 24 : 0,
         keyRepeat: REPEAT_DELAY !== 0,

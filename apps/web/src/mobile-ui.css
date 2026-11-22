@@ -265,24 +265,6 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
   font-weight: 800;
 }
 .gameArtwork img { display: block; width: 100%; height: 100%; object-fit: contain; }
-
-.mrpArtwork {
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #28394f, #18212e);
-  color: #9fb6d8;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .08em;
-}
-
-.mrpArtwork img { width: 100%; height: 100%; object-fit: cover; }
-
-.optionAvailability {
-  display: block;
-  color: #b36b2c;
-  font-size: 12px;
-}
 .gameEntryInfo { display: grid; flex: 1 1 auto; min-width: 0; gap: 4px; }
 .cardName, .cardMeta, .optionTitle strong, .storeInfoTitle, .storeInfoDesc {
   display: block;
@@ -478,27 +460,6 @@ body.runtime-active[data-orientation="landscape"] .player:not(:has(.flashPlayerS
 .touchLayoutEditor .layout-action-row { grid-template-columns: 52px minmax(0, 1fr); }
 .touchLayoutEditor .layout-order { gap: 5px; }
 .touchLayoutEditor .layout-note { margin: 0; }
-.keyboardEditorSvg { display: block; width: 100%; min-height: 520px; max-height: 72vh; background: #20262e; touch-action: none; }
-.keyboardEditorSvg text { font: 0.025px/1.1 system-ui, sans-serif; pointer-events: none; }
-.keyboardEditorTitle { font-weight: 700; }
-.keyboardEditorButton { cursor: pointer; }
-.keyboardEditorButton rect { fill: var(--ui-panel, #29313a); stroke: var(--ui-border, #65717d); stroke-width: .004; }
-.keyboardEditorButton text { fill: var(--ui-text, #fff); }
-.keyboardEditorButton:focus rect, .keyboardEditorSvg [role="button"]:focus > rect { stroke: #f6c344; stroke-width: .012; outline: none; }
-.keyboardEditorToolbar { display: flex; }
-.keyboardEditorToolbar > .keyboardEditorButton { transform: translateY(.055); width: .12; height: .045; }
-.keyboardEditorToolbar > .keyboardEditorButton:nth-of-type(1) { transform: translate(.01px, .055px); }
-.keyboardEditorToolbar > .keyboardEditorButton:nth-of-type(2) { transform: translate(.76px, .055px); }
-.keyboardEditorToolbar > .keyboardEditorButton:nth-of-type(3) { transform: translate(.78px, .11px); }
-.keyboardEditorToolbar > .keyboardEditorButton:nth-of-type(4) { transform: translate(.64px, .11px); }
-.keyboardEditorToolbar > .keyboardEditorButton:nth-of-type(5) { transform: translate(.5px, .11px); }
-.keyboardEditorStage { pointer-events: all; }
-.keyboardEditorSafeArea { fill: none; stroke: #4b9; stroke-dasharray: .012 .008; stroke-width: .004; pointer-events: none; }
-.keyboardEditorDisplay { fill: #1119; stroke: #e88; stroke-dasharray: .01 .01; stroke-width: .004; pointer-events: none; }
-.keyboardEditorInspector { pointer-events: all; }
-.keyboardEditorInspector > .keyboardEditorButton { width: .085; height: .045; }
-.keyboardEditorCommands { pointer-events: all; }
-.keyboardEditorCommands > .keyboardEditorButton { width: .12; height: .05; }
 .player:not(.runtimePlayerToolbarCollapsed) .flashPlayerStage {
   top: calc(max(8px, var(--safe-area-top, 0px)) + 56px);
 }
@@ -513,20 +474,6 @@ body.runtime-active[data-orientation="landscape"] .player:not(:has(.flashPlayerS
 .flashRuffleHost { overflow: hidden; }
 .flashRuffleHost ruffle-player { outline: none; }
 .flashControls { display: none; }
-.flashRuntimeView .keyboard-surface {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  touch-action: none;
-}
-.flashRuntimeView .keyboard-surface .keyboard-key {
-  pointer-events: all;
-  cursor: pointer;
-}
-.flashPlayerFullscreen .keyboard-surface { display: none; }
 .flashArchiveSection { margin-top: 12px; }
 .flashArchiveSection .sectionHeading { margin-top: 12px; }
 .flashArchiveSection .flashImportFields { grid-template-columns: minmax(0, 1fr) auto; }

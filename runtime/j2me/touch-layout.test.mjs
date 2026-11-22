@@ -5,21 +5,17 @@ import vm from 'node:vm'
 
 const source = readFileSync(new URL('./touch-layout.js', import.meta.url), 'utf8')
 
-function createLayout(settingsStore = new Map(), profileStorage = null) {
+function createLayout(settingsStore = new Map()) {
   const body = { dataset: {} }
-  const events = []
   const window = {
     document: { body, getElementById: () => null },
-    CustomEvent: function (type, init) { this.type = type; this.detail = init.detail },
-    dispatchEvent: (event) => events.push(event),
-    KeyboardProfileStorage: profileStorage,
     Settings: {
       touchLayout: (id) => settingsStore.get(id) || {},
       setTouchLayout: (id, value) => value ? settingsStore.set(id, value) : settingsStore.delete(id),
     },
   }
   vm.runInNewContext(source, { window, document: window.document })
-  return { layout: window.TouchLayout, body, events }
+  return { layout: window.TouchLayout, body }
 }
 
 test('uses the Java keypad default layout and stable action slots', () => {
@@ -57,99 +53,4 @@ test('persists layouts per game and restores the Java default layout', () => {
   assert.equal(adapter.get().dpad, 'mirror')
   assert.equal(adapter.reset().sides, 'swapped')
   assert.equal(store.has('mrp:test-game'), false)
-})
-
-test('migrates legacy fields into normalized per-game runtime overrides', () => {
-  const { layout } = createLayout()
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(layout.migrateLegacy({
-      dpad: 'rotate-cw',
-      sides: 'standard',
-      numbers: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'star', 'pound'],
-      actions: { back: 'ret', choice: 'ok', num1: 'up' },
-      unsupported: 'retain-me',
-    }, 'j2me'))),
-    {
-      override: {
-        layoutId: 'landscape-split',
-        controlOverrides: {
-          dpadRotation: 'rotate-cw',
-          sideGroup: 'standard',
-          numberSlotOrder: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'star', 'pound'],
-          slotActions: {
-            up: 'up', right: 'right', down: 'down', left: 'left', ok: 'ok',
-            choice: 'ok', back: 'ret', ret: 'ret', clear: 'clear', star: 'star',
-            num0: 'num0', pound: 'pound', num1: 'up', num2: 'num2', num3: 'num3',
-            num4: 'num4', num5: 'num5', num6: 'num6', num7: 'num7', num8: 'num8', num9: 'num9',
-          },
-        },
-      },
-      backup: { unsupported: 'retain-me' },
-    },
-  )
-})
-
-test('keeps a valid legacy source until the versioned envelope write succeeds', () => {
-  const source = { dpad: 'mirror', sides: 'swapped', numbers: ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'star', '0', 'pound'], actions: {} }
-  const legacy = new Map([['game-1', source]])
-  let succeeds = false
-  const profileStorage = {
-    update(callback) {
-      if (!succeeds) return false
-      callback({ perGameOverrides: {} })
-      return true
-    },
-  }
-  const { layout, events } = createLayout(legacy, profileStorage)
-  const adapter = layout.forGame('game-1', 'mrp')
-  assert.equal(adapter.migrate(), false)
-  assert.equal(legacy.get('game-1'), source)
-  succeeds = true
-  assert.equal(adapter.migrate(), true)
-  assert.equal(legacy.has('game-1'), false)
-  assert.equal(events.at(-1).type, 'xiaochao:keyboardprofilechange')
-  assert.equal(events.at(-1).detail.runtime, 'mrp')
-  assert.equal(events.at(-1).detail.profile.gameId, 'game-1')
-})
-
-test('migrates supported fields, backs up unsupported fields, then clears source', () => {
-  const source = { dpad: 'mirror', sides: 'unsupported-side', actions: { choice: 'ok', num1: 'up', future: 'custom' } }
-  const legacy = new Map([['game-unsupported', source]])
-  let saved
-  const profileStorage = {
-    update(callback) {
-      const next = callback({ perGameOverrides: {}, migrationBackups: [] })
-      saved = next
-      return true
-    },
-  }
-  const { layout } = createLayout(legacy, profileStorage)
-  const adapter = layout.forGame('game-unsupported', 'j2me')
-  assert.equal(adapter.migrate(), true)
-  assert.equal(legacy.has('game-unsupported'), false)
-  const override = saved.perGameOverrides['game-unsupported'].j2me
-  assert.equal(override.controlOverrides.dpadRotation, 'mirror')
-  assert.equal(override.controlOverrides.slotActions.choice, 'ok')
-  assert.equal(override.controlOverrides.slotActions.num1, 'up')
-  assert.equal(override.controlOverrides.slotActions.num2, 'num2')
-  assert.deepEqual(JSON.parse(JSON.stringify(saved.migrationBackups[0].record)), source)
-  assert.deepEqual(JSON.parse(JSON.stringify(saved.migrationBackups[0].unsupported)), {
-    sides: 'unsupported-side',
-    'actions.future': 'custom',
-  })
-})
-
-test('rotated d-pad maps displayed sectors to delivered logical directions', () => {
-  const { layout } = createLayout()
-  const migrated = layout.migrateLegacy({ dpad: 'rotate-cw' }, 'j2me')
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(migrated.override.controlOverrides.slotActions)),
-    {
-      up: 'up', right: 'right', down: 'down', left: 'left', ok: 'ok',
-      choice: 'choice', back: 'back', ret: 'ret', clear: 'clear',
-      star: 'star', pound: 'pound',
-      num0: 'num0', num1: 'num1', num2: 'num2', num3: 'num3', num4: 'num4',
-      num5: 'num5', num6: 'num6', num7: 'num7', num8: 'num8', num9: 'num9',
-    },
-  )
 })
