@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PhoneMarkup } from './PhoneMarkup.jsx'
 import { createRuntimeSession, loadClassic, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
@@ -14,6 +14,8 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     runtime: 'j2me',
     gameId: game.id || game.file,
   }))
+  const onExitRef = useRef(onExit)
+  onExitRef.current = onExit
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   function applyRuntimeSettings() {
@@ -92,8 +94,8 @@ export function J2MEPlayer({ game, onExit, onReady }) {
         ensureActive()
         window.__XIAOCHAO_KEYMAP_BOOT__?.()
         ensureActive()
-        window.__XIAOCHAO_REQUEST_EXIT = onExit
-        window.showExitScreen = onExit
+        window.__XIAOCHAO_REQUEST_EXIT = (...args) => onExitRef.current?.(...args)
+        window.showExitScreen = window.__XIAOCHAO_REQUEST_EXIT
         ensureActive()
         if (typeof window.onload === 'function') window.onload(new Event('load'))
         ensureActive()
@@ -125,6 +127,6 @@ export function J2MEPlayer({ game, onExit, onReady }) {
       delete window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__
       cleanupRuntimeArtifacts()
     }
-  }, [game, onExit, keyboardSession])
+  }, [game.file, game.local, keyboardSession])
   return <div className="runtime-view">{loading && !error ? <RuntimeLoading /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup keyboardSession={keyboardSession} /></div>
 }
