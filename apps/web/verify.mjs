@@ -482,36 +482,45 @@ try {
     const route = `#/play/j2me/${encodeURIComponent(J2ME_FILE)}?tab=j2me&name=Verify%20J2ME`
     inRuntimeFrame = true
     await navigate(route, 2500)
-    const j2me = await evaluate(`(() => ({ player: !!document.querySelector('.player'), phone: !!document.querySelector('#phone'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure'), editor: !!document.querySelector('#editor-layer'), states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [] }))()`)
+    const j2me = await evaluate(`(() => {
+      const surface = document.querySelector('.keyboard-surface')
+      const key = surface?.querySelector('[data-action-id="num1"]')
+      const rect = (node) => { if (!node) return null; const r=node.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height} }
+      return {
+        player: !!document.querySelector('.player'),
+        phone: !!document.querySelector('#phone'),
+        boot: !!document.querySelector('.runtimeBoot'),
+        failure: !!document.querySelector('.runtimeFailure'),
+        editor: !!document.querySelector('#editor-layer'),
+        exitConfirm: !!document.querySelector('.exitConfirm'),
+        surface: rect(surface),
+        key: rect(key),
+        keyCount: surface?.querySelectorAll('[data-control-id]').length || 0,
+        htmlButtons: surface?.querySelectorAll('button').length || 0,
+        states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [],
+      }
+    })()`)
     console.log('J2ME startup:', JSON.stringify(j2me))
     requireCheck(j2me.player && j2me.phone && j2me.editor, 'J2ME player did not mount')
+    requireCheck(!j2me.exitConfirm, 'J2ME showed an exit confirmation immediately after startup')
+    requireCheck(j2me.surface?.width > 0 && j2me.surface?.height > 0 && j2me.keyCount >= 12 && j2me.htmlButtons === 0, 'J2ME SVG keyboard is missing or collapsed')
+    requireCheck(j2me.key?.width >= 24 && j2me.key?.height >= 24, 'J2ME SVG numeric key is too small')
     requireCheck(j2me.states.includes('boot') || j2me.states.includes('failure') || j2me.boot || j2me.failure, 'J2ME startup state was never rendered')
     const viewports = [[844, 390], [1280, 720], [390, 844], [320, 568], [375, 667]]
     for (const [width, height] of viewports) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
       await evaluate(`document.body.dataset.orientation='${width > height ? 'landscape' : 'portrait'}'; window.TouchLayout?.apply(window.TouchLayout.defaults()); window.ScreenSetup?.refit?.(); true`)
       await sleep(100)
-      const snapshot = await rectSnapshot()
-      console.log(`Viewport ${width}x${height}:`, JSON.stringify(snapshot))
-      if (width === 320 || width === 375) {
-        const portrait = await evaluate(`(() => {
-          const rect = (id) => document.querySelector(id).getBoundingClientRect()
-          const canvas = rect('#canvas')
-          return {
-            canvasHeight: canvas.height,
-            headerGap: canvas.top - rect('.runtimeToolbar').bottom,
-            leftGap: rect('#ret').top - rect('#choice').bottom,
-            rightGap: rect('#clear').top - rect('#back').bottom,
-            navHeight: rect('#nav').height,
-            digitHeight: rect('#numpad .key').height,
-            digitGap: parseFloat(getComputedStyle(document.querySelector('#numpad')).rowGap),
-          }
-        })()`)
-        console.log('J2ME portrait gaps:', JSON.stringify(portrait))
-        requireCheck(portrait.canvasHeight > 0 && portrait.headerGap > 0, 'J2ME toolbar overlaps the game canvas')
-        requireCheck(portrait.leftGap > 0 && portrait.rightGap > 0, 'J2ME side buttons have no vertical gap')
-        requireCheck(portrait.navHeight > 60 && portrait.digitHeight > 18 && portrait.digitGap > 0, 'J2ME portrait keys collapsed')
-      }
+      const snapshot = await evaluate(`(() => {
+        const surface=document.querySelector('.keyboard-surface'), key=surface?.querySelector('[data-action-id="num1"]')
+        const bounds=(node)=>{if(!node)return null;const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}}
+        return {surface:bounds(surface),key:bounds(key),count:surface?.querySelectorAll('[data-control-id]').length||0,buttons:surface?.querySelectorAll('button').length||0,exit:!!document.querySelector('.exitConfirm'),scrollWidth:document.documentElement.scrollWidth}
+      })()`)
+      console.log(`J2ME SVG ${width}x${height}:`, JSON.stringify(snapshot))
+      requireCheck(snapshot.surface?.width > 0 && snapshot.surface?.height > 0 && snapshot.count >= 12 && snapshot.buttons === 0, `J2ME SVG keyboard invalid at ${width}x${height}`)
+      requireCheck(snapshot.key?.width >= 24 && snapshot.key?.height >= 24, `J2ME numeric key too small at ${width}x${height}`)
+      requireCheck(!snapshot.exit, `J2ME shows an exit confirmation at ${width}x${height}`)
+      requireCheck(snapshot.scrollWidth <= width + 1, `J2ME runtime overflows at ${width}x${height}`)
       if (width === 375) {
         const toolbar = await evaluate(`(() => {
           const toggle = document.querySelector('.runtimeToolbarToggle')

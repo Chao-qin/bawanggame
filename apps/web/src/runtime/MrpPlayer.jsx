@@ -70,6 +70,6 @@ export function MrpPlayer({ game, onExit, onReady }) {
       delete window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__
       cleanupRuntimeArtifacts()
     }
-  }, [game, onExit, keyboardSession])
+  }, [game.file, keyboardSession])
   return <div className="runtime-view">{loading && !error ? <RuntimeLoading label="正在启动冒泡社区…" /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup mrp keyboardSession={keyboardSession} /></div>
 }
