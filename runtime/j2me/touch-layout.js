@@ -23,10 +23,6 @@
   function validDpad(value) { return D_PAD_VISUAL[value] ? value : DEFAULT.dpad; }
   function validSides(value) { return value === "standard" || value === "swapped" ? value : DEFAULT.sides; }
   function keyId(value) { return value === "*" ? "star" : value === "#" ? "pound" : String(value); }
-  function actionSlot(value) {
-    var match = /^(?:num)?([0-9])$/.exec(value);
-    return match ? "num" + match[1] : value;
-  }
 
   function normalize(value) {
     var source = value && typeof value === "object" ? value : {};
@@ -40,10 +36,8 @@
     var rawActions = source.actions && typeof source.actions === "object" ? source.actions : {};
     ACTION_SLOTS.forEach(function (slot) {
       var fallback = DEFAULT_ACTIONS[slot] || slot;
-      var numeric = /^num([0-9])$/.exec(slot);
-      var legacyDisplaySlot = numeric ? numeric[1] : slot;
-      var action = String(rawActions[slot] || rawActions[actionSlot(slot)] || rawActions[legacyDisplaySlot] || fallback);
-      if (ACTIONS.indexOf(action) < 0) action = fallback;
+      var action = String(rawActions[slot] || fallback);
+      if (ACTIONS.indexOf(action) < 0) action = DEFAULT_ACTIONS[slot];
       if (!action) action = fallback;
       actions[slot] = action;
     });
@@ -67,9 +61,8 @@
     return out;
   }
 
-  function forGame(gameId, runtime) {
+  function forGame(gameId) {
     var settings = window.Settings || (typeof Settings !== "undefined" ? Settings : null);
-    runtime = runtime === "mrp" || runtime === "flash" ? runtime : "j2me";
     var adapter = { current: normalize(settings && settings.touchLayout ? settings.touchLayout(gameId) : null) };
     gameAdapter = adapter;
 
@@ -86,39 +79,6 @@
         if (settings && settings.setTouchLayout) settings.setTouchLayout(gameId, adapter.current);
         return applyCurrent();
       },
-      migrate: function () {
-        if (!settings || typeof settings.touchLayout !== "function") return false;
-        var source = settings.touchLayout(gameId);
-        if (!source || typeof source !== "object" || !Object.keys(source).length) return true;
-        var migrated = migrateLegacy(source, runtime);
-        var bridge = window.KeyboardProfileStorage;
-        if (!bridge || typeof bridge.update !== "function") return false;
-        var saved = bridge.update(function (config) {
-          config.perGameOverrides = config.perGameOverrides || {};
-          config.perGameOverrides[gameId] = config.perGameOverrides[gameId] || {};
-          config.perGameOverrides[gameId][runtime] = migrated.override;
-          config.migrationBackups = config.migrationBackups || [];
-          if (Object.keys(migrated.backup).length) {
-            config.migrationBackups.push({
-              source: "legacy-touch-layout",
-              gameId: gameId,
-              runtime: runtime,
-              record: copy(source),
-              unsupported: copy(migrated.backup)
-            });
-          }
-          return config;
-        });
-        if (!saved) return false;
-        if (settings.setTouchLayout) settings.setTouchLayout(gameId, null);
-        var profile = { gameId: gameId, layoutId: migrated.override.layoutId, controlOverrides: copy(migrated.override.controlOverrides) };
-        if (window.dispatchEvent && window.CustomEvent) {
-          window.dispatchEvent(new window.CustomEvent("xiaochao:keyboardprofilechange", {
-            detail: { runtime: runtime, profile: profile }
-          }));
-        }
-        return true;
-      },
       reset: function () {
         adapter.current = defaults();
         if (settings && settings.setTouchLayout) settings.setTouchLayout(gameId, null);
@@ -133,48 +93,15 @@
     if (typeof config !== "undefined") config.touchLayout = current;
     document.body.dataset.dpadLayout = current.dpad;
     document.body.dataset.sideLayout = current.sides;
+    var order = {};
+    current.numbers.forEach(function (item, index) { order[item] = index; });
+    NUMBERS.forEach(function (item) {
+      var node = document.getElementById(item === "star" ? "star" : item === "pound" ? "pound" : "num" + item);
+      if (node) node.style.order = String(order[item]);
+    });
     if (typeof window.__XIAOCHAO_KEYMAP_REBIND__ === "function") window.__XIAOCHAO_KEYMAP_REBIND__();
+    if (window.KeypadCanvas) window.KeypadCanvas.refresh();
     return current;
-  }
-
-  function migrateLegacy(value, runtime) {
-    var source = value && typeof value === "object" ? value : {};
-    var normalized = normalize(source);
-    var allowed = { dpad: true, sides: true, numbers: true, actions: true };
-    var unsupported = {};
-    Object.keys(source).forEach(function (key) {
-      if (!allowed[key]) unsupported[key] = source[key];
-    });
-    var rawActions = source.actions && typeof source.actions === "object" ? source.actions : {};
-    Object.keys(rawActions).forEach(function (slot) {
-      if (ACTION_SLOTS.indexOf(actionSlot(slot)) < 0) unsupported["actions." + slot] = rawActions[slot];
-      else if (ACTIONS.indexOf(String(rawActions[slot])) < 0) unsupported["actions." + slot] = rawActions[slot];
-    });
-    var rawNumbers = Array.isArray(source.numbers) ? source.numbers : [];
-    if (source.numbers != null && (!Array.isArray(source.numbers) || rawNumbers.length !== 12 || rawNumbers.some(function (item) {
-      var value = keyId(item);
-      return NUMBERS.indexOf(value) < 0;
-    }))) unsupported.numbers = source.numbers;
-    if (source.dpad != null && !D_PAD_VISUAL[source.dpad]) unsupported.dpad = source.dpad;
-    if (source.sides != null && source.sides !== "standard" && source.sides !== "swapped") unsupported.sides = source.sides;
-    var slotActions = {};
-    ACTION_SLOTS.forEach(function (slot) {
-      var numeric = /^num([0-9])$/.exec(slot);
-      var legacySlot = numeric ? numeric[1] : slot;
-      slotActions[slot] = normalized.actions[slot] || normalized.actions[legacySlot];
-    });
-    return {
-      override: {
-        layoutId: runtime === "flash" ? "qwerty-72" : "landscape-split",
-        controlOverrides: {
-          dpadRotation: normalized.dpad,
-          sideGroup: normalized.sides,
-          numberSlotOrder: normalized.numbers.slice(),
-          slotActions: slotActions
-        }
-      },
-      backup: unsupported
-    };
   }
 
   function el(tag, cls, props) {
@@ -280,7 +207,6 @@
     normalize: normalize,
     mapButtons: mapButtons,
     visualDpad: visualDpad,
-    migrateLegacy: migrateLegacy,
     apply: apply,
     forGame: forGame
   };

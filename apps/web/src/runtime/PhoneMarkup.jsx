@@ -1,5 +1,9 @@
 import React from 'react'
-import { KeyboardSurface } from './keyboard/KeyboardSurface.jsx'
+import { CheckOutline, CloseOutline, DownOutline, LeftOutline, MinusOutline, RightOutline, UndoOutline, UpOutline } from 'antd-mobile-icons'
+
+function KeyIcon({ as: Icon }) {
+  return <Icon className="keypadIcon" aria-hidden="true" />
+}
 
 const initialEditorLayerStyle = {
   position: 'absolute',
@@ -15,7 +19,13 @@ const initialEditorLayerStyle = {
   pointerEvents: 'none',
 }
 
-export function PhoneMarkup({ mrp = false, keyboardSession }) {
+export function PhoneMarkup({ mrp = false }) {
+  const blockRuntimeGesture = (event) => {
+    const target = event.target
+    if (!target.closest?.('#keypad')) return
+    if (target.closest?.('#editor-layer, #mrp-dialog-text, #panel')) return
+    event.preventDefault()
+  }
   return <div className={'runtime-stage' + (mrp ? ' mrp-stage' : '')} data-runtime-stage>
     <div id="phone" className="runtime-phone">
     <form id="editor-layer" className="runtime-editor-layer" style={initialEditorLayerStyle} onSubmit={(event) => event.preventDefault()} autoComplete="off">
@@ -44,7 +54,23 @@ export function PhoneMarkup({ mrp = false, keyboardSession }) {
         </>}
       </div>
     </div>
-     <div id="keypad" data-runtime-control="keyboard"><KeyboardSurface session={keyboardSession} runtime={mrp ? 'mrp' : 'j2me'} /></div>
+    <div id="keypad" onTouchStartCapture={blockRuntimeGesture} onTouchMoveCapture={blockRuntimeGesture} onContextMenuCapture={blockRuntimeGesture} onDragStartCapture={blockRuntimeGesture}>
+      <canvas id="keypad-canvas" aria-hidden="true" />
+      <div id="nav" data-runtime-control="nav">
+        <button id="choice" className="key soft" title="左软键"><KeyIcon as={MinusOutline} /></button>
+        <div id="dpad">
+          <button id="up" className="key dir" aria-label="上"><KeyIcon as={UpOutline} /></button>
+          <button id="left" className="key dir" aria-label="左"><KeyIcon as={LeftOutline} /></button>
+          <button id="ok" className="key" aria-label="确认"><KeyIcon as={CheckOutline} /></button>
+          <button id="right" className="key dir" aria-label="右"><KeyIcon as={RightOutline} /></button>
+          <button id="down" className="key dir" aria-label="下"><KeyIcon as={DownOutline} /></button>
+        </div>
+        <button id="back" className="key soft" title="右软键"><KeyIcon as={MinusOutline} /></button>
+        <button id="ret" className="key mini" title="挂机键"><KeyIcon as={UndoOutline} /></button>
+        <button id="clear" className="key mini" title="清除"><KeyIcon as={CloseOutline} /></button>
+      </div>
+      <div id="numpad" data-runtime-control="numpad">{[['1','.,?'],['2','abc'],['3','def'],['4','ghi'],['5','jkl'],['6','mno'],['7','pqrs'],['8','tuv'],['9','wxyz'],['*','+'],['0','␣'],['#','⇧']].map(([n, sub]) => <button key={n} id={n === '*' ? 'star' : n === '#' ? 'pound' : `num${n}`} className="key"><b>{n}</b><i>{sub}</i></button>)}</div>
+    </div>
     </div>
   </div>
 }

@@ -267,7 +267,6 @@
   // 引用 config/vmSetTimeout 会 ReferenceError。因此惰性 boot：defer 链就绪后再 bind。
   var pad = null;
   var inputController = null;
-  var unregisterKeyboardRelease = null;
   function dispatchAction(action, pressed, source, meta) {
     var code = codeOf(action);
     if (code == null) return;
@@ -275,34 +274,28 @@
     enqueue(code, pressed, meta || null);
     kick();
   }
-  function inputRepeat(action) {
-    var code = codeOf(action);
-    if (code == null) return;
-    code = mapped(code);
-    var state = S[code];
-    if (state && state.seen) { MIDP.sendKeyRepeat(code); trace(code, "p"); }
-  }
   function bindTouchpad() {
-    var keyboardSession = window.__XIAOCHAO_KEYBOARD_SESSION__;
-    var surface = keyboardSession && keyboardSession.getSurface && keyboardSession.getSurface();
-    if (!surface || window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__) return;
-    var buttons = {};
-    var actionMap = {};
-    var controls = keyboardSession && keyboardSession.getProfile && keyboardSession.getProfile().layout.controls || [];
-    controls.forEach(function (control) {
-      buttons[control.id] = control.actionId;
-      actionMap[control.id] = control.actionId;
-    });
-    if (!Object.keys(buttons).length) {
-      Object.keys(BUTTONS).forEach(function (action) { buttons[action] = action; actionMap[action] = action; });
-    }
+    var buttons = touchButtons();
     pad = Touchpad.bind({
-      surface: surface,
       buttons: buttons,
-      actionMap: actionMap,
-      input: inputController,
-      onPressedChange: function (ids) { if (keyboardSession) keyboardSession.notifyPressed(new Set(ids)); },
-      dpadVisual: function (direction) { return direction; },
+      dpadVisual: function (direction) { return window.TouchLayout ? TouchLayout.visualDpad(direction, config.touchLayout) : direction; },
+      sink: {
+        press: function (code, meta) {
+          var action = actionOf(code);
+          if (action && inputController) inputController.press("touch:" + action, action, meta);
+        },
+        release: function (code, meta) {
+          var action = actionOf(code);
+          if (action && inputController) inputController.release("touch:" + action, action, meta);
+        },
+        repeat: function (code) {
+          var action = actionOf(code);
+          var rc = mapped(code);
+          var s = S[rc];
+          if (action && inputController) inputController.repeat("touch:" + action, action);
+          else if (s && s.seen) { MIDP.sendKeyRepeat(rc); trace(rc, "p"); }
+        }
+      },
       feedback: {
         vibrate: config.vibrate | 0,
         keyRepeat: String(config.keyRepeat) !== "0",
@@ -330,16 +323,15 @@
         sink: {
           press: function (action, source, meta) { dispatchAction(action, true, source, meta); },
           release: function (action, source, meta) { dispatchAction(action, false, source, meta); },
-          repeat: inputRepeat
+          repeat: function (action) {
+            var code = codeOf(action);
+            if (code == null) return;
+            code = mapped(code);
+            var state = S[code];
+            if (state && state.seen) { MIDP.sendKeyRepeat(code); trace(code, "p"); }
+          }
         }
       });
-      if (window.__XIAOCHAO_KEYBOARD_SESSION__ && window.__XIAOCHAO_KEYBOARD_SESSION__.registerInputRelease) {
-        unregisterKeyboardRelease = window.__XIAOCHAO_KEYBOARD_SESSION__.registerInputRelease(function () {
-          if (pad) pad.releaseAll();
-          if (inputController && inputController.releaseAll) inputController.releaseAll();
-          releaseAll();
-        });
-      }
       window.__XIAOCHAO_INPUT_CONTROLLER__ = inputController;
     }
     bindTouchpad();
@@ -359,10 +351,6 @@
     if (inputController) {
       try { inputController.destroy(); } catch (_) {}
       inputController = null;
-    }
-    if (unregisterKeyboardRelease) {
-      unregisterKeyboardRelease();
-      unregisterKeyboardRelease = null;
     }
     if (window.__XIAOCHAO_INPUT_CONTROLLER__) delete window.__XIAOCHAO_INPUT_CONTROLLER__;
     Object.keys(rafTasks).forEach(function (id) { delete rafTasks[id]; });
