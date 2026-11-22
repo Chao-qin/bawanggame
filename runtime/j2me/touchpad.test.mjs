@@ -46,6 +46,48 @@ function environment() {
   return { window, surface }
 }
 
+test('does not fall back to browser vibration inside the native host', () => {
+  const { window, surface } = environment()
+  let browserVibrations = 0
+  let nativeHaptics = 0
+  window.navigator.vibrate = () => { browserVibrations += 1 }
+  window.__XIAOCHAO_RN_HOST__ = { haptic() { nativeHaptics += 1; return false } }
+  const keyTarget = { insideSurface: true, closest: (selector) => selector === '[data-control-id]' ? surface.keys.right : null }
+  const pad = window.Touchpad.bind({
+    surface,
+    buttons: { right: 'right' },
+    actionMap: { right: 'right' },
+    input: { press() {}, release() {} },
+    feedback: { vibrate: 24 },
+  })
+
+  surface.dispatch('pointerdown', { pointerId: 10, pointerType: 'touch', clientX: 90, clientY: 10, target: keyTarget, preventDefault() {} })
+
+  assert.equal(nativeHaptics, 1)
+  assert.equal(browserVibrations, 0)
+  pad.destroy()
+})
+
+test('does not call browser vibration for an incomplete native host', () => {
+  for (const host of [{}, { haptic() { throw new Error('bridge unavailable') } }]) {
+    const { window, surface } = environment()
+    let browserVibrations = 0
+    window.navigator.vibrate = () => { browserVibrations += 1 }
+    window.__XIAOCHAO_RN_HOST__ = host
+    const keyTarget = { insideSurface: true, closest: (selector) => selector === '[data-control-id]' ? surface.keys.right : null }
+    const pad = window.Touchpad.bind({
+      surface,
+      buttons: { right: 'right' },
+      actionMap: { right: 'right' },
+      input: { press() {}, release() {} },
+      feedback: { vibrate: 24 },
+    })
+    surface.dispatch('pointerdown', { pointerId: 11, pointerType: 'touch', clientX: 90, clientY: 10, target: keyTarget, preventDefault() {} })
+    assert.equal(browserVibrations, 0)
+    pad.destroy()
+  }
+})
+
 test('routes diagonal SVG pointer actions through source-aware input', () => {
   const { window, surface } = environment()
   const edges = []

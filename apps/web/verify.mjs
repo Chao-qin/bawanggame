@@ -358,8 +358,13 @@ try {
     htmlButtons: document.querySelectorAll('.keyboard-surface button').length,
     foreignObjects: document.querySelectorAll('.keyboard-surface foreignObject').length,
     actionPrefix: [...document.querySelectorAll('.keyboard-surface [data-action-id]')].every((node) => node.dataset.actionId.startsWith('flash-key:')),
+    shapeFill: getComputedStyle(document.querySelector('.keyboard-key rect')).fill,
+    shapeStroke: getComputedStyle(document.querySelector('.keyboard-key rect')).stroke,
+    labelFill: getComputedStyle(document.querySelector('.keyboard-key text')).fill,
+    labelHeight: document.querySelector('.keyboard-key text')?.getBoundingClientRect().height || 0,
   }))()`)
   requireCheck(svgContract.surface && svgContract.count === 72 && svgContract.htmlButtons === 0 && svgContract.foreignObjects === 0 && svgContract.actionPrefix, `Flash SVG contract invalid: ${JSON.stringify(svgContract)}`)
+  requireCheck(svgContract.shapeFill === 'rgb(57, 67, 79)' && svgContract.shapeStroke === 'rgb(135, 147, 161)' && svgContract.labelFill === 'rgb(255, 255, 255)' && svgContract.labelHeight > 4, `Flash SVG colors or labels invalid: ${JSON.stringify(svgContract)}`)
   console.log('Flash SVG contract:', JSON.stringify(svgContract))
   await evaluate(`(() => { const player = document.querySelector('ruffle-player'); window.__flashKeyEvents = []; player?.focus(); for (const type of ['keydown', 'keyup']) document.addEventListener(type, (event) => { if (['ArrowRight','ArrowLeft'].includes(event.key)) window.__flashKeyEvents.push([type, event.key]) }, true); return { player: !!player, focused: document.activeElement === player } })()`)
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
@@ -486,6 +491,8 @@ try {
       const surface = document.querySelector('.keyboard-surface')
       const key = surface?.querySelector('[data-action-id="num1"]')
       const rect = (node) => { if (!node) return null; const r=node.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height} }
+      const keyShape = key?.querySelector('rect, circle')
+      const keyLabel = key?.querySelector('text')
       return {
         player: !!document.querySelector('.player'),
         phone: !!document.querySelector('#phone'),
@@ -495,6 +502,10 @@ try {
         exitConfirm: !!document.querySelector('.exitConfirm'),
         surface: rect(surface),
         key: rect(key),
+        keyFill: keyShape ? getComputedStyle(keyShape).fill : null,
+        keyStroke: keyShape ? getComputedStyle(keyShape).stroke : null,
+        keyTextFill: keyLabel ? getComputedStyle(keyLabel).fill : null,
+        keyTextHeight: keyLabel?.getBoundingClientRect().height || 0,
         keyCount: surface?.querySelectorAll('[data-control-id]').length || 0,
         htmlButtons: surface?.querySelectorAll('button').length || 0,
         states: window.__XIAOCHAO_VERIFY_RUNTIME_STATES__ || [],
@@ -505,6 +516,7 @@ try {
     requireCheck(!j2me.exitConfirm, 'J2ME showed an exit confirmation immediately after startup')
     requireCheck(j2me.surface?.width > 0 && j2me.surface?.height > 0 && j2me.keyCount >= 12 && j2me.htmlButtons === 0, 'J2ME SVG keyboard is missing or collapsed')
     requireCheck(j2me.key?.width >= 24 && j2me.key?.height >= 24, 'J2ME SVG numeric key is too small')
+    requireCheck(j2me.keyFill === 'rgb(57, 67, 79)' && j2me.keyStroke === 'rgb(135, 147, 161)' && j2me.keyTextFill === 'rgb(255, 255, 255)' && j2me.keyTextHeight > 4, 'J2ME SVG key colors or labels are invalid')
     requireCheck(j2me.states.includes('boot') || j2me.states.includes('failure') || j2me.boot || j2me.failure, 'J2ME startup state was never rendered')
     const viewports = [[844, 390], [1280, 720], [390, 844], [320, 568], [375, 667]]
     for (const [width, height] of viewports) {
@@ -514,11 +526,13 @@ try {
       const snapshot = await evaluate(`(() => {
         const surface=document.querySelector('.keyboard-surface'), key=surface?.querySelector('[data-action-id="num1"]')
         const bounds=(node)=>{if(!node)return null;const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}}
-        return {surface:bounds(surface),key:bounds(key),count:surface?.querySelectorAll('[data-control-id]').length||0,buttons:surface?.querySelectorAll('button').length||0,exit:!!document.querySelector('.exitConfirm'),scrollWidth:document.documentElement.scrollWidth}
+        const shape=key?.querySelector('rect,circle'), label=key?.querySelector('text')
+        return {surface:bounds(surface),key:bounds(key),keyFill:shape?getComputedStyle(shape).fill:null,keyStroke:shape?getComputedStyle(shape).stroke:null,keyTextFill:label?getComputedStyle(label).fill:null,keyTextHeight:label?.getBoundingClientRect().height||0,count:surface?.querySelectorAll('[data-control-id]').length||0,buttons:surface?.querySelectorAll('button').length||0,exit:!!document.querySelector('.exitConfirm'),scrollWidth:document.documentElement.scrollWidth}
       })()`)
       console.log(`J2ME SVG ${width}x${height}:`, JSON.stringify(snapshot))
       requireCheck(snapshot.surface?.width > 0 && snapshot.surface?.height > 0 && snapshot.count >= 12 && snapshot.buttons === 0, `J2ME SVG keyboard invalid at ${width}x${height}`)
       requireCheck(snapshot.key?.width >= 24 && snapshot.key?.height >= 24, `J2ME numeric key too small at ${width}x${height}`)
+      requireCheck(snapshot.keyFill === 'rgb(57, 67, 79)' && snapshot.keyStroke === 'rgb(135, 147, 161)' && snapshot.keyTextFill === 'rgb(255, 255, 255)' && snapshot.keyTextHeight > 4, `J2ME key colors or labels invalid at ${width}x${height}`)
       requireCheck(!snapshot.exit, `J2ME shows an exit confirmation at ${width}x${height}`)
       requireCheck(snapshot.scrollWidth <= width + 1, `J2ME runtime overflows at ${width}x${height}`)
       if (width === 375) {

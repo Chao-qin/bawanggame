@@ -6,7 +6,7 @@ import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
 import { createKeyboardSession } from './keyboard/KeyboardSession.js'
 import { createKeyboardProfileStorage } from './keyboard/storage.js'
 
-export function MrpPlayer({ game, onExit, onReady }) {
+export function MrpPlayer({ game, onExit, onReady, onError }) {
   const [keyboardSession] = useState(() => createKeyboardSession({
     runtime: 'mrp',
     gameId: `mrp:${game.file}`,
@@ -52,6 +52,7 @@ export function MrpPlayer({ game, onExit, onReady }) {
           cleanupRuntimeArtifacts()
           setLoading(false)
           setError(e.message || String(e))
+          onError?.()
         }
       }
     })()

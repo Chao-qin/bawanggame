@@ -112,10 +112,11 @@
       if (!(requested > 0)) return;
       var duration = Math.max(8, Math.min(40, Math.round(requested)));
       var host = window.__XIAOCHAO_RN_HOST__;
-      if (host && typeof host.haptic === "function") {
+      if (host) {
         try {
-          if (host.haptic(duration) !== false) return;
+          if (typeof host.haptic === "function") host.haptic(duration);
         } catch (_) {}
+        return;
       }
       var vibration = typeof navigator !== "undefined" && navigator && navigator.vibrate;
       if (typeof vibration !== "function") return;
