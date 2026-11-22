@@ -8,6 +8,12 @@ describe('MRP catalog', () => {
     expect(() => normalizeMrpManifest([{ file: '../demo.mrp' }])).toThrow()
   })
 
+  it('accepts single-slash local artwork and HTTPS artwork only', () => {
+    expect(enrichMrpCatalog([{ file: 'a.mrp', iconUrl: '/covers/a.png' }], false, new Set())[0].artworkUrl).toBe('/covers/a.png')
+    expect(enrichMrpCatalog([{ file: 'a.mrp', iconUrl: '//bad.example/a.png' }], false, new Set())[0].artworkUrl).toBeNull()
+    expect(enrichMrpCatalog([{ file: 'a.mrp', iconUrl: 'http://bad.example/a.png' }], false, new Set())[0].artworkUrl).toBeNull()
+  })
+
   it('reports missing runtime and package independently', () => {
     const records = [{ file: 'demo.mrp', name: 'Demo' }, { file: 'other.mrp', name: 'Other' }]
     expect(enrichMrpCatalog(records, false, new Set(['demo.mrp']))).toMatchObject([

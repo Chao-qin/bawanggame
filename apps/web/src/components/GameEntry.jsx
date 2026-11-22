@@ -13,8 +13,10 @@ export function GameArtwork({ src, name, className = '' }) {
 }
 
 export function MrpArtwork({ src, name, className = '' }) {
-  return <span className={`gameArtwork mrpArtwork ${className}`} aria-label={src ? undefined : '暂无游戏封面'}>
-    <span aria-hidden="true">{src ? <img src={src} alt="" /> : 'MRP'}</span>
+  const [failed, setFailed] = useState(false)
+  const showImage = src && !failed
+  return <span className={`gameArtwork mrpArtwork ${className}`} aria-label={showImage ? undefined : '暂无游戏封面'}>
+    <span aria-hidden="true">{showImage ? <img src={src} alt="" onError={() => setFailed(true)} /> : 'MRP'}</span>
   </span>
 }
 

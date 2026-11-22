@@ -16,7 +16,7 @@ export function normalizeMrpManifest(value: unknown): MrpManifestRecord[] {
 
 export function artworkUrl(record: MrpManifestRecord): string | null {
   const value = record.iconUrl || record.coverUrl
-  return value && (value.startsWith('/') || /^https:\/\//i.test(value)) ? value : null
+  return value && (/^\/(?!\/)/.test(value) || /^https:\/\//i.test(value)) ? value : null
 }
 
 export function enrichMrpCatalog(records: MrpManifestRecord[], runtimeAvailable: boolean, availableFiles: Set<string>): MrpCatalogEntry[] {

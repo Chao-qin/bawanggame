@@ -115,7 +115,7 @@ function useServerGames(kind) {
         setState({
           loading: false,
           error: null,
-          games: data.map((g) => ({
+          games: (Array.isArray(data) ? data : data?.games || []).map((g) => ({
             kind,
             file: g.file,
             name: g.name || g.file,
