@@ -88,6 +88,7 @@ export function J2MEPlayer({ game, onExit, onReady, onError }) {
         applyRuntimeSettings()
         ensureActive()
         window.ScreenSetup?.setOrientation?.(window.config?.orientation)
+        keyboardSession.refreshConfig()
         ensureActive()
         window.__XIAOCHAO_RUNTIME_EXTRAS_INIT__?.()
         ensureActive()

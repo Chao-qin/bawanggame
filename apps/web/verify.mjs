@@ -577,6 +577,35 @@ try {
     await clickPlayerBack()
     await sleep(150)
     requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'exit confirmation did not open')
+    const continueBefore = await evaluate(`(() => {
+      const canvas = document.querySelector('#canvas')
+      let frames = null
+      try { frames = window.MIDP && window.MIDP.frames } catch (error) { frames = String(error) }
+      return {canvas: !!canvas, width: canvas?.width || 0, height: canvas?.height || 0, frames}
+    })()`)
+    console.log('J2ME continue before:', JSON.stringify(continueBefore))
+    const continueClicked = await evaluate(`(() => {
+      const button = document.querySelector('.exitConfirm .optionButton')
+      if (!button) return false
+      button.click()
+      return true
+    })()`)
+    requireCheck(continueClicked, 'Continue button was not found')
+    await waitFor("!document.querySelector('.exitConfirm')", 'Continue to dismiss the exit confirmation')
+    await sleep(350)
+    const continueAfter = await evaluate(`(() => {
+      const canvas = document.querySelector('#canvas')
+      let frames = null
+      try { frames = window.MIDP && window.MIDP.frames } catch (error) { frames = String(error) }
+      return {player: !!document.querySelector('.player'), dialog: !!document.querySelector('.exitConfirm'), canvas: !!canvas, width: canvas?.width || 0, height: canvas?.height || 0, frames}
+    })()`)
+    console.log('J2ME continue:', JSON.stringify({before: continueBefore, after: continueAfter}))
+    requireCheck(continueBefore.canvas && continueBefore.width > 0 && continueBefore.height > 0 && Number.isFinite(continueBefore.frames), 'J2ME runtime frame counter was not active before Continue')
+    requireCheck(continueAfter.player && !continueAfter.dialog && continueAfter.canvas && continueAfter.width > 0 && continueAfter.height > 0, 'Continue stopped or unmounted the J2ME runtime')
+    requireCheck(continueAfter.frames > continueBefore.frames, 'J2ME frame counter did not advance after Continue; runtime may be frozen')
+    await clickPlayerBack()
+    await sleep(150)
+    requireCheck(await evaluate("!!document.querySelector('.exitConfirm')"), 'exit confirmation did not reopen after Continue')
     await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
     inRuntimeFrame = false
     await sleep(1500)

@@ -54,7 +54,7 @@ test('resolves persisted runtime assignments and refreshes after migration', () 
   migrated.perGameOverrides.game = { j2me: { layoutId: 'landscape-split', controlOverrides: {} } }
   session.refreshConfig(migrated)
   assert.equal(changed.source, 'per-game')
-  assert.equal(changed.layoutId, 'portrait-dpad')
+  assert.equal(changed.layoutId, 'landscape-split')
   session.invalidate()
 })
 
@@ -95,4 +95,53 @@ test('profile refresh releases held inputs and keeps the registered surface acti
   assert.equal(session.registerSurface({ setAttribute() {} }).accepted, false)
   assert.equal(session.getSurface(), surface)
   session.invalidate()
+})
+
+test('uses configured runtime orientation instead of viewport orientation', () => {
+  const previousWindow = globalThis.window
+  globalThis.window = {
+    innerWidth: 900,
+    innerHeight: 500,
+    config: { orientation: 'portrait' },
+    addEventListener() {},
+    removeEventListener() {},
+  }
+  try {
+    const session = createKeyboardSession({ runtime: 'j2me', gameId: 'game', timeout: 100 })
+    assert.equal(session.getProfile().orientation, 'portrait')
+    assert.equal(session.getProfile().layoutId, 'phone-keypad')
+    session.invalidate()
+  } finally {
+    globalThis.window = previousWindow
+  }
+})
+
+test('refreshes the automatic profile when the viewport orientation changes', () => {
+  const previousWindow = globalThis.window
+  const listeners = new Map()
+  globalThis.window = {
+    innerWidth: 390,
+    innerHeight: 844,
+    addEventListener(type, listener) {
+      const handlers = listeners.get(type) || new Set()
+      handlers.add(listener)
+      listeners.set(type, handlers)
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener)
+    },
+  }
+  try {
+    const session = createKeyboardSession({ runtime: 'j2me', gameId: 'game', timeout: 100 })
+    assert.equal(session.getProfile().layoutId, 'phone-keypad')
+    globalThis.window.innerWidth = 844
+    globalThis.window.innerHeight = 390
+    listeners.get('orientationchange')?.forEach((listener) => listener())
+    assert.equal(session.getProfile().orientation, 'landscape')
+    assert.equal(session.getProfile().layoutId, 'landscape-split')
+    session.invalidate()
+    assert.equal(listeners.get('orientationchange')?.size, 0)
+  } finally {
+    globalThis.window = previousWindow
+  }
 })

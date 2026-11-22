@@ -34,6 +34,9 @@ test('provides immutable built-ins with an exact 72-key game QWERTY inventory', 
   assert.ok(Object.isFrozen(qwerty.controls))
   assert.equal(BUILTIN_LAYOUTS['landscape-split'].target.orientation, 'landscape')
   assert.equal(BUILTIN_LAYOUTS['portrait-dpad'].target.orientation, 'portrait')
+  assert.equal(BUILTIN_LAYOUTS['phone-keypad'].target.orientation, 'portrait')
+  assert.ok(BUILTIN_LAYOUTS['phone-keypad'].controls.find((control) => control.id === 'up').y <
+    BUILTIN_LAYOUTS['phone-keypad'].controls.find((control) => control.id === 'key-1').y)
   assert.ok(Object.isFrozen(BUILTIN_THEMES))
   assert.ok(['classic', 'high-contrast', 'light'].every((id) => BUILTIN_THEMES[id]))
 })
@@ -61,7 +64,7 @@ test('normalizes controls and rejects non-finite or non-positive geometry', () =
 test('routes defaults by runtime and orientation with explicit and migrated precedence', () => {
   assert.deepEqual(DEFAULT_PROFILES, {
     flash: { portrait: { layoutId: 'qwerty-72', themeId: 'classic' }, landscape: { layoutId: 'qwerty-72', themeId: 'classic' } },
-    j2me: { portrait: { layoutId: 'portrait-dpad', themeId: 'classic' }, landscape: { layoutId: 'landscape-split', themeId: 'classic' } },
+    j2me: { portrait: { layoutId: 'phone-keypad', themeId: 'classic' }, landscape: { layoutId: 'landscape-split', themeId: 'classic' } },
     mrp: { portrait: { layoutId: 'portrait-dpad', themeId: 'classic' }, landscape: { layoutId: 'landscape-split', themeId: 'classic' } },
   })
   const config = {
@@ -75,6 +78,11 @@ test('routes defaults by runtime and orientation with explicit and migrated prec
   const migrated = resolveProfile(config, { runtime: 'j2me', orientation: 'landscape', gameId: 'game' })
   assert.equal(migrated.layoutId, 'landscape-split')
   assert.equal(migrated.source, 'per-game')
+  const migratedPortrait = resolveProfile({
+    perGameOverrides: { game: { j2me: { layoutId: 'landscape-split', controlOverrides: {} } } },
+  }, { runtime: 'j2me', orientation: 'portrait', gameId: 'game' })
+  assert.equal(migratedPortrait.layoutId, 'landscape-split')
+  assert.equal(migratedPortrait.source, 'per-game')
   assert.equal(resolveProfile({}, { runtime: 'flash', orientation: 'landscape' }).layoutId, 'qwerty-72')
 })
 

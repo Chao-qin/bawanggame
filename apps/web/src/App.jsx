@@ -7,6 +7,7 @@ import { MrpPlayer } from './runtime/MrpPlayer.jsx'
 import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
 import { FlashPlayer } from './runtime/FlashPlayer.jsx'
 import { InputMappingPopup } from './runtime/InputMappingPopup.jsx'
+import { createRuntimeBackGate } from './runtime/runtimeBackGate.js'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
 import { fetchArtwork, validArtwork } from './artwork.js'
 import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
@@ -933,10 +934,14 @@ function Player({ game, onBack, nativeBackSignal }) {
   const toolbarCollapsed = toolbarChoice?.landscape === toolbarLandscape ? toolbarChoice.collapsed : toolbarLandscape
   const playerRef = useRef(null)
   const stageRef = useRef(null)
-  const lastNativeBackSignal = useRef(nativeBackSignal)
+  const backGateRef = useRef(null)
   const runtimeCleanupRef = useRef(noopCleanup)
   const exitStartedRef = useRef(false)
   const settingsReady = game.kind === 'j2me' && runtimeReadyFor === game.file
+  const runtimePhase = game.kind === 'j2me' || game.kind === 'maopao'
+    ? runtimeReadyFor === game.file ? 'ready' : runtimeFailedFor === game.file ? 'failed' : 'starting'
+    : 'ready'
+  if (!backGateRef.current) backGateRef.current = createRuntimeBackGate(nativeBackSignal)
   const registerRuntimeCleanup = useCallback((cleanup) => {
     runtimeCleanupRef.current = typeof cleanup === 'function' ? cleanup : noopCleanup
   }, [])
@@ -1014,20 +1019,19 @@ function Player({ game, onBack, nativeBackSignal }) {
     }
   }, [])
   useEffect(() => {
-    if (nativeBackSignal === lastNativeBackSignal.current) return
-    lastNativeBackSignal.current = nativeBackSignal
-    if ((game.kind === 'j2me' || game.kind === 'maopao') && runtimeReadyFor !== game.file && runtimeFailedFor !== game.file) return
-    setConfirming(true)
-  }, [game.file, game.kind, nativeBackSignal, runtimeFailedFor, runtimeReadyFor])
+    const gate = backGateRef.current
+    gate.setPhase(runtimePhase)
+    if (gate.observe(nativeBackSignal)) setConfirming(true)
+  }, [nativeBackSignal, runtimePhase])
   useEffect(() => () => {
     runtimeCleanupRef.current()
     if (fullscreenElement()) exitFullscreen().catch(() => {})
     cleanupRuntimeArtifacts()
   }, [])
   const requestBack = useCallback(() => {
-    if ((game.kind === 'j2me' || game.kind === 'maopao') && runtimeReadyFor !== game.file && runtimeFailedFor !== game.file) return
+    if (!backGateRef.current.canRequest()) return
     if (!exitStartedRef.current) setConfirming(true)
-  }, [game.file, game.kind, runtimeFailedFor, runtimeReadyFor])
+  }, [])
   const toggleFullscreen = async () => {
     try {
       if (fullscreenElement()) await exitFullscreen()
