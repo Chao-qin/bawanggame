@@ -116,6 +116,8 @@ Expected: Vite build succeeds and generated files remain untracked/ignored.
 
 Start the web dev server on an available port and verify the J2ME route at desktop and portrait-sized viewports. Confirm the SVG contains `up`, `down`, `left`, `right`, numeric, soft-key, and `ret` controls; startup has no exit dialog; a back request opens the dialog only after ready; Continue leaves the runtime mounted.
 
+Use a real local JAR (`VERIFY_J2ME_FILE='地下城与勇士DNF_鬼剑士.jar'`) for runtime checks. After selecting Continue, assert the emulator's `MIDP.frames` advances; a static title screen (such as Tetris) may legitimately not repaint continuously and must not be used alone as a freeze signal.
+
 - [ ] **Step 4: Review the diff**
 
 Run: `git diff --check`, `git status --short`, and inspect `git diff origin/main...HEAD`.
