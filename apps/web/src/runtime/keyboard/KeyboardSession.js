@@ -127,10 +127,14 @@ export function createKeyboardSession(options = {}) {
   const onOrientation = () => session.refreshConfig()
   host?.addEventListener('xiaochao:keyboardprofilechange', refresh)
   host?.addEventListener('xiaochao:viewportchange', onOrientation)
+  host?.addEventListener('resize', onOrientation)
+  host?.addEventListener('orientationchange', onOrientation)
   const originalInvalidate = session.invalidate
   session.invalidate = function () {
     host?.removeEventListener('xiaochao:keyboardprofilechange', refresh)
     host?.removeEventListener('xiaochao:viewportchange', onOrientation)
+    host?.removeEventListener('resize', onOrientation)
+    host?.removeEventListener('orientationchange', onOrientation)
     originalInvalidate()
   }
   return session
