@@ -54,7 +54,7 @@ test('resolves persisted runtime assignments and refreshes after migration', () 
   migrated.perGameOverrides.game = { j2me: { layoutId: 'landscape-split', controlOverrides: {} } }
   session.refreshConfig(migrated)
   assert.equal(changed.source, 'per-game')
-  assert.equal(changed.layoutId, 'portrait-dpad')
+  assert.equal(changed.layoutId, 'landscape-split')
   session.invalidate()
 })
 
@@ -95,4 +95,23 @@ test('profile refresh releases held inputs and keeps the registered surface acti
   assert.equal(session.registerSurface({ setAttribute() {} }).accepted, false)
   assert.equal(session.getSurface(), surface)
   session.invalidate()
+})
+
+test('uses configured runtime orientation instead of viewport orientation', () => {
+  const previousWindow = globalThis.window
+  globalThis.window = {
+    innerWidth: 900,
+    innerHeight: 500,
+    config: { orientation: 'portrait' },
+    addEventListener() {},
+    removeEventListener() {},
+  }
+  try {
+    const session = createKeyboardSession({ runtime: 'j2me', gameId: 'game', timeout: 100 })
+    assert.equal(session.getProfile().orientation, 'portrait')
+    assert.equal(session.getProfile().layoutId, 'portrait-dpad')
+    session.invalidate()
+  } finally {
+    globalThis.window = previousWindow
+  }
 })

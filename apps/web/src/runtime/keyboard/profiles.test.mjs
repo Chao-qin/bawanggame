@@ -75,6 +75,11 @@ test('routes defaults by runtime and orientation with explicit and migrated prec
   const migrated = resolveProfile(config, { runtime: 'j2me', orientation: 'landscape', gameId: 'game' })
   assert.equal(migrated.layoutId, 'landscape-split')
   assert.equal(migrated.source, 'per-game')
+  const migratedPortrait = resolveProfile({
+    perGameOverrides: { game: { j2me: { layoutId: 'landscape-split', controlOverrides: {} } } },
+  }, { runtime: 'j2me', orientation: 'portrait', gameId: 'game' })
+  assert.equal(migratedPortrait.layoutId, 'landscape-split')
+  assert.equal(migratedPortrait.source, 'per-game')
   assert.equal(resolveProfile({}, { runtime: 'flash', orientation: 'landscape' }).layoutId, 'qwerty-72')
 })
 

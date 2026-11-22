@@ -15,7 +15,12 @@ export function createKeyboardSession(options = {}) {
   let config = options.config || loadKeyboardConfig()
   let surface = null
   let currentGameId = gameId
-  const currentOrientation = () => options.orientation || (typeof window !== 'undefined' && window.innerWidth > window.innerHeight ? 'landscape' : 'portrait')
+  const currentOrientation = () => {
+    if (options.orientation) return options.orientation
+    const configured = typeof window !== 'undefined' && window.config?.orientation
+    if (configured === 'portrait' || configured === 'landscape') return configured
+    return typeof window !== 'undefined' && window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'
+  }
   let profile = options.profile || resolveProfile(config, { runtime, orientation: currentOrientation(), gameId: currentGameId })
   let invalid = false
   let settled = false

@@ -158,7 +158,7 @@ export function resolveProfile(config = {}, { runtime, orientation, gameId } = {
   const key = `${validRuntime}:${validOrientation}`
   const explicit = config.profileAssignments?.[key]
   const legacy = gameId != null ? config.perGameOverrides?.[gameId]?.[validRuntime] : null
-  const chosen = explicit || DEFAULT_PROFILES[validRuntime][validOrientation]
+  const chosen = explicit || legacy || DEFAULT_PROFILES[validRuntime][validOrientation]
   const layoutId = chosen?.layoutId
   const themeId = chosen?.themeId || DEFAULT_PROFILES[validRuntime][validOrientation].themeId
   const layouts = { ...BUILTIN_LAYOUTS, ...(config.customLayouts || {}) }
