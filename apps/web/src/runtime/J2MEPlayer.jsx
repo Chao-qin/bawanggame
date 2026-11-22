@@ -39,6 +39,7 @@ export function J2MEPlayer({ game, onExit, onReady, onError }) {
     try { jarFile = decodeURIComponent(jarFile) } catch {}
     window.__XIAOCHAO_RUNTIME_JAR = game.local ? `local:${jarFile}` : `jar/${jarFile}`
     let alive = true
+    let runtimeReady = false
     const session = createRuntimeSession()
     window.__XIAOCHAO_KEYBOARD_SESSION__ = keyboardSession
     window.KeyboardProfileStorage = createKeyboardProfileStorage()
@@ -94,11 +95,14 @@ export function J2MEPlayer({ game, onExit, onReady, onError }) {
         ensureActive()
         window.__XIAOCHAO_KEYMAP_BOOT__?.()
         ensureActive()
-        window.__XIAOCHAO_REQUEST_EXIT = (...args) => onExitRef.current?.(...args)
+        window.__XIAOCHAO_REQUEST_EXIT = (...args) => {
+          if (runtimeReady) onExitRef.current?.(...args)
+        }
         window.showExitScreen = window.__XIAOCHAO_REQUEST_EXIT
         ensureActive()
         if (typeof window.onload === 'function') window.onload(new Event('load'))
         ensureActive()
+        runtimeReady = true
         onReady?.()
         setLoading(false)
       } catch (e) {
@@ -113,6 +117,7 @@ export function J2MEPlayer({ game, onExit, onReady, onError }) {
     })()
     return () => {
       alive = false
+      runtimeReady = false
       session.invalidate()
       keyboardSession.invalidate()
       try { window.myflushAll && window.myflushAll() } catch (_) {}
