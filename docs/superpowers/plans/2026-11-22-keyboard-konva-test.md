@@ -212,6 +212,49 @@ git add apps/web/src/App.jsx apps/web/src/keyboard/KeyboardTestPage.jsx apps/web
 git commit -m "feat: add keyboard layout test route"
 ```
 
+## Chunk 4: React Router Migration
+
+### Task 6: Replace custom hash routing with React Router
+
+**Files:**
+- Modify: `apps/web/package.json`
+- Modify: `pnpm-lock.yaml`
+- Modify: `apps/web/src/main.jsx`
+- Modify: `apps/web/src/App.jsx`
+- Create: `apps/web/src/router.jsx`
+- Modify: `apps/web/verify.mjs`
+
+- [ ] **Step 1: Add React Router and route smoke assertions**
+
+Add React Router DOM 6.30.x (the v6 data-router API is required for `useBlocker`) and extend browser checks first for direct hash routes, refresh, library tab navigation, game launch/back/cancel/confirm, keyboard-test navigation, and iframe route matching.
+
+- [ ] **Step 2: Define hash data-router route trees**
+
+Create `router.jsx` with separate application and runtime-frame hash routers. Match `/library/:tab?`, `/play/:kind/*file`, `/test/keyboard`, and a wildcard fallback. Parse play params/search params through route components, preserve encoded filenames, and keep `runtime-frame=1` on iframe URLs.
+
+- [ ] **Step 3: Replace App route state with router state**
+
+Remove `parseRoute`, `routeHash`, route refs, raw `hashchange`/`popstate` listeners, and manual history writes. Use `useLocation`, `useNavigate`, `useParams`, and route props. Preserve tab persistence, play entry scroll restoration, and direct-play fallback without maintaining a parallel route state.
+
+- [ ] **Step 4: Preserve exit confirmation with a navigation blocker**
+
+Use `useBlocker` for POP navigation away from active play routes. When blocked, request the existing native/game exit confirmation and reset the blocked navigation so cancel retains play. Confirmed exit navigates with replace to the originating library tab. Keep the iframe ready/exit/insets message contract unchanged.
+
+- [ ] **Step 5: Mount the correct router in each document**
+
+In `main.jsx`, mount `RouterProvider` with the normal app router or runtime-frame router based on the existing frame detection. Preserve ConfigProvider, local JAR script loading, and responsive-contract installation.
+
+- [ ] **Step 6: Verify route workflows**
+
+Run layout/pointer unit tests, Web build, and browser smoke. Extend smoke to test direct/refresh routes, library tab push/back, direct play URL, browser Back cancellation and confirmation, confirmed return to originating tab, keyboard test history, unknown-route fallback, and runtime iframe route/message flow when fixtures are available.
+
+- [ ] **Step 7: Commit the route migration**
+
+```bash
+git add apps/web/package.json pnpm-lock.yaml apps/web/src/main.jsx apps/web/src/App.jsx apps/web/src/router.jsx apps/web/verify.mjs docs/superpowers/specs/2026-11-22-keyboard-konva-test-design.md docs/superpowers/plans/2026-11-22-keyboard-konva-test.md
+git commit -m "feat: manage application routes with React Router"
+```
+
 ## Chunk 3: Browser Verification
 
 ### Task 5: Extend browser smoke checks and verify interactions

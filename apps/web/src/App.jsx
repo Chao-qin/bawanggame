@@ -1,6 +1,7 @@
 import { Button, DotLoading, Empty, Input, Popup, SearchBar, TextArea } from 'antd-mobile'
 import { AppstoreOutline, ArrowsAltOutline, CalculatorOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline, ShrinkOutline } from 'antd-mobile-icons'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
 import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
 import { MrpPlayer } from './runtime/MrpPlayer.jsx'
@@ -45,10 +46,6 @@ function apiPath(path) {
   return isEmbeddedHost() && mobileApiBase ? mobileApiBase + path : path
 }
 
-function decodeRoutePart(value, fallback = '') {
-  try { return decodeURIComponent(value || fallback) } catch (_) { return fallback }
-}
-
 function routeForLibrary(tab) {
   return { type: 'library', tab: TAB_IDS.has(tab) ? tab : 'j2me' }
 }
@@ -57,17 +54,17 @@ function routeForGame(game, tab) {
   return { type: 'play', tab: TAB_IDS.has(tab) ? tab : 'j2me', game }
 }
 
-function routeHash(route) {
-  if (route.type === 'keyboard-test') return '#/test/keyboard'
+function routePath(route) {
+  if (route.type === 'keyboard-test') return '/test/keyboard'
   if (route.type === 'play') {
     const params = new URLSearchParams()
     params.set('tab', route.tab)
     params.set('name', route.game.name || route.game.file)
     if (route.game.local) params.set('local', '1')
     const suffix = params.toString()
-    return '#/play/' + encodeURIComponent(route.game.kind) + '/' + encodeURIComponent(route.game.file) + (suffix ? '?' + suffix : '')
+    return '/play/' + encodeURIComponent(route.game.kind) + '/' + encodeURIComponent(route.game.file) + (suffix ? '?' + suffix : '')
   }
-  return '#/library/' + route.tab
+  return '/library/' + route.tab
 }
 
 function fullscreenElement() {
@@ -77,25 +74,6 @@ function fullscreenElement() {
 function exitFullscreen() {
   const exit = document.exitFullscreen || document.webkitExitFullscreen
   return typeof exit === 'function' ? Promise.resolve(exit.call(document)) : Promise.resolve()
-}
-
-function parseRoute(hash = '') {
-  const value = String(hash || '').replace(/^#\/?/, '')
-  const [path, queryString = ''] = value.split('?')
-  const parts = path.split('/')
-  if (parts[0] === 'test' && parts[1] === 'keyboard') return { type: 'keyboard-test' }
-  if (parts[0] === 'play' && parts[1] && parts[2]) {
-    const kind = decodeRoutePart(parts[1])
-    const file = decodeRoutePart(parts[2])
-    const query = new URLSearchParams(queryString)
-    if (GAME_KINDS.has(kind) && file) {
-      const name = query.get('name') || file.split('/').pop() || file
-      return routeForGame({ kind, file, name, vendor: '', desc: '', size: 0, iconUrl: null, local: query.get('local') === '1' }, query.get('tab'))
-    }
-  }
-  if (parts[0] === 'library') return routeForLibrary(decodeRoutePart(parts[1], 'j2me'))
-  const requested = new URLSearchParams(window.location.search).get('tab')
-  return routeForLibrary(TAB_IDS.has(requested) ? requested : (localStorage.getItem('xiaochao-tab') || 'j2me'))
 }
 
 function hasLocalJars() {
@@ -926,7 +904,7 @@ function Store({ onRefreshLibrary }) {
   </section>
 }
 
-function Player({ game, onBack, nativeBackSignal }) {
+function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(fullscreenElement()))
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
@@ -1095,7 +1073,7 @@ function Player({ game, onBack, nativeBackSignal }) {
             <strong>退出当前游戏？</strong>
             <span>当前游戏进度可能尚未保存。</span>
             <div>
-              <Button className="optionButton" onClick={() => setConfirming(false)}>继续游戏</Button>
+              <Button className="optionButton" onClick={() => { setConfirming(false); onCancelBack?.() }}>继续游戏</Button>
               <Button className="optionButton optionDanger" color="danger" fill="outline" onClick={exit}>退出游戏</Button>
             </div>
           </div>
@@ -1116,9 +1094,15 @@ export function isRuntimeFrame() {
 }
 
 export function RuntimeFramePage() {
-  const [route] = useState(() => parseRoute(window.location.hash))
+  const { kind, '*': file = '' } = useParams()
+  const location = useLocation()
+  const query = new URLSearchParams(location.search)
   const [nativeBackSignal, requestBack] = useNativeBackRequest()
   const leave = useCallback(() => window.parent.postMessage(RUNTIME_EXIT_MESSAGE, window.location.origin), [])
+  const name = query.get('name') || file.split('/').pop() || file
+  const game = GAME_KINDS.has(kind) && file
+    ? { kind, file, name, vendor: '', desc: '', size: 0, iconUrl: null, local: query.get('local') === '1' }
+    : null
 
   useLayoutEffect(() => {
     const parent = window.parent
@@ -1134,8 +1118,8 @@ export function RuntimeFramePage() {
     }
   }, [requestBack])
 
-  return route.type === 'play' && FRAME_RUNTIME_KINDS.has(route.game.kind)
-    ? <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leave} />
+  return game && FRAME_RUNTIME_KINDS.has(game.kind)
+    ? <Player game={game} nativeBackSignal={nativeBackSignal} onBack={leave} />
     : null
 }
 
@@ -1145,7 +1129,7 @@ function RuntimeFrame({ route, nativeBackSignal, onBack }) {
   const pendingBack = useRef(false)
   const url = new URL(window.location.href)
   url.searchParams.set('runtime-frame', '1')
-  url.hash = routeHash(route)
+  url.hash = routePath(route)
 
   useLayoutEffect(() => {
     const syncInsets = () => {
@@ -1185,13 +1169,44 @@ function RuntimeFrame({ route, nativeBackSignal, onBack }) {
 
 export default function App() {
   useEffect(() => installResponsiveContract(), [])
-  const [route, setRoute] = useState(() => parseRoute(window.location.hash))
+  const location = useLocation()
+  const params = useParams()
+  const navigate = useNavigate()
+  const query = new URLSearchParams(location.search)
+  const routeType = location.pathname === '/test/keyboard'
+    ? 'keyboard-test'
+    : location.pathname.startsWith('/play/')
+      ? 'play'
+      : 'library'
+  const tabParam = params.tab || query.get('tab') || localStorage.getItem('xiaochao-tab') || 'j2me'
+  const tab = TAB_IDS.has(tabParam) ? tabParam : 'j2me'
+  const gameFile = params['*'] || ''
+  const gameName = query.get('name') || gameFile.split('/').pop() || gameFile
+  const game = routeType === 'play' && GAME_KINDS.has(params.kind) && gameFile
+    ? {
+      kind: params.kind,
+      file: gameFile,
+      name: gameName,
+      vendor: '',
+      desc: '',
+      size: 0,
+      iconUrl: null,
+      local: query.get('local') === '1',
+    }
+    : null
+  const route = routeType === 'play' && game
+    ? routeForGame(game, query.get('tab') || tab)
+    : routeType === 'keyboard-test'
+      ? { type: 'keyboard-test' }
+      : routeForLibrary(tab)
   const [nativeBackSignal, requestBack] = useNativeBackRequest()
-  const routeRef = useRef(route)
-  const restoringHistory = useRef(false)
   const libraryScroll = useRef(null)
   const playing = route.type === 'play'
   const keyboardTest = route.type === 'keyboard-test'
+  const directEntryStarted = useRef(false)
+  const shouldBlock = useCallback(({ currentLocation, nextLocation, historyAction }) =>
+    currentLocation.pathname.startsWith('/play/') && currentLocation.pathname !== nextLocation.pathname, [])
+  const blocker = useBlocker(shouldBlock)
 
   useLayoutEffect(() => {
     if (!playing && libraryScroll.current !== null) {
@@ -1207,64 +1222,57 @@ export default function App() {
     }
   }, [requestBack])
 
-  useEffect(() => { routeRef.current = route }, [route])
+  useEffect(() => {
+    if (route.type === 'library') localStorage.setItem('xiaochao-tab', route.tab)
+  }, [route.type, route.tab])
 
   useEffect(() => {
-    const normalized = routeHash(route)
-    const historyState = window.history.state || {}
-    if (route.type === 'play' && !historyState.xiaochaoGameEntry) {
-      const library = routeForLibrary(route.tab)
-      window.history.replaceState({ xiaochaoRoute: routeHash(library), xiaochaoLibraryEntry: true }, '', routeHash(library))
-      window.history.pushState({ xiaochaoRoute: normalized, xiaochaoGameEntry: true }, '', normalized)
-    } else if (window.location.hash !== normalized) {
-      window.history.replaceState({ xiaochaoRoute: normalized }, '', normalized)
-    }
-    const handleLocation = () => {
-      const next = parseRoute(window.location.hash)
-      const current = routeRef.current
-      if (current.type === 'play' && next.type !== 'play') {
-        if (!restoringHistory.current) {
-          restoringHistory.current = true
-          window.history.forward()
-          requestBack()
-        }
-        return
-      }
-      if (current.type === 'library' && next.type === 'play') libraryScroll.current = window.scrollY
-      if (restoringHistory.current) restoringHistory.current = false
-      setRoute(next)
-      if (next.type === 'library') localStorage.setItem('xiaochao-tab', next.tab)
-    }
-    window.addEventListener('popstate', handleLocation)
-    window.addEventListener('hashchange', handleLocation)
-    return () => {
-      window.removeEventListener('popstate', handleLocation)
-      window.removeEventListener('hashchange', handleLocation)
-    }
-  }, [requestBack])
+    if (routeType === 'library' && params.tab !== tab) navigate(routePath(routeForLibrary(tab)), { replace: true })
+  }, [navigate, params.tab, routeType, tab])
 
-  const tab = route.tab
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    requestBack()
+  }, [blocker.state, requestBack])
+
+  useEffect(() => {
+    if (route.type === 'play' && !location.state?.xiaochaoGameEntry && !directEntryStarted.current) {
+      directEntryStarted.current = true
+      navigate(routePath(routeForLibrary(route.tab)), {
+        replace: true,
+        state: { pendingDirectPlay: routePath(route) },
+      })
+      return
+    }
+    if (route.type === 'library' && location.state?.pendingDirectPlay) {
+      navigate(location.state.pendingDirectPlay, {
+        state: { xiaochaoGameEntry: true, originTab: route.tab },
+      })
+    }
+  }, [location.state, navigate, route])
 
   function switchTab(id) {
     const next = routeForLibrary(id)
-    window.history.pushState({ xiaochaoRoute: routeHash(next) }, '', routeHash(next))
-    setRoute(next)
+    navigate(routePath(next))
     localStorage.setItem('xiaochao-tab', id)
   }
 
   function startGame(game) {
     libraryScroll.current = window.scrollY
     const next = routeForGame(game, tab)
-    window.history.pushState({ xiaochaoRoute: routeHash(next), xiaochaoGameEntry: true }, '', routeHash(next))
-    setRoute(next)
+    navigate(routePath(next), { state: { xiaochaoGameEntry: true, originTab: tab } })
   }
 
   const leaveGame = useCallback(() => {
-    const next = routeForLibrary(tab)
-    window.history.replaceState({ xiaochaoRoute: routeHash(next) }, '', routeHash(next))
-    setRoute(next)
+    const originTab = TAB_IDS.has(location.state?.originTab) ? location.state.originTab : tab
+    const next = routeForLibrary(originTab)
+    if (blocker.state === 'blocked') blocker.proceed()
+    else navigate(routePath(next), { replace: true })
     localStorage.setItem('xiaochao-tab', next.tab)
-  }, [tab])
+  }, [blocker, location.state, navigate, tab])
+  const cancelBlockedBack = useCallback(() => {
+    if (blocker.state === 'blocked') blocker.reset()
+  }, [blocker])
 
   const [libraryTick, setLibraryTick] = useState(0)
 
@@ -1284,7 +1292,7 @@ export default function App() {
     </div>
     {keyboardTest && <Suspense fallback={null}><KeyboardTestPage /></Suspense>}
     {playing && (FRAME_RUNTIME_KINDS.has(route.game.kind)
-      ? <RuntimeFrame key={routeHash(route)} route={route} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />
-      : <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />)}
+      ? <RuntimeFrame key={routePath(route)} route={route} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />
+      : <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leaveGame} onCancelBack={cancelBlockedBack} />)}
   </>
 }

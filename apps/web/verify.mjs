@@ -68,7 +68,7 @@ async function evaluate(expression) {
     expression = `document.querySelector('.runtimeFrame')?.contentWindow.eval(${JSON.stringify(expression)})`
   }
   const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || 'browser evaluation failed')
+  if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'browser evaluation failed')
   return result.result.value
 }
 
@@ -383,12 +383,38 @@ try {
   await sleep(250)
   await waitFor("!document.querySelector('.keyboardCanvas') && document.querySelector('.appShell')?.hidden === false", 'unknown hash library fallback')
   requireCheck(await evaluate("!!document.querySelector('.tab[aria-current=page]')"), 'unknown hash did not render the library fallback')
-  await navigate('#/play/flash/sample-game.swf?tab=flash&name=Star%20Catcher', 800)
-  await waitFor("!!document.querySelector('.playerStage')", 'sample Flash play route')
-  await evaluate("window.__XIAOCHAO_NATIVE_BACK_REQUEST__?.(); true")
-  await waitFor("!!document.querySelector('.exitConfirm')", 'Flash exit dialog from keyboard route check')
+  await navigate('#/library/flash', 500)
+  await send('Page.reload')
+  await waitFor("document.querySelector('.tab[aria-current=page]')?.textContent.includes('Flash')", 'fresh Flash library route')
+  await sleep(250)
+  await waitFor("document.querySelector('.card .cardName')", 'Flash library card')
+  const openedFlashOptions = await evaluate(`(() => {
+    const card = [...document.querySelectorAll('.card')].find((item) => item.querySelector('.cardName')?.textContent.includes('Star Catcher'))
+    card?.click()
+    return !!card
+  })()`)
+  requireCheck(openedFlashOptions, 'Star Catcher card missing')
+  await waitFor("!!document.querySelector('.optionSheet')", 'Flash game options')
+  await evaluate(`[...document.querySelectorAll('.optionSheet button')].find((button) => button.textContent.trim() === '启动')?.click(); true`)
+  await waitFor("!!document.querySelector('.playerStage')", 'Flash game from library navigation')
+  await evaluate("history.back(); true")
+  await waitFor("!!document.querySelector('.exitConfirm')", 'Flash exit dialog on router Back')
+  requireCheck(await evaluate("location.hash.includes('/play/flash/sample-game.swf') && !!document.querySelector('.playerStage')"), 'router Back unmounted play before confirmation')
+  await evaluate("document.querySelector('.exitConfirm .optionButton')?.click(); true")
+  await sleep(150)
+  requireCheck(await evaluate("!document.querySelector('.exitConfirm') && !!document.querySelector('.playerStage')"), 'canceling router Back did not resume play')
+  await evaluate("history.back(); true")
+  await waitFor("!!document.querySelector('.exitConfirm')", 'second Flash exit dialog on router Back')
   await evaluate("document.querySelector('.exitConfirm .optionDanger')?.click(); true")
+  await sleep(200)
   await waitFor("location.hash === '#/library/flash' && !document.querySelector('.playerStage')", 'Flash library after play route')
+  await navigate('#/play/flash/sample-game.swf?tab=flash&name=Star%20Catcher', 800)
+  await waitFor("!!document.querySelector('.playerStage')", 'direct sample Flash play route')
+  requireCheck(await evaluate("location.hash.includes('/play/flash/sample-game.swf')"), 'direct play route was not preserved')
+  await navigate('#/library/flash', 500)
+  await waitFor("document.querySelector('.tab[aria-current=page]')?.textContent.includes('Flash') && !document.querySelector('.playerStage')", 'library after direct play route')
+  await navigate('#/library/not-a-tab', 500)
+  await waitFor("location.hash === '#/library/j2me'", 'invalid library tab normalization')
 
   if (!process.env.VERIFY_KEYBOARD_ONLY) {
   for (const [label, route] of UI_ROUTES) {

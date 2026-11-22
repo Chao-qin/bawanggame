@@ -14,7 +14,8 @@
     "konva": "^9.3.22",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-konva": "^18.2.10"
+    "react-konva": "^18.2.10",
+    "react-router-dom": "6.30.1"
   },
   "devDependencies": {
     "@unocss/preset-uno": "^66.12.0",
