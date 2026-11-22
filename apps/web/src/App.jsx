@@ -10,7 +10,7 @@ import { InputMappingPopup } from './runtime/InputMappingPopup.jsx'
 import { createRuntimeBackGate } from './runtime/runtimeBackGate.js'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
 import { fetchArtwork, validArtwork } from './artwork.js'
-import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
+import { GameArtwork, LibraryGameEntry, MrpArtwork, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
 import { installResponsiveContract } from './responsive.js'
 import { addBundled, addFromFile, addFromUrl, fillArtwork, list as listLocalFlash, remove as removeLocalFlash } from './localFlash.js'
@@ -105,7 +105,7 @@ function useServerGames(kind) {
     if (kind !== 'maopao') return
     let alive = true
     setState({ loading: true, error: null, games: [] })
-    fetch('/maopao/hall/manifest.json')
+    fetch('/__mrp/catalog')
       .then((r) => {
         if (!r.ok) throw new Error('HTTP ' + r.status)
         return r.json()
@@ -122,7 +122,9 @@ function useServerGames(kind) {
             vendor: g.vendor || '',
             desc: g.desc || '',
             size: g.size || 0,
-            iconUrl: typeof g.iconUrl === 'string' ? g.iconUrl : null,
+            iconUrl: typeof g.artworkUrl === 'string' ? g.artworkUrl : null,
+            available: g.available === true,
+            availabilityReason: g.availabilityReason || null,
             local: false,
           })),
         })
@@ -401,12 +403,13 @@ function GameMenu({ game, onStart, onSelect, onRemove, onClose }) {
           next?.focus()
         }}>
         <div className="optionHead">
-          <GameArtwork src={game.iconUrl} name={game.name} className="optionIcon" />
+          {game.kind === 'maopao' ? <MrpArtwork src={game.iconUrl} name={game.name} className="optionIcon" /> : <GameArtwork src={game.iconUrl} name={game.name} className="optionIcon" />}
           <div className="optionTitle"><strong>{game.name}</strong><span>{[game.vendor, game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机游戏' : ''].filter(Boolean).join(' · ')}</span></div>
           <Button fill="none" className="iconButton" onClick={onClose} aria-label="关闭"><CloseOutline aria-hidden="true" /></Button>
         </div>
         <div className="optionBody">
-          <Button className="optionButton" color="primary" onClick={() => { onStart(game); onClose() }}>启动</Button>
+          {game.availabilityReason && <span className="optionAvailability">{game.availabilityReason}</span>}
+          <Button className="optionButton" color="primary" disabled={game.kind === 'maopao' && game.available === false} onClick={() => { onStart(game); onClose() }}>启动</Button>
           {game.local && <Button className="optionButton" onClick={() => { onSelect(game); onClose() }}>选择</Button>}
           {game.local && <Button className="optionButton optionDanger" color="danger" fill="outline" onClick={() => { onRemove(game); onClose() }}>卸载</Button>}
         </div>

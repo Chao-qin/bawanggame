@@ -79,7 +79,7 @@ To include the MRP library, first place the vmrp runtime and your local game ass
 docker compose -f compose.yaml -f compose.mrp.yaml up --build -d --wait
 ```
 
-The default container starts with an empty MRP catalog. The optional Compose file mounts the tracked `maopao-revival/hall/` catalog and the vendor checkout’s `vmrp_v1.0/` and `public/mrps/` directories. Verify both vendor directories exist before adding the override. The 「大宋豪侠 · 本地复活」 entry requires the separate `dasong-server` service.
+The default container includes the tracked MRP catalog and reports games as unavailable until the optional Compose file mounts the vendor checkout’s `vmrp_v1.0/` and `public/mrps/` directories. Verify both vendor directories exist before adding the override. The 「大宋豪侠 · 本地复活」 entry requires the separate `dasong-server` service.
 
 ```bash
 docker compose logs -f web

@@ -25,6 +25,11 @@ export function MrpPlayer({ game, onExit, onReady, onError }) {
     window.__XIAOCHAO_RUNTIME_SESSION__ = session
     ;(async () => {
       try {
+        const catalogResponse = await fetch('/__mrp/catalog')
+        if (!catalogResponse.ok) throw new Error('冒泡游戏目录不可用')
+        const catalog = await catalogResponse.json()
+        const entry = catalog.games?.find((item) => item.file === game.file)
+        if (!entry?.available) throw new Error(entry?.availabilityReason || '该冒泡游戏未安装')
         await Promise.all(styles.map((src) => loadStyle(src, session)))
         const keyboardReady = await keyboardSession.ready
         if (!keyboardReady.available) window.__XIAOCHAO_KEYBOARD_UNAVAILABLE__ = true

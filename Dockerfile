@@ -39,8 +39,9 @@ COPY --from=build /app/apps/server/dist/src/ apps/server/src/
 COPY runtime/ runtime/
 COPY games/jar/.keep games/jar/
 COPY start.sh turnserver.conf ./
+COPY maopao-revival/hall/manifest.json maopao-revival/hall/manifest.json
+COPY maopao-revival/hall/manifest.json maopao-revival/vendor/vmrp.github.io/hall/manifest.json
 RUN mkdir -p maopao-revival/vendor/vmrp.github.io/hall \
- && printf '[]\n' > maopao-revival/vendor/vmrp.github.io/hall/manifest.json \
  && install -d -o node -g node "$TURN_STATE_DIR"
 
 USER node

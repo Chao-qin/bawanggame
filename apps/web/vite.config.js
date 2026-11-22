@@ -8,6 +8,7 @@ const apiTarget = `http://127.0.0.1:${process.env.PORT || 8080}`
 // 模拟器内核资源在站点根路径，开发时代理到 8080。
 const proxyTargets = [
   '/__icon',
+  '/__mrp',
   '/__jars',
   '/__52java',
   '/__flash',
