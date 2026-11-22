@@ -9,8 +9,9 @@ import { URL } from 'node:url'
 import { WebSocketServer, WebSocket } from 'ws'
 import yauzl from 'yauzl'
 import { parseFlashArchiveDetail, parseFlashArchiveGames, type FlashArchiveGame } from './flashCatalog.js'
+import { loadMrpCatalog } from './mrpCatalog.js'
 
-const PROJECT = resolve(import.meta.dirname, '../../..')
+const PROJECT = resolve(process.env.PROJECT_ROOT ?? process.cwd())
 const PORT = Number(process.env.PORT ?? 8080)
 const JAVA_BASE = (process.env['52JAVA_BASE_URL'] ?? 'https://java.52emu.cn').replace(/\/$/, '')
 const JAVA_HOSTS = new Set([new URL(JAVA_BASE).hostname, ...(new URL(JAVA_BASE).hostname === 'java.52emu.cn' ? ['d2.52emu.cn'] : [])])
@@ -305,6 +306,10 @@ const server = createServer(async (req, res) => {
     return res.end()
   }
   if (url.pathname === '/__jars') return jars(res)
+  if (url.pathname === '/__mrp/catalog') {
+    try { return json(res, 200, await loadMrpCatalog(join(PROJECT, 'maopao-revival'), join(MRP, 'vmrp_v1.0'), join(MRP, 'public', 'mrps'))) }
+    catch (error) { console.error('MRP catalog error:', error); return json(res, 502, { error: 'mrp_catalog_unavailable' }) }
+  }
   if (url.pathname === '/__icon') {
     const name = url.searchParams.get('jar') ?? ''
     const file = resolve(JARS, name)
