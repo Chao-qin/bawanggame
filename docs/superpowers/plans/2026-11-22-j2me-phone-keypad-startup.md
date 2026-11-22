@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make J2ME honor its configured portrait phone keypad and prevent stale startup exit requests from blocking the runtime.
+**Goal:** Add the portrait phone keypad preset with navigation above numbers, honor configured profiles, and prevent stale startup exit requests from blocking the runtime.
 
-**Architecture:** Keep the shared SVG keyboard. Make profile resolution honor explicit runtime orientation and migrated per-game layout precedence, then refresh the keyboard session after J2ME loads and applies runtime configuration. Isolate Player back-request gating in a small pure helper so startup, terminal failure, and ready states can be tested without mounting the full application.
+**Architecture:** Keep the shared SVG keyboard. Add `phone-keypad` to the built-in layout catalog, make profile resolution honor explicit runtime orientation and migrated per-game layout precedence, then refresh the keyboard session after J2ME loads and applies runtime configuration. Isolate Player back-request gating in a small pure helper so startup, terminal failure, and ready states can be tested without mounting the full application.
 
 **Tech Stack:** React 18, Vite, ES modules, Node's built-in test runner, existing J2ME runtime scripts.
 

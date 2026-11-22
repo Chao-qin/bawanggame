@@ -62,6 +62,30 @@ const numericControls = [
   control('clear', 'clear', 'Clear', 0.52, 0.88, 0.12, 0.1),
 ]
 
+const phoneKeypadControls = [
+  ...dpadControls.map((item) => ({
+    ...item,
+    x: item.id === 'left' ? 0.02 : item.id === 'right' ? 0.24 : 0.13,
+    y: item.id === 'up' ? 0.08 : item.id === 'down' ? 0.28 : 0.18,
+    width: 0.1,
+    height: 0.09,
+  })),
+  control('ok', 'ok', 'OK', 0.13, 0.39, 0.1, 0.09),
+  control('choice', 'choice', 'Soft 1', 0.42, 0.08, 0.12, 0.09),
+  control('back', 'back', 'Soft 2', 0.56, 0.08, 0.12, 0.09),
+  control('ret', 'ret', 'Back', 0.70, 0.08, 0.12, 0.09),
+  control('clear', 'clear', 'Clear', 0.42, 0.20, 0.12, 0.09),
+  ...numericControls
+    .filter((item) => /^key-(?:[0-9]|star|pound)$/.test(item.id))
+    .map((item) => ({
+      ...item,
+      x: 0.30 + ((item.x - 0.66) / 0.11) * 0.12,
+      y: 0.52 + ((item.y - 0.58) / 0.105) * 0.105,
+      width: 0.1,
+      height: 0.085,
+    })),
+]
+
 const BUILTIN_LAYOUTS = deepFreeze({
   'qwerty-72': {
     id: 'qwerty-72', schemaVersion: 1, name: 'Game QWERTY 72',
@@ -80,6 +104,11 @@ const BUILTIN_LAYOUTS = deepFreeze({
     target: { runtime: 'j2me', orientation: 'portrait' },
     controls: [...dpadControls, ...numericControls],
   },
+  'phone-keypad': {
+    id: 'phone-keypad', schemaVersion: 1, name: 'Phone Navigation Keypad',
+    target: { runtime: 'j2me', orientation: 'portrait' },
+    controls: phoneKeypadControls,
+  },
 })
 
 const BUILTIN_THEMES = deepFreeze({
@@ -94,7 +123,7 @@ const DEFAULT_PROFILES = deepFreeze({
     landscape: { layoutId: 'qwerty-72', themeId: 'classic' },
   },
   j2me: {
-    portrait: { layoutId: 'portrait-dpad', themeId: 'classic' },
+    portrait: { layoutId: 'phone-keypad', themeId: 'classic' },
     landscape: { layoutId: 'landscape-split', themeId: 'classic' },
   },
   mrp: {

@@ -109,7 +109,7 @@ test('uses configured runtime orientation instead of viewport orientation', () =
   try {
     const session = createKeyboardSession({ runtime: 'j2me', gameId: 'game', timeout: 100 })
     assert.equal(session.getProfile().orientation, 'portrait')
-    assert.equal(session.getProfile().layoutId, 'portrait-dpad')
+    assert.equal(session.getProfile().layoutId, 'phone-keypad')
     session.invalidate()
   } finally {
     globalThis.window = previousWindow

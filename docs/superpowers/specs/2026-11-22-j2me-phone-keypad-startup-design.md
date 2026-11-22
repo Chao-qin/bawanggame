@@ -9,8 +9,9 @@ blocked after selecting "continue".
 ## Scope
 
 - Keep the shared SVG keyboard and its logical action adapters.
-- Ensure J2ME portrait resolves to the traditional D-pad keypad unless the user
-  has an explicit profile or per-game override.
+- Add a phone keypad preset with navigation controls above a numeric keypad,
+  and make it the J2ME portrait default unless the user has an explicit
+  profile or per-game override.
 - Make runtime readiness and exit-confirmation state transition atomically from
   the player's point of view.
 - Preserve existing input mappings, saved layouts, normal back/exit behavior,
@@ -23,8 +24,10 @@ blocked after selecting "continue".
    starting, unless the runtime has already reported a terminal failure.
 3. Selecting "continue" only dismisses the confirmation overlay; it must not
    stop, invalidate, or reload the runtime.
-4. In portrait orientation, the active J2ME layout exposes the phone D-pad,
-   soft keys, numeric keypad, and supported controls in the shared SVG surface.
+4. In portrait orientation, the automatic J2ME profile uses the phone keypad
+   preset: navigation controls and soft keys above a 3x4 numeric keypad.
+   Explicit runtime/orientation assignments, per-game overrides, and custom
+   layouts remain authoritative.
 5. On teardown, all keyboard sources and runtime hooks are released exactly
    once.
 
@@ -33,6 +36,11 @@ blocked after selecting "continue".
 The player owns lifecycle gating. The keyboard profile resolver owns layout
 selection. Runtime scripts remain adapters and are not rewritten unless a
 reproduction proves that they mutate or replace the shared surface.
+
+The built-in layout catalog contains the existing `portrait-dpad`,
+`landscape-split`, and `qwerty-72` layouts plus the new `phone-keypad` preset.
+The runtime keyboard is an absolute SVG overlay over the runtime stage and does
+not participate in document flow; only key nodes accept pointer input.
 
 ## Verification
 
