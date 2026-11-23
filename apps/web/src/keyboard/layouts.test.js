@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { keyUnits } from './hit-test.js'
-import { getLayout, KEYBOARD_LAYOUTS, layoutGroup, T9_LANDSCAPE, T9_PORTRAIT } from './layouts.js'
+import { cornerIconLayout, getLayout, KEYBOARD_LAYOUTS, layoutGroup, T9_LANDSCAPE, T9_PORTRAIT } from './layouts.js'
 
 test('exports all eight keyboard layouts with required key counts', () => {
   assert.deepEqual(KEYBOARD_LAYOUTS.map(({ id }) => id), ['full-size', 'tkl', '75-percent', '60-percent', 'dpad-abxy', 'numpad', 't9-portrait', 't9-landscape'])
@@ -11,6 +11,12 @@ test('exports all eight keyboard layouts with required key counts', () => {
 const RUNTIME_ACTIONS = ['up', 'down', 'left', 'right', 'ok', 'choice', 'back', 'ret', 'clear', 'star', 'pound',
   'num0', 'num1', 'num2', 'num3', 'num4', 'num5', 'num6', 'num7', 'num8', 'num9']
 const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+// A corner key's box surrounds part of the wheel, but only the area outside its arc is a key, so those two shapes
+// never really overlap. Every other pair still has to stay clear of each other.
+const solidOverlap = (a, b) => {
+  const wheelAndCorner = (x, y) => x.shape === 'wheel' && y.shape === 'corner'
+  return wheelAndCorner(a, b) || wheelAndCorner(b, a) ? false : overlaps(a, b)
+}
 const actionsOf = (keys) => keys.flatMap((item) => keyUnits(item).map(({ value }) => value))
 
 test('T9 presets drive every runtime action exactly once, with no overlapping keys', () => {
@@ -23,7 +29,7 @@ test('T9 presets drive every runtime action exactly once, with no overlapping ke
     assert.equal(wheel[0].width, wheel[0].height, `${id}: the wheel is round`)
     assert.deepEqual(wheel[0].wheel, { up: 'up', down: 'down', left: 'left', right: 'right', center: 'ok' })
     for (const [index, a] of layout.keys.entries()) {
-      for (const b of layout.keys.slice(index + 1)) assert.ok(!overlaps(a, b), `${id}: ${a.id} overlaps ${b.id}`)
+      for (const b of layout.keys.slice(index + 1)) assert.ok(!solidOverlap(a, b), `${id}: ${a.id} overlaps ${b.id}`)
     }
   }
   const digits = getLayout(T9_PORTRAIT).keys.filter(({ value }) => /^num\d$|^star$|^pound$/.test(value))
@@ -45,8 +51,48 @@ test('T9 halves: navigation above the digits in portrait, left of them with room
   }
   const portrait = getLayout(T9_PORTRAIT)
   assert.ok(extent(layoutGroup(portrait, 'nav').keys).bottom <= extent(layoutGroup(portrait, 'numpad').keys).top)
+  const portraitWheel = portrait.keys.find(({ shape }) => shape === 'wheel')
+  assert.equal(portraitWheel.width, 3.4)
+  assert.deepEqual(
+    ['choice', 'back', 'ret', 'clear'].map((id) => portrait.keys.find((key) => key.id === id).y),
+    [0, 0, 2.25, 2.25], 'end/clear keys moved up beside the wheel instead of taking their own row',
+  )
+  const digits = layoutGroup(portrait, 'numpad').keys
+  const digitHeight = extent(digits).bottom - extent(digits).top
+  assert.ok(extent(digits).top <= 4, 'digits start where the old function-key row used to be')
+  assert.ok(digitHeight > 3.3 && digits[0].height > 0.75, 'the digits get the height the navigation half gave up')
   const landscape = getLayout(T9_LANDSCAPE)
   assert.ok(extent(layoutGroup(landscape, 'numpad').keys).left - extent(layoutGroup(landscape, 'nav').keys).right >= 2, 'a gap for the game screen')
+  assert.ok(extent(layoutGroup(landscape, 'nav').keys).bottom < 2.8, 'landscape navigation half is shorter too')
+})
+
+test('T9 function keys are four arc-cut corners around a wheel that dominates the navigation half', () => {
+  for (const id of [T9_PORTRAIT, T9_LANDSCAPE]) {
+    const layout = getLayout(id)
+    const wheel = layout.keys.find(({ shape }) => shape === 'wheel')
+    const cx = wheel.x + wheel.width / 2
+    const cy = wheel.y + wheel.height / 2
+    const corners = layout.keys.filter(({ shape }) => shape === 'corner')
+    assert.equal(corners.length, 4, `${id}: four corner function keys`)
+    assert.deepEqual(new Set(corners.map(({ corner }) => corner)),
+      new Set(['top-left', 'top-right', 'bottom-left', 'bottom-right']))
+    for (const key of corners) {
+      assert.equal(key.arc.cx, cx, `${id}/${key.id}: arc shares the wheel centre`)
+      assert.equal(key.arc.cy, cy, `${id}/${key.id}: arc shares the wheel centre`)
+      assert.ok(key.arc.radius > wheel.width / 2, `${id}/${key.id}: the arc leaves a gap around the wheel`)
+      const innerX = key.corner.includes('left') ? key.x + key.width : key.x
+      const innerY = key.corner.startsWith('top') ? key.y + key.height : key.y
+      const outerX = key.corner.includes('left') ? key.x : key.x + key.width
+      const outerY = key.corner.startsWith('top') ? key.y : key.y + key.height
+      assert.ok(Math.hypot(innerX - cx, innerY - cy) < key.arc.radius, `${id}/${key.id}: inner corner is cut away`)
+      assert.ok(Math.hypot(outerX - cx, outerY - cy) > key.arc.radius, `${id}/${key.id}: outer corner remains`)
+    }
+    const nav = layoutGroup(layout, 'nav').keys
+    const navHeight = Math.max(...nav.map(({ y, height }) => y + height))
+    const navWidth = Math.max(...nav.map(({ x, width }) => x + width))
+    assert.ok(wheel.height / navHeight > 0.75, `${id}: the wheel owns most of the navigation height`)
+    assert.ok(navHeight / navWidth < 1.5, `${id}: the navigation half is compact`)
+  }
 })
 
 test('physical keyboards expose six rows and QWERTY alpha sequences', () => {
@@ -138,6 +184,15 @@ test('ANSI widths, row spacing, staggering, and key bounds are valid', () => {
     Math.max(...full.keys.filter(({ block }) => ['navigation', 'arrows'].includes(block)).map(({ x, width }) => x + width)))
 })
 
+test('60% layout keeps Esc on the number row', () => {
+  const sixty = getLayout('60-percent')
+  const escape = sixty.keys.find(({ id }) => id === 'escape')
+  const numberRow = sixty.keys.filter(({ row }) => row === 1)
+  assert.equal(escape.y, 1)
+  assert.ok(numberRow.includes(escape))
+  assert.equal(numberRow.find(({ id }) => id === 'grave').x, 1)
+})
+
 test('controller values and numeric keypad values match their contracts', () => {
   assert.deepEqual(getLayout('dpad-abxy').keys.map(({ value }) => value).sort(), [
     'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'KeyA', 'KeyB', 'KeyX', 'KeyY',
@@ -154,4 +209,37 @@ test('controller values and numeric keypad values match their contracts', () => 
   assert.ok(Math.abs(add.x - 3.6) < 1e-9 && add.y === 1.2 && add.height === 2.2)
   assert.ok(Math.abs(enter.x - 3.6) < 1e-9 && Math.abs(enter.y - 3.6) < 1e-9 && enter.height === 2.2)
   assert.ok(zero.width === 2 && Math.abs(decimal.x - 2.4) < 1e-9 && Math.abs(decimal.y - 4.8) < 1e-9)
+})
+
+test('T9 corner icons centre on the visible sliver and stay clear of the wheel arc', () => {
+  for (const id of [T9_PORTRAIT, T9_LANDSCAPE]) {
+    const layout = getLayout(id)
+    const corners = layout.keys.filter(({ shape }) => shape === 'corner')
+    assert.deepEqual(corners.map(({ icon }) => icon).sort(), ['back', 'check', 'clear', 'end'])
+    const anchors = []
+    for (const key of corners) {
+      const { x, y, size, cx, cy, indicator, anchor } = cornerIconLayout(key)
+      assert.ok(x >= 0 && y >= 0 && x + size <= key.width + 1e-9 && y + size <= key.height + 1e-9,
+        `${id}/${key.id}: icon stays inside the key box`)
+      const left = key.corner.endsWith('left')
+      const top = key.corner.startsWith('top')
+      const nearX = left ? x + size : x
+      const nearY = top ? y + size : y
+      assert.ok(Math.hypot(nearX - (key.arc.cx - key.x), nearY - (key.arc.cy - key.y)) >= key.arc.radius - 1e-9,
+        `${id}/${key.id}: the icon clears the arc gap`)
+      assert.ok(Math.abs(indicator.x + indicator.width / 2 - cx) < 1e-9,
+        `${id}/${key.id}: indicator follows the icon centre`)
+      assert.ok(indicator.y + indicator.height <= y + 1e-9, `${id}/${key.id}: indicator above the icon`)
+      assert.ok(Math.abs(cx - key.width / 2) > 0.05 && Math.abs(cy - key.height / 2) > 0.05,
+        `${id}/${key.id}: icon biased towards the outer corner`)
+      anchors.push([anchor.x + key.x, anchor.y + key.y])
+    }
+    const wheel = layout.keys.find(({ shape }) => shape === 'wheel')
+    const wheelCx = wheel.x + wheel.width / 2
+    const wheelCy = wheel.y + wheel.height / 2
+    for (const [ax, ay] of anchors) {
+      assert.ok(anchors.some(([bx, by]) => Math.abs((ax + bx) / 2 - wheelCx) < 1e-6 && Math.abs((ay + by) / 2 - wheelCy) < 1e-6),
+        `${id}: icon anchor ${ax},${ay} is mirrored about the wheel`)
+    }
+  }
 })

@@ -70,7 +70,16 @@ function wheelTarget(key, x, y, previous, landing) {
   return { keyId: key.id, units: parts.map((part) => unitOf(key, part)?.id).filter(Boolean), hub: landing ? false : previous.hub }
 }
 
-const contains = (key, x, y) => x >= key.x && x < key.x + key.width && y >= key.y && y < key.y + key.height
+// A corner function key only owns the part of its box outside the arc that cuts its inner corner away. Everything
+// inside that arc belongs to the gap or to the wheel, so a tap near the wheel never presses a function key.
+const contains = (key, x, y) => {
+  if (x < key.x || x >= key.x + key.width || y < key.y || y >= key.y + key.height) return false
+  if (key.shape === 'corner' && key.arc) {
+    const { cx, cy, radius } = key.arc
+    return Math.hypot(x - cx, y - cy) >= radius
+  }
+  return true
+}
 
 /**
  * The target under (x, y). `previous` is what this pointer held a moment ago (omit it for a pointer that is landing).

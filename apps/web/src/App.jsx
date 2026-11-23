@@ -953,6 +953,14 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
       window.removeEventListener('xiaochao:viewportchange', syncToolbarMode)
     }
   }, [])
+  // Collapsing or expanding the toolbar changes the stage's available box. Refit once React has committed so the
+  // runtime canvas is measured against the final box, instead of snapping to a stale width/height.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      try { window.ScreenSetup?.refit?.() } catch {}
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [toolbarCollapsed])
   useEffect(() => {
     const mountOverlay = (node) => {
       if (!node) return node
@@ -1046,6 +1054,8 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
     } catch (_) {}
   }
   const openSettings = () => {
+    setInputMappingOpen(false)
+    setKeypadSettingsOpen(false)
     if (typeof window.__XIAOCHAO_OPEN_SETTINGS__ === 'function') {
       window.__XIAOCHAO_OPEN_SETTINGS__()
       return
@@ -1076,13 +1086,21 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
     <div ref={playerRef} className={`player${game.kind === 'j2me' ? ' j2mePlayer' : ''}${game.kind === 'j2me' || game.kind === 'maopao' ? ' phoneRuntimePlayer' : ''}${game.kind === 'flash' ? ' flashPlayer' : ''}${game.kind === 'flash' && isFullscreen ? ' flashPlayerFullscreen' : ''}${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
       <div className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <Button className="runtimeToolbarToggle" onClick={() => setToolbarChoice({ landscape: toolbarLandscape, collapsed: !toolbarCollapsed })} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}><MoreOutline aria-hidden="true" /></Button>
-        {!toolbarCollapsed && <div className="runtimeToolbarContent">
+          {!toolbarCollapsed && <div className="runtimeToolbarContent">
           <Button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅"><LeftOutline aria-hidden="true" /></Button>
           <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
           <span className="runtimeToolbarSpacer" />
           {game.kind === 'j2me' && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={openSettings} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><SetOutline aria-hidden="true" /></Button>}
-          {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => setKeypadSettingsOpen(true)} aria-label="键盘设置" title="键盘设置"><AppstoreOutline aria-hidden="true" /></Button>}
-          {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => setInputMappingOpen(true)} aria-label="按键映射" title="按键映射" disabled={runtimeReadyFor !== game.file}><CalculatorOutline aria-hidden="true" /></Button>}
+          {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => {
+            window.__XIAOCHAO_CLOSE_SETTINGS__?.()
+            setInputMappingOpen(false)
+            setKeypadSettingsOpen((open) => !open)
+          }} aria-label="键盘设置" title="键盘设置"><AppstoreOutline aria-hidden="true" /></Button>}
+          {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => {
+            window.__XIAOCHAO_CLOSE_SETTINGS__?.()
+            setKeypadSettingsOpen(false)
+            setInputMappingOpen((open) => !open)
+          }} aria-label="按键映射" title="按键映射" disabled={runtimeReadyFor !== game.file}><CalculatorOutline aria-hidden="true" /></Button>}
           <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? <ShrinkOutline aria-hidden="true" /> : <ArrowsAltOutline aria-hidden="true" />}</Button>
         </div>}
       </div>

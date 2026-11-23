@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Arc, Circle, Group, Layer, Line, Rect, RegularPolygon, Stage, Text } from 'react-konva'
+import { Arc, Circle, Group, Layer, Line, Rect, RegularPolygon, Shape, Stage, Text } from 'react-konva'
 import { hitTest, layoutUnits, WHEEL_HUB, wheelGeometry } from './hit-test.js'
+import { cornerIconLayout } from './layouts.js'
 import { createPointerState, pointerDown, pointerMove, pointerTarget, pointerUp, pressedKeyIds, releaseAll } from './pointer-state.js'
 
 // Key body colours, top → bottom of the face. Depth comes from a solid edge under each key, not shadowBlur: a blurred
@@ -93,6 +94,90 @@ function KeyFace({ item, scale, pressed }) {
         listening={false}
       />
     )}
+  </>
+}
+
+/** The cut-away corner: an arc concentric with the wheel joins the two inner edges of the key's box. */
+function cornerPath(item) {
+  const { x, y, width, height, corner, arc } = item
+  const left = corner === 'top-left' || corner === 'bottom-left'
+  const top = corner === 'top-left' || corner === 'top-right'
+  const outer = { x: left ? x : x + width, y: top ? y : y + height }
+  const inner = { x: left ? x + width : x, y: top ? y + height : y }
+  const spanX = Math.sqrt(Math.max(0, arc.radius ** 2 - (inner.x - arc.cx) ** 2))
+  const spanY = Math.sqrt(Math.max(0, arc.radius ** 2 - (inner.y - arc.cy) ** 2))
+  const a = { x: inner.x, y: arc.cy + (top ? -spanX : spanX) }
+  const b = { x: arc.cx + (left ? -spanY : spanY), y: inner.y }
+  const start = Math.atan2(a.y - arc.cy, a.x - arc.cx)
+  const end = Math.atan2(b.y - arc.cy, b.x - arc.cx)
+  const anticlockwise = ((end - start + 2 * Math.PI) % (2 * Math.PI)) > Math.PI
+  return { outer, inner, a, b, arc, start, end, anticlockwise }
+}
+
+const ICON_COLOUR = { check: '#7fd6ff', back: '#cfe3f2', end: TONE.danger, clear: TONE.warning }
+
+/** The four T9 function keys are icons, not legends: check (left soft key), back (right soft key), end (hang up)
+ *  and clear. All are strokes in layout units around the icon box centre, so they scale with the canvas. */
+function CornerIcon({ kind, layout, scale, colour }) {
+  const s = layout.size * scale
+  const x = layout.cx * scale
+  const y = layout.cy * scale
+  const stroke = { stroke: colour, strokeWidth: s * 0.11, lineCap: 'round', lineJoin: 'round', listening: false }
+  const line = (points) => (
+    <Line {...stroke} points={points.flatMap(([px, py]) => [x + px * s, y + py * s])} />
+  )
+  if (kind === 'check') return line([[-0.34, 0.02], [-0.08, 0.26], [0.36, -0.26]])
+  if (kind === 'back') return <>
+    {line([[-0.34, 0], [0.32, 0]])}
+    {line([[-0.06, -0.24], [-0.34, 0], [-0.06, 0.24]])}
+  </>
+  if (kind === 'end') return <>
+    <Circle x={x} y={y} radius={s * 0.3} stroke={colour} strokeWidth={s * 0.1} listening={false} />
+    {line([[-0.2, 0.2], [0.2, -0.2]])}
+  </>
+  return <>
+    {line([[0.36, -0.26], [-0.12, -0.26], [-0.36, 0], [-0.12, 0.26], [0.36, 0.26]])}
+    {line([[-0.02, -0.13], [0.2, 0.13]])}
+    {line([[0.2, -0.13], [-0.02, 0.13]])}
+  </>
+}
+
+/** A T9 function key: a corner block whose inner corner is replaced by that arc. A solid edge under the face gives
+ *  it the same depth as a rectangular key, and the rim stroke outlines the curve that follows the wheel. */
+function CornerKeyFace({ item, scale, pressed }) {
+  const u = (value) => value * scale
+  const path = cornerPath(item)
+  const iconLayout = cornerIconLayout(item)
+  const colour = pressed ? LEGEND_PRESSED : ICON_COLOUR[item.icon] || LEGEND
+  const scene = (sink) => (context, shape) => {
+    const px = (point) => u(point.x - item.x)
+    const py = (point) => u(point.y - item.y) + sink
+    context.beginPath()
+    context.moveTo(px(path.outer), py(path.outer))
+    context.lineTo(px(path.inner), py(path.outer))
+    context.lineTo(px(path.a), py(path.a))
+    context.arc(u(path.arc.cx - item.x), u(path.arc.cy - item.y) + sink, u(path.arc.radius),
+      path.start, path.end, path.anticlockwise)
+    context.lineTo(px(path.outer), py(path.inner))
+    context.closePath()
+    context.fillStrokeShape(shape)
+  }
+  return <>
+    {!pressed && <Shape sceneFunc={scene(u(0.06))} fill={EDGE} perfectDrawEnabled={false} listening={false} />}
+    <Shape
+      sceneFunc={scene(0)}
+      {...gradient(u(item.height), pressed ? PRESSED : FACE[item.block] || FACE.default)}
+      stroke={pressed ? PRESSED_RIM : RIM}
+      strokeWidth={u(0.025)}
+      perfectDrawEnabled={false}
+      listening={false}
+    />
+    {item.indicator && (
+      <Rect x={u(iconLayout.indicator.x)} y={u(iconLayout.indicator.y)} width={u(iconLayout.indicator.width)}
+        height={u(iconLayout.indicator.height)} cornerRadius={u(0.025)}
+        fill={pressed ? LEGEND_PRESSED : '#7fd6ff'} listening={false} />
+    )}
+    <CornerIcon kind={item.icon} layout={iconLayout} scale={scale} colour={colour} />
   </>
 }
 
@@ -294,7 +379,9 @@ export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = '
         </Group>
       ) : (
         <Group key={item.id} x={item.x * scale} y={item.y * scale}>
-          <KeyFace item={item} scale={scale} pressed={false} />
+          {item.shape === 'corner'
+            ? <CornerKeyFace item={item} scale={scale} pressed={false} />
+            : <KeyFace item={item} scale={scale} pressed={false} />}
         </Group>
       ))}
     </Group>
@@ -330,7 +417,11 @@ export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = '
                   <WheelPressed item={item} scale={scale} parts={heldKeys.get(item.id)} />
                 </Group>
               ) : (
-                <Group key={item.id} x={item.x * scale} y={item.y * scale}><KeyFace item={item} scale={scale} pressed /></Group>
+                <Group key={item.id} x={item.x * scale} y={item.y * scale}>
+                  {item.shape === 'corner'
+                    ? <CornerKeyFace item={item} scale={scale} pressed />
+                    : <KeyFace item={item} scale={scale} pressed />}
+                </Group>
               ))}
             </Group>
           </Layer>

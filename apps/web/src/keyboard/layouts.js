@@ -90,8 +90,13 @@ const compact75 = fullSize.filter((item) => item.block !== 'numpad' &&
 
 const sixtyPercent = (() => {
   const rows = mainRows()
-  const keys = [...rows.flat()].map((item) => item.id === 'shift-right' ? { ...item, width: 2.25 } : item)
-  keys.push(key('escape', 'Esc', 'Escape', 0, 0, 1, 'alpha', 0))
+  const keys = [...rows.flat()].map((item) => {
+    if (item.id === 'shift-right') return { ...item, width: 2.25 }
+    // Keep Esc on the number row so the 60% layout stays five rows tall.
+    if (item.row === 1) return { ...item, x: item.x + 1 }
+    return item
+  })
+  keys.push(key('escape', 'Esc', 'Escape', 0, 1, 1, 'alpha', 1))
   return keys.filter((item) => !['control-right'].includes(item.id))
 })()
 
@@ -148,9 +153,18 @@ const t9Side = {
   ret: ['挂机', undefined, { tone: 'danger' }],
   clear: ['C', '清除', { tone: 'warning' }],
 }
-const sideKey = (id, x, y, width, height) => {
+// A function key is a corner block: its box reaches towards the wheel, but the inner corner is cut away by an arc
+// concentric with the wheel. That gives the wheel almost the whole navigation area and leaves the four keys the
+// corners. KeyboardCanvas.jsx draws the arc; hit-test.js presses only the part of the box outside it.
+const T9_ARC_GAP = 0.12
+// The four function keys are drawn as icons, not legends: check = left soft key, back = right soft key,
+// end = end/hang-up key, clear = clear key. The label/value remain the runtime action and its accessible name.
+const T9_ICON = { choice: 'check', back: 'back', ret: 'end', clear: 'clear' }
+const t9Arc = (cx, cy, wheelSize) => ({ cx, cy, radius: wheelSize / 2 + T9_ARC_GAP })
+const cornerKey = (id, x, y, width, height, corner, arc) => {
   const [label, legend, extra] = t9Side[id]
-  return phoneKey(id, label, x, y, width, height, 'soft', 'nav', legend, extra)
+  return phoneKey(id, label, x, y, width, height, 'soft', 'nav', legend,
+    { ...extra, shape: 'corner', corner, arc, icon: T9_ICON[id] })
 }
 
 // The 8-way direction wheel: one round key for up / down / left / right with OK at its hub (hit-test.js).
@@ -161,27 +175,34 @@ const navWheel = (x, y, size) => phoneKey('dpad', 'OK', x, y, size, size, 'dpad'
 const t9Digits = ({ x, y, width, height, stepX, stepY }) => T9_DIGITS.map(([id, label, legend], index) =>
   phoneKey(id, label, x + (index % 3) * stepX, y + Math.floor(index / 3) * stepY, width, height, 'numpad', 'numpad', legend))
 
-// Portrait: soft and end keys flank the wheel, digits below — the front of a candybar phone. The navigation row is
-// exactly as wide as the digits (5 units).
+// Portrait: four corner function keys around a wheel that fills the (now much shorter) navigation area. Dropping the
+// separate row of end/clear keys frees height for taller, more widely spaced digit keys. The navigation row stays
+// exactly as wide as the digits (5 units), and the whole layout still matches the keypad's 5 / 7.5 aspect ratio.
+const PORTRAIT_WHEEL = { x: 0.8, y: 0.2, size: 3.4 }
+const portraitArc = t9Arc(PORTRAIT_WHEEL.x + PORTRAIT_WHEEL.size / 2,
+  PORTRAIT_WHEEL.y + PORTRAIT_WHEEL.size / 2, PORTRAIT_WHEEL.size)
 const t9Portrait = [
-  sideKey('choice', 0, 0, 1.2, 1.14),
-  sideKey('ret', 0, 1.26, 1.2, 1.14),
-  navWheel(1.3, 0, 2.4),
-  sideKey('back', 3.8, 0, 1.2, 1.14),
-  sideKey('clear', 3.8, 1.26, 1.2, 1.14),
-  ...t9Digits({ x: 0, y: 2.64, width: 1.6, height: 0.66, stepX: 1.7, stepY: 0.74 }),
+  navWheel(PORTRAIT_WHEEL.x, PORTRAIT_WHEEL.y, PORTRAIT_WHEEL.size),
+  cornerKey('choice', 0, 0, 2.05, 1.55, 'top-left', portraitArc),
+  cornerKey('back', 2.95, 0, 2.05, 1.55, 'top-right', portraitArc),
+  cornerKey('ret', 0, 2.25, 2.05, 1.55, 'bottom-left', portraitArc),
+  cornerKey('clear', 2.95, 2.25, 2.05, 1.55, 'bottom-right', portraitArc),
+  ...t9Digits({ x: 0, y: 3.95, width: 1.6, height: 0.8, stepX: 1.7, stepY: 0.9 }),
 ]
 
-// Landscape: soft keys above and end / clear below the wheel on the left, digits on the right, a gap between the
-// two halves for the game screen. The navigation half is kept short for its width (3.54 × 2.8), so in the side
-// column it is sized by the column's width and leaves room above it for the collapsed runtime toolbar.
+// Landscape: the same four-corner arrangement in the left side column, digits on the right with a gap between the
+// halves for the game screen. The navigation half is shorter than before (2.6 vs 3.54 units), so the wheel dominates
+// its column and the four function keys take only the corners.
+const LANDSCAPE_WHEEL = { x: 0.4, y: 0.3, size: 2 }
+const landscapeArc = t9Arc(LANDSCAPE_WHEEL.x + LANDSCAPE_WHEEL.size / 2,
+  LANDSCAPE_WHEEL.y + LANDSCAPE_WHEEL.size / 2, LANDSCAPE_WHEEL.size)
 const t9Landscape = [
-  sideKey('choice', 0, 0, 1.35, 0.55),
-  sideKey('back', 1.45, 0, 1.35, 0.55),
-  navWheel(0.3, 0.67, 2.2),
-  sideKey('ret', 0, 2.99, 1.35, 0.55),
-  sideKey('clear', 1.45, 2.99, 1.35, 0.55),
-  ...t9Digits({ x: 5.3, y: 0, width: 1.15, height: 0.86, stepX: 1.25, stepY: 0.96 }),
+  navWheel(LANDSCAPE_WHEEL.x, LANDSCAPE_WHEEL.y, LANDSCAPE_WHEEL.size),
+  cornerKey('choice', 0, 0, 1.3, 1, 'top-left', landscapeArc),
+  cornerKey('back', 1.5, 0, 1.3, 1, 'top-right', landscapeArc),
+  cornerKey('ret', 0, 1.6, 1.3, 1, 'bottom-left', landscapeArc),
+  cornerKey('clear', 1.5, 1.6, 1.3, 1, 'bottom-right', landscapeArc),
+  ...t9Digits({ x: 5.3, y: 0, width: 1.15, height: 0.9, stepX: 1.25, stepY: 0.98 }),
 ]
 
 export const T9_PORTRAIT = 't9-portrait'
@@ -202,3 +223,41 @@ export const getLayout = (id) => KEYBOARD_LAYOUTS.find((layout) => layout.id ===
 
 /** One half of a layout (the keys of `group`), as a layout of its own. */
 export const layoutGroup = (layout, group) => ({ ...layout, id: `${layout.id}:${group}`, keys: layout.keys.filter((item) => item.group === group) })
+
+/** A corner function key is an L-shaped sliver: its inner corner was cut away by the wheel's arc. Centre its icon on
+ *  the *visible* sliver — halfway between the outer corner and the arc's 45° point — not on the old full box, and keep
+ *  the whole icon box outside the arc. Coordinates are relative to the key's box, in layout units. */
+export function cornerIconLayout(item) {
+  const { x, y, width, height, corner, arc } = item
+  const left = corner.endsWith('left')
+  const top = corner.startsWith('top')
+  const diagonal = arc.radius / Math.SQRT2
+  const anchorX = ((left ? 0 : width) + arc.cx + (left ? -diagonal : diagonal) - x) / 2
+  const anchorY = ((top ? 0 : height) + arc.cy + (top ? -diagonal : diagonal) - y) / 2
+  const centreX = arc.cx - x
+  const centreY = arc.cy - y
+
+  const place = (size) => {
+    const half = size / 2
+    const cx = Math.min(Math.max(anchorX, half + 0.04), width - half - 0.04)
+    // Leave a strip at the top for the soft-key indicator bar.
+    const cy = Math.min(Math.max(anchorY, half + 0.13), height - half - 0.04)
+    // The corner of the icon box nearest the wheel decides whether it clears the arc.
+    const nearX = left ? cx + half : cx - half
+    const nearY = top ? cy + half : cy - half
+    return { size, cx, cy, x: cx - half, y: cy - half,
+      clear: Math.hypot(nearX - centreX, nearY - centreY) >= arc.radius }
+  }
+
+  let size = Math.min(0.38, width * 0.3, height * 0.4)
+  let box = place(size)
+  while (!box.clear && size > 0.2) {
+    size *= 0.9
+    box = place(size)
+  }
+  return {
+    ...box,
+    indicator: { x: box.cx - 0.2, y: 0.04, width: 0.4, height: 0.05 },
+    anchor: { x: anchorX, y: anchorY },
+  }
+}
