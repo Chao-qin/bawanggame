@@ -110,17 +110,18 @@ diff review、validation 为 `pass`，feature audit 为 `fix_required`（1 条 P
 | diff review | P3 | 旧记录（无 `local`）与新记录分摊游玩次数 | `recordPlay` 把同类别同文件名的旧记录并入；验证：旧记录 4 次 + 本次 → 5 次 |
 | diff review | P3 | `?v=` 长缓存依赖手动升级版本号 | 服务器注释写明「改运行时脚本必须升 `RUNTIME_VERSION`」；本轮改了 `touchpad.js`，升到 `20261123-4` |
 | feature audit | P3 | 经典键盘落在键缝的触摸被忽略 | 修复，见验收表 |
-| feature audit | P3 | Flash 未测、Ruffle 哈希文件仍每次 304 | Ruffle 哈希 core / wasm 改长缓存（`ruffle.js` 仍 `no-cache`）；Flash 启动时间未测，列入未覆盖 |
+| feature audit | P3 | Flash 未测、Ruffle 哈希文件仍每次 304 | Ruffle 哈希 core / wasm 改长缓存；`ruffle.js` 由 `loadScript` 以 `?v=` 加载，同样长缓存，升级 Ruffle 时必须一并升 `RUNTIME_VERSION`；Flash 启动时间未测，列入未覆盖 |
 | feature audit | P3 | Flash 方向键无斜向 | 未做：八向轮的要求针对 T9；记录为后续 |
 
 ## R2 评审处理
 
-diff review、feature audit 均为 `pass`，只有 P3。
+diff review、feature audit、validation 均为 `pass`，只有 P3。
 
 | 来源 | 问题 | 处理 |
 |---|---|---|
 | feature audit | 历史先按全部类别取前 12 条再按标签过滤，另一类别玩得多时本标签的行会消失 | 改为先按标签过滤、以库还原、去重，再取前 12 条；探针：12 条更新的冒泡记录下 J2ME 标签仍显示 Diamond Rush |
 | diff review | 同一款 Java 游戏本机版与服务器版各有记录时，「大家都在玩」按其中一条的次数排序，不是两者之和 | 记录：只影响排序，不影响启动 |
+| validation | spec 说 `ruffle.js` 仍 `no-cache`，实际以 `?v=` 加载、长缓存 | 改正 R1 表述；服务器注释写明升级 Ruffle 也要升版本号 |
 | feature audit | 精致化只覆盖 T9（默认键盘），经典键盘与 Flash 触屏键外观未改 | 记录：用户反馈的 T9 键盘已重做；经典与 Flash 外观列为后续 |
 
 ## 未覆盖

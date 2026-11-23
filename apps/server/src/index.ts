@@ -230,8 +230,9 @@ const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.svg', '.wasm', 
 
 // Names that change whenever their content does: Vite's hashed bundles (/assets/), Ruffle's hashed core and wasm
 // (/ruffle/, staged by apps/web/scripts/stage-flash-assets.mjs) and runtime scripts requested with the runtime
-// version (?v=, apps/web/src/runtime/loadScript.js — bump RUNTIME_VERSION whenever a runtime script changes). The
-// browser may keep them without revalidating — a launch otherwise spends one round trip per runtime file on 304s.
+// version (?v=, apps/web/src/runtime/loadScript.js; /ruffle/ruffle.js is one of them). Bump RUNTIME_VERSION whenever
+// a runtime script changes or Ruffle is upgraded. The browser may keep these without revalidating — a launch
+// otherwise spends one round trip per runtime file on 304s.
 const HASHED_RUFFLE = /^\/ruffle\/(core\.ruffle\.[0-9a-f]{16,}\.js|[0-9a-f]{16,}\.wasm)$/
 function immutableRequest(url: URL) {
   return url.searchParams.has('v') || url.pathname.startsWith('/assets/') || HASHED_RUFFLE.test(url.pathname)
