@@ -19,7 +19,7 @@
 1. **滑动触发（所有画布键盘与 Flash 触屏键）**：手指落在键盘区域后一直被跟踪到抬起；离开一个键时抬起它，进入另一个键时按下它；从键缝滑入按键也会按下。经典键盘原有的按键间滑动保持不变，补上「落在键缝再滑入」（只限 `#nav` / `#numpad` 内，从游戏画面滑进键盘仍不按键）。
 2. **T9 八向轮**：方向区改为一个圆形轮盘，中心为 OK。四个主方向各占 60°，斜向各占 30° 并同时按住相邻两个方向；扇区边缘 6° 滞回，手指抖动不跳键。只有落在中心的触摸才确认 OK，从方向滑进中心只松开方向（与经典键盘一致）。正在转轮盘的手指在 1.25 倍半径内保持在轮盘上，不会误按旁边的软键。
 3. **T9 外观**：渐变键面 + 实心底边（不用模糊阴影，保持性能）、软键指示条、「挂机」红色、「C 清除」琥珀色、轮盘扇区刻度与主方向箭头、按下时点亮对应扇区。横屏导航区宽高比收窄，不再顶到折叠工具栏下方。
-4. **游玩记录**：记录里保存 `local`；每个标签只显示本标签类别的记录，并以本标签已加载的库为准还原游戏（库加载完之前不显示，库里已没有的游戏不显示，同一款游戏按大厅的身份合并去重）。
+4. **游玩记录**：记录里保存 `local`；每个标签只显示本标签类别的记录，并以本标签已加载的库为准还原游戏（库加载完之前不显示，库里已没有的游戏不显示，Java 游戏按大厅的身份合并去重），过滤后每行取前 12 条。
 5. **启动提速**：
    - J2ME 播放器在加载脚本前就开始下载 `java/classes.jar`，`main-all.js` 的 `load()` 直接取用；预取失败时回退到原请求。
    - emoji 图在首帧之后再加载；加载前含 emoji 的文字按普通文字绘制与测量（`©` 等字符也在 emoji 表里，必须有此回退）。
@@ -35,8 +35,10 @@
 | 键盘画布 | `apps/web/src/keyboard/KeyboardCanvas.jsx`（宿主元素上做坐标命中与滑动；外观；轮盘绘制） |
 | T9 预设 | `apps/web/src/keyboard/layouts.js`、`layouts.test.js` |
 | 使用方 | `runtime/RuntimeKeypad.jsx`（每个手指 + 动作一个输入源，斜向一次震动）、`keyboard/KeyboardTestPage.jsx`、`runtime/FlashControls.jsx` |
+| 经典键盘 | `runtime/j2me/touchpad.js`（落在 `#nav` / `#numpad` 键缝的触摸也跟踪，滑到键上即按下） |
 | 游玩记录 | `apps/web/src/cloud.js`、`App.jsx`（`Library` 历史行） |
 | 启动 | `runtime/J2MEPlayer.jsx`、`runtime/loadScript.js`、`runtime/j2me/bld/main-all.js`、`apps/server/src/index.ts` |
+| 文档 | 本文件、`docs/superpowers/plans/2026-11-23-keypad-slide-boot-speed.md` |
 | 冒烟 | `apps/web/verify.mjs`（键盘测试页：滑到相邻键换键、滑出键盘抬起） |
 
 ## 不可破坏的现有行为
@@ -123,6 +125,10 @@ diff review、feature audit、validation 均为 `pass`，只有 P3。
 | diff review | 同一款 Java 游戏本机版与服务器版各有记录时，「大家都在玩」按其中一条的次数排序，不是两者之和 | 记录：只影响排序，不影响启动 |
 | validation | spec 说 `ruffle.js` 仍 `no-cache`，实际以 `?v=` 加载、长缓存 | 改正 R1 表述；服务器注释写明升级 Ruffle 也要升版本号 |
 | feature audit | 精致化只覆盖 T9（默认键盘），经典键盘与 Flash 触屏键外观未改 | 记录：用户反馈的 T9 键盘已重做；经典与 Flash 外观列为后续 |
+
+## R3 评审处理（最后一轮）
+
+diff review、feature audit 均为 `pass`。feature audit 的 P3（修改范围表漏列 `touchpad.js` 与计划文档、目标 4 未写「过滤后取前 12 条」）已补。之后不再改代码。
 
 ## 未覆盖
 
