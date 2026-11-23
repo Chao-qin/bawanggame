@@ -1,10 +1,46 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getLayout, KEYBOARD_LAYOUTS } from './layouts.js'
+import { getLayout, KEYBOARD_LAYOUTS, layoutGroup, T9_LANDSCAPE, T9_PORTRAIT } from './layouts.js'
 
-test('exports all six keyboard layouts with required key counts', () => {
-  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ id }) => id), ['full-size', 'tkl', '75-percent', '60-percent', 'dpad-abxy', 'numpad'])
-  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ keys }) => keys.length), [104, 87, 82, 61, 8, 17])
+test('exports all eight keyboard layouts with required key counts', () => {
+  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ id }) => id), ['full-size', 'tkl', '75-percent', '60-percent', 'dpad-abxy', 'numpad', 't9-portrait', 't9-landscape'])
+  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ keys }) => keys.length), [104, 87, 82, 61, 8, 17, 21, 21])
+})
+
+const RUNTIME_ACTIONS = ['up', 'down', 'left', 'right', 'ok', 'choice', 'back', 'ret', 'clear', 'star', 'pound',
+  'num0', 'num1', 'num2', 'num3', 'num4', 'num5', 'num6', 'num7', 'num8', 'num9']
+const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+
+test('T9 presets drive every runtime action exactly once, with no overlapping keys', () => {
+  for (const id of [T9_PORTRAIT, T9_LANDSCAPE]) {
+    const layout = getLayout(id)
+    assert.equal(layout.type, 'phone')
+    assert.deepEqual(layout.keys.map(({ value }) => value).sort(), [...RUNTIME_ACTIONS].sort(), `${id} actions`)
+    for (const [index, a] of layout.keys.entries()) {
+      for (const b of layout.keys.slice(index + 1)) assert.ok(!overlaps(a, b), `${id}: ${a.id} overlaps ${b.id}`)
+    }
+  }
+  const digits = getLayout(T9_PORTRAIT).keys.filter(({ value }) => /^num\d$|^star$|^pound$/.test(value))
+  assert.deepEqual(digits.map(({ label }) => label).join(''), '123456789*0#', 'digits read like a phone')
+  assert.equal(digits.find(({ value }) => value === 'num7').secondaryLegend, 'pqrs')
+})
+
+test('T9 halves: navigation above the digits in portrait, left of them with room for the screen in landscape', () => {
+  const extent = (keys) => ({
+    left: Math.min(...keys.map(({ x }) => x)), right: Math.max(...keys.map(({ x, width }) => x + width)),
+    top: Math.min(...keys.map(({ y }) => y)), bottom: Math.max(...keys.map(({ y, height }) => y + height)),
+  })
+  for (const id of [T9_PORTRAIT, T9_LANDSCAPE]) {
+    const layout = getLayout(id)
+    const nav = layoutGroup(layout, 'nav').keys
+    const numpad = layoutGroup(layout, 'numpad').keys
+    assert.equal(nav.length + numpad.length, layout.keys.length, `${id}: every key is in a half`)
+    assert.deepEqual(nav.map(({ value }) => value).sort(), ['back', 'choice', 'clear', 'down', 'left', 'ok', 'ret', 'right', 'up'])
+  }
+  const portrait = getLayout(T9_PORTRAIT)
+  assert.ok(extent(layoutGroup(portrait, 'nav').keys).bottom <= extent(layoutGroup(portrait, 'numpad').keys).top)
+  const landscape = getLayout(T9_LANDSCAPE)
+  assert.ok(extent(layoutGroup(landscape, 'numpad').keys).left - extent(layoutGroup(landscape, 'nav').keys).right >= 2, 'a gap for the game screen')
 })
 
 test('physical keyboards expose six rows and QWERTY alpha sequences', () => {

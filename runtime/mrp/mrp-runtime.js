@@ -59,6 +59,8 @@
     delete window.__XIAOCHAO_INPUT_RESET__;
   };
   function tapFx(node) {
+    // The classic keypad's buttons; absent or hidden while the T9 keypad is in use.
+    if (!node) return;
     node.classList.add('tap');
     setTimeout(function () { node.classList.remove('tap'); }, 160);
   }
@@ -153,6 +155,11 @@
     }
   }
   window.addEventListener('xiaochao:viewportchange', fit);
+  // The box also changes after the viewport event: the toolbar row and the keypad settle in React and a
+  // ResizeObserver a frame later, and a fit taken before that leaves the screen sized for the old layout
+  // (clipped under the keypad, or shrunk). Refit whenever the box itself changes size.
+  var displayBox = document.getElementById('display-container');
+  if (displayBox && window.ResizeObserver) new ResizeObserver(function () { fit(); }).observe(displayBox);
   fit();
 
   /* ---------- 对话框 / 文本（vmrp js_* 回调所需） ---------- */

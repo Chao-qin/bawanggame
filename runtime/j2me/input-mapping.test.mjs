@@ -150,3 +150,24 @@ test('keeps legacy delete-key and literal digit defaults', () => {
   assert.deepEqual(edges, ['P:clear', 'R:clear', 'P:num7', 'R:num7'])
   input.destroy()
 })
+
+test('polls gamepads only while one is connected', () => {
+  const { window } = createEnvironment()
+  const timers = new Set()
+  let next = 1
+  window.setInterval = () => { const id = next++; timers.add(id); return id }
+  window.clearInterval = (id) => timers.delete(id)
+  let pads = [null, null]
+  window.navigator.getGamepads = () => pads
+  const input = window.InputMapping.create({ gameId: 'gamepad-idle', gamepad: true, repeat: false, sink: {} })
+  assert.equal(timers.size, 0, 'no controller, no polling')
+  pads = [{ index: 0, buttons: [], axes: [] }]
+  window.dispatch('gamepadconnected', { gamepad: pads[0] })
+  assert.equal(timers.size, 1, 'a connected controller is polled')
+  window.dispatch('gamepadconnected', { gamepad: pads[0] })
+  assert.equal(timers.size, 1, 'and only by one timer')
+  pads = [null]
+  window.dispatch('gamepaddisconnected', { gamepad: { index: 0 } })
+  assert.equal(timers.size, 0, 'polling stops with the last controller')
+  input.destroy()
+})

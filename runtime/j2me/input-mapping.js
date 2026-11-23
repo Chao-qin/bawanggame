@@ -261,6 +261,15 @@
       axisState = Object.create(null);
     }
 
+    // Poll only while a controller is connected: getGamepads() every 16ms with nothing plugged in is pure
+    // battery drain on a phone. Browsers announce a controller with gamepadconnected (on its first input).
+    function anyGamepad() {
+      try { return Array.prototype.some.call(root.navigator.getGamepads ? root.navigator.getGamepads() : [], Boolean); } catch (_) { return false; }
+    }
+    function startPolling() { if (!pollTimer && !destroyed) pollTimer = root.setInterval(pollGamepads, 16); }
+    function stopPolling() { if (pollTimer) root.clearInterval(pollTimer); pollTimer = 0; }
+    function onConnect() { startPolling(); pollGamepads(); }
+
     function onVisibility() { if (root.document.hidden) releaseAll(); }
     function onBlur() { windowFocused = false; releaseAll(); }
     function onFocus() { windowFocused = true; }
@@ -270,6 +279,7 @@
         if (source.indexOf("gamepad:" + index + ":") === 0) releaseSource(source);
       });
       Object.keys(axisState).forEach(function (key) { if (key.indexOf(index + ":") === 0) delete axisState[key]; });
+      if (!anyGamepad()) stopPolling();
     }
 
     root.document.addEventListener("keydown", onKeyDown, true);
@@ -280,8 +290,8 @@
     root.addEventListener("pagehide", releaseAll);
     root.addEventListener("gamepaddisconnected", onDisconnect);
     if (options.gamepad) {
-      pollTimer = root.setInterval(pollGamepads, 16);
-      root.addEventListener("gamepadconnected", pollGamepads);
+      root.addEventListener("gamepadconnected", onConnect);
+      if (anyGamepad()) startPolling();
     }
 
     return {
@@ -319,7 +329,7 @@
         if (destroyed) return;
         destroyed = true;
         releaseAll();
-        if (pollTimer) root.clearInterval(pollTimer);
+        stopPolling();
         root.document.removeEventListener("keydown", onKeyDown, true);
         root.document.removeEventListener("keyup", onKeyUp, true);
         root.document.removeEventListener("visibilitychange", onVisibility);
@@ -327,7 +337,7 @@
         root.removeEventListener("focus", onFocus);
         root.removeEventListener("pagehide", releaseAll);
         root.removeEventListener("gamepaddisconnected", onDisconnect);
-        root.removeEventListener("gamepadconnected", pollGamepads);
+        root.removeEventListener("gamepadconnected", onConnect);
       }
     };
   }

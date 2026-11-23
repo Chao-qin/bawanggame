@@ -335,8 +335,12 @@
     }
 
     // ---------- 指针监听（document 级，支持滑动手势） ----------
+    // Keys are found by position (elementsFromPoint), which sees through anything layered on top. Only a touch
+    // that lands on the runtime stage (the phone plus its safe-area padding, where edge keys are still in reach)
+    // may press one: a tap on a popup, the exit confirmation or the toolbar must not press the key underneath.
     function excluded(e) {
-      return opts.exclude && e.target.closest && e.target.closest(opts.exclude);
+      if (!e.target || !e.target.closest || !e.target.closest("[data-runtime-stage]")) return true;
+      return opts.exclude && e.target.closest(opts.exclude);
     }
 
     listen(document, "pointerdown", function (e) {

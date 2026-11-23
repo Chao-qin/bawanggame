@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PhoneMarkup } from './PhoneMarkup.jsx'
 import { createRuntimeSession, loadClassic, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
+import { claimRuntimeDocument, RUNTIME_ALREADY_BOOTED } from './runtime-boot.js'
 
 const styles = ['/style/main.css', '/style/lcdui.css', '/style/feedback.css']
 const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/libs/encoding.js', '/libs/webaudio-tinysynth.min.js', '/libs/BenzAMRRecorder.min.js', '/bld/native.js', '/config/default.js', '/config/settings.js', '/config/localjars.js', '/config/urlparams.js', '/screen.js', '/bld/j2me.js', '/bld/main-all.js', '/debug-native.js', '/bld/lcdui.js', '/bld/net.js', '/btroom.js', '/bld/bt.js', '/bld/media.js', '/bld/micro3d.js', '/bld/m3g.js', '/files.js', '/runtime-extras.js', '/runtime/j2me/touch-layout.js', '/panel.js', '/keypad-canvas.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/keymap.js']
@@ -10,6 +11,9 @@ const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/l
 export function J2MEPlayer({ game, onExit, onReady }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  // Latest callbacks without restarting the runtime when a parent re-renders with new function identities.
+  const callbacks = useRef({ onExit, onReady })
+  callbacks.current = { onExit, onReady }
   function applyRuntimeSettings() {
     const cfg = window.config
     if (!cfg) return
@@ -23,6 +27,12 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     if (gear) gear.style.removeProperty('display')
   }
   useEffect(() => {
+    if (!claimRuntimeDocument('j2me')) {
+      setLoading(false)
+      setError(RUNTIME_ALREADY_BOOTED)
+      return undefined
+    }
+    const requestExit = () => callbacks.current.onExit?.()
     document.body.classList.add('runtime-active')
     window.__XIAOCHAO_RUNTIME__ = true
     // The catalog may provide an already escaped filename; main-all.js performs
@@ -74,12 +84,12 @@ export function J2MEPlayer({ game, onExit, onReady }) {
         ensureActive()
         window.__XIAOCHAO_KEYMAP_BOOT__?.()
         ensureActive()
-        window.__XIAOCHAO_REQUEST_EXIT = onExit
-        window.showExitScreen = onExit
+        window.__XIAOCHAO_REQUEST_EXIT = requestExit
+        window.showExitScreen = requestExit
         ensureActive()
         if (typeof window.onload === 'function') window.onload(new Event('load'))
         ensureActive()
-        onReady?.()
+        callbacks.current.onReady?.()
         setLoading(false)
       } catch (e) {
         if (alive && session.active) {
@@ -103,6 +113,7 @@ export function J2MEPlayer({ game, onExit, onReady }) {
       if (window.__XIAOCHAO_RUNTIME_SESSION__ === session) delete window.__XIAOCHAO_RUNTIME_SESSION__
       cleanupRuntimeArtifacts()
     }
-  }, [game, onExit])
+    // Only a different game restarts the runtime (and then it is refused: one game per runtime frame).
+  }, [game.file, game.local])
   return <div className="runtime-view">{loading && !error ? <RuntimeLoading /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup /></div>
 }

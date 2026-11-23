@@ -6,6 +6,7 @@ import './keyboard-test.css'
 const categories = [
   { id: 'physical', label: '实体键盘' },
   { id: 'controller', label: '游戏控制器' },
+  { id: 'phone', label: '直板手机' },
 ]
 
 export function KeyboardTestPage() {

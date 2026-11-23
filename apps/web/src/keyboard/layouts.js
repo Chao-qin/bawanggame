@@ -127,6 +127,51 @@ const numericKeypad = numpadValues.map(([id, label, value, width], index) => {
   return item
 })
 
+// Candybar (T9) phone keypads. `value` is the runtime action that InputMapping understands (up/down/left/right/ok,
+// choice/back soft keys, ret = end key, clear, star/pound, num0-9), so the J2ME and MRP runtimes can be driven
+// by these layouts directly. `group` splits a layout into the halves a landscape game screen sits between.
+const T9_DIGITS = [
+  ['num1', '1', '.,?'], ['num2', '2', 'abc'], ['num3', '3', 'def'],
+  ['num4', '4', 'ghi'], ['num5', '5', 'jkl'], ['num6', '6', 'mno'],
+  ['num7', '7', 'pqrs'], ['num8', '8', 'tuv'], ['num9', '9', 'wxyz'],
+  ['star', '*', '+'], ['num0', '0', '␣'], ['pound', '#', '⇧'],
+]
+const phoneKey = (id, label, x, y, width, height, block, group, secondaryLegend) =>
+  ({ ...key(id, label, id, x, y, width, block, 0, secondaryLegend), height, group })
+
+const t9Navigation = ({ x = 0, y = 0, side, sideHeight, sideGap, cross, crossX, crossY }) => {
+  const step = cross + 0.04
+  return [
+    phoneKey('choice', '左软', x, y, side, sideHeight, 'soft', 'nav'),
+    phoneKey('ret', '挂机', x, y + sideHeight + sideGap, side, sideHeight, 'soft', 'nav'),
+    phoneKey('back', '右软', x + crossX * 2 + step * 3 - 0.04 - side, y, side, sideHeight, 'soft', 'nav'),
+    phoneKey('clear', '清除', x + crossX * 2 + step * 3 - 0.04 - side, y + sideHeight + sideGap, side, sideHeight, 'soft', 'nav'),
+    phoneKey('up', '▲', x + crossX + step, y + crossY, cross, cross, 'dpad', 'nav'),
+    phoneKey('left', '◀', x + crossX, y + crossY + step, cross, cross, 'dpad', 'nav'),
+    phoneKey('ok', 'OK', x + crossX + step, y + crossY + step, cross, cross, 'dpad', 'nav'),
+    phoneKey('right', '▶', x + crossX + step * 2, y + crossY + step, cross, cross, 'dpad', 'nav'),
+    phoneKey('down', '▼', x + crossX + step, y + crossY + step * 2, cross, cross, 'dpad', 'nav'),
+  ]
+}
+
+const t9Digits = ({ x, y, width, height, stepX, stepY }) => T9_DIGITS.map(([id, label, legend], index) =>
+  phoneKey(id, label, x + (index % 3) * stepX, y + Math.floor(index / 3) * stepY, width, height, 'numpad', 'numpad', legend))
+
+// Portrait: soft and end keys flank a D-pad, digits below — the front of a candybar phone.
+const t9Portrait = [
+  ...t9Navigation({ side: 1.15, sideHeight: 1.16, sideGap: 0.1, cross: 0.78, crossX: 1.29, crossY: 0 }),
+  ...t9Digits({ x: 0, y: 2.62, width: 1.6, height: 0.66, stepX: 1.7, stepY: 0.74 }),
+]
+
+// Landscape: navigation on the left, digits on the right, a gap between them for the game screen.
+const t9Landscape = [
+  ...t9Navigation({ side: 1.2, sideHeight: 0.8, sideGap: 2.14, cross: 0.82, crossX: 0.9, crossY: 0.3 }),
+  ...t9Digits({ x: 7.3, y: 0, width: 1.15, height: 0.86, stepX: 1.25, stepY: 0.96 }),
+]
+
+export const T9_PORTRAIT = 't9-portrait'
+export const T9_LANDSCAPE = 't9-landscape'
+
 export const KEYBOARD_LAYOUTS = [
   { id: 'full-size', label: '全尺寸 104 键', type: 'physical', keys: fullSize },
   { id: 'tkl', label: 'TKL 87 键', type: 'physical', keys: tkl },
@@ -134,6 +179,11 @@ export const KEYBOARD_LAYOUTS = [
   { id: '60-percent', label: '60% 61 键', type: 'physical', keys: sixtyPercent },
   { id: 'dpad-abxy', label: '方向键 + ABXY', type: 'controller', keys: dpadAbxy },
   { id: 'numpad', label: '数字键盘', type: 'controller', keys: numericKeypad },
+  { id: T9_PORTRAIT, label: 'T9 直板（竖屏）', type: 'phone', keys: t9Portrait },
+  { id: T9_LANDSCAPE, label: 'T9 横屏（左方向 · 右数字）', type: 'phone', keys: t9Landscape },
 ]
 
 export const getLayout = (id) => KEYBOARD_LAYOUTS.find((layout) => layout.id === id)
+
+/** One half of a layout (the keys of `group`), as a layout of its own. */
+export const layoutGroup = (layout, group) => ({ ...layout, id: `${layout.id}:${group}`, keys: layout.keys.filter((item) => item.group === group) })

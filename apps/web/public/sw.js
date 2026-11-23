@@ -22,8 +22,12 @@ self.addEventListener('fetch', event => {
 
   event.respondWith(
     caches.match(request).then(cached => cached || fetch(request).then(response => {
-      const copy = response.clone()
-      caches.open(CACHE).then(cache => cache.put(request, copy))
+      // Only successful responses: this is cache-first, so a cached 404 or 500 from a deploy or a restart
+      // would be served for that runtime file from then on.
+      if (response.ok && response.type === 'basic') {
+        const copy = response.clone()
+        caches.open(CACHE).then(cache => cache.put(request, copy))
+      }
       return response
     })),
   )

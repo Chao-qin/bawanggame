@@ -1,13 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PhoneMarkup } from './PhoneMarkup.jsx'
 import { createRuntimeSession, loadClassic, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
+import { claimRuntimeDocument, RUNTIME_ALREADY_BOOTED } from './runtime-boot.js'
 
-export function MrpPlayer({ game, onExit, onReady }) {
+export function MrpPlayer({ game, onReady }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const callbacks = useRef({ onReady })
+  callbacks.current = { onReady }
   useEffect(() => {
+    if (!claimRuntimeDocument('mrp')) {
+      setLoading(false)
+      setError(RUNTIME_ALREADY_BOOTED)
+      return undefined
+    }
     document.body.classList.add('runtime-active')
     window.__XIAOCHAO_RUNTIME_MRP = game.file
     window.__XIAOCHAO_RUNTIME_MRP_URL = `/maopao/public/mrps/${encodeURIComponent(game.file)}`
@@ -24,7 +32,7 @@ export function MrpPlayer({ game, onExit, onReady }) {
         }
         if (!alive || !session.active) return
         setLoading(false)
-        onReady?.()
+        callbacks.current.onReady?.()
       } catch (e) {
         if (alive && session.active) {
           session.invalidate()
@@ -45,6 +53,6 @@ export function MrpPlayer({ game, onExit, onReady }) {
       if (window.__XIAOCHAO_RUNTIME_SESSION__ === session) delete window.__XIAOCHAO_RUNTIME_SESSION__
       cleanupRuntimeArtifacts()
     }
-  }, [game, onExit])
+  }, [game.file])
   return <div className="runtime-view">{loading && !error ? <RuntimeLoading label="正在启动冒泡社区…" /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup mrp /></div>
 }
