@@ -439,6 +439,9 @@ body.runtime-active[data-orientation="landscape"] .player:not(:has(.flashPlayerS
   background: var(--ui-surface);
   color: var(--ui-text);
 }
+/* Keep the settings sheet and its mask above the embedded simulator and runtime toolbar. */
+.adm-mask.runtimeSettingsMask { z-index: 1000; }
+.adm-popup:has(.inputMappingSheet) { z-index: 1001; }
 .inputMappingPanel { display: grid; gap: 10px; }
 .inputMappingHeader, .inputMappingFooter { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .inputMappingHeader strong { font-size: 16px; }

@@ -13,7 +13,16 @@ const PLACEMENT_OPTIONS = [
 /** Keypad choice for the J2ME and MRP runtimes; saved once for every game. */
 export function KeypadSettingsPopup({ visible, onClose }) {
   const [prefs, update] = useKeypadPrefs()
-  return <Popup visible={visible} onMaskClick={onClose} onClose={onClose} position="bottom" bodyClassName="inputMappingSheet">
+  return <Popup
+    visible={visible}
+    onMaskClick={onClose}
+    onClose={onClose}
+    closeOnMaskClick
+    destroyOnClose
+    position="bottom"
+    maskClassName="runtimeSettingsMask"
+    bodyClassName="inputMappingSheet"
+  >
     <section className="inputMappingPanel" role="dialog" aria-modal="true" aria-label="键盘设置">
       <header className="inputMappingHeader">
         <strong>键盘设置</strong>

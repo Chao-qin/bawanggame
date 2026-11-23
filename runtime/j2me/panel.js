@@ -659,6 +659,9 @@
   window.__XIAOCHAO_OPEN_SETTINGS__ = function () {
     toggle(panel.hidden);
   };
+  window.__XIAOCHAO_CLOSE_SETTINGS__ = function () {
+    if (!panel.hidden) toggle(false);
+  };
 
   function place() {
     var c = document.getElementById("display").getBoundingClientRect();

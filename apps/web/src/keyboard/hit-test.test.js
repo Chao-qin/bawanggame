@@ -75,3 +75,26 @@ test('wheel units carry the runtime actions', () => {
   const plain = layout.keys.find(({ id }) => id === 'num1')
   assert.deepEqual(keyUnits(plain).map(({ id: unitId, value }) => [unitId, value]), [['num1', 'num1']])
 })
+
+test('corner function keys press only outside the arc that cuts them away from the wheel', () => {
+  for (const id of [T9_PORTRAIT, T9_LANDSCAPE]) {
+    const preset = getLayout(id)
+    for (const key of preset.keys.filter(({ shape }) => shape === 'corner')) {
+      const { cx, cy, radius } = key.arc
+      const outerX = key.corner.includes('left') ? key.x + 0.08 : key.x + key.width - 0.08
+      const outerY = key.corner.startsWith('top') ? key.y + 0.08 : key.y + key.height - 0.08
+      assert.deepEqual(hitTest(preset, outerX, outerY).units, [key.id], `${id}/${key.id}: outer corner presses`)
+      const vx = outerX - cx
+      const vy = outerY - cy
+      const length = Math.hypot(vx, vy)
+      const insideX = cx + (vx / length) * (radius - 0.06)
+      const insideY = cy + (vy / length) * (radius - 0.06)
+      assert.ok(insideX > key.x && insideX < key.x + key.width && insideY > key.y && insideY < key.y + key.height,
+        `${id}/${key.id}: the cut-away point is still inside the key's box`)
+      assert.notEqual(hitTest(preset, insideX, insideY).keyId, key.id, `${id}/${key.id}: arc cut-away is dead`)
+    }
+    const wheel = preset.keys.find(({ shape }) => shape === 'wheel')
+    assert.equal(hitTest(preset, wheel.x + wheel.width / 2, wheel.y + wheel.height / 2).keyId, 'dpad',
+      `${id}: the hub is never stolen by a corner key`)
+  }
+})

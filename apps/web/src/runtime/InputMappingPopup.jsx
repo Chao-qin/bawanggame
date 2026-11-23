@@ -79,7 +79,16 @@ export function InputMappingPopup({ visible, onClose }) {
     return () => host.replaceChildren()
   }, [visible, activeTab, controller])
 
-  return <Popup visible={visible} onMaskClick={onClose} onClose={onClose} position="bottom" bodyClassName="inputMappingSheet">
+  return <Popup
+    visible={visible}
+    onMaskClick={onClose}
+    onClose={onClose}
+    closeOnMaskClick
+    destroyOnClose
+    position="bottom"
+    maskClassName="runtimeSettingsMask"
+    bodyClassName="inputMappingSheet"
+  >
     <section className="inputMappingPanel" role="dialog" aria-modal="true" aria-label="按键映射">
       <header className="inputMappingHeader">
         <strong>按键映射</strong>
