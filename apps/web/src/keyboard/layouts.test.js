@@ -1,21 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { keyUnits } from './hit-test.js'
 import { getLayout, KEYBOARD_LAYOUTS, layoutGroup, T9_LANDSCAPE, T9_PORTRAIT } from './layouts.js'
 
 test('exports all eight keyboard layouts with required key counts', () => {
   assert.deepEqual(KEYBOARD_LAYOUTS.map(({ id }) => id), ['full-size', 'tkl', '75-percent', '60-percent', 'dpad-abxy', 'numpad', 't9-portrait', 't9-landscape'])
-  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ keys }) => keys.length), [104, 87, 82, 61, 8, 17, 21, 21])
+  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ keys }) => keys.length), [104, 87, 82, 61, 8, 17, 17, 17])
 })
 
 const RUNTIME_ACTIONS = ['up', 'down', 'left', 'right', 'ok', 'choice', 'back', 'ret', 'clear', 'star', 'pound',
   'num0', 'num1', 'num2', 'num3', 'num4', 'num5', 'num6', 'num7', 'num8', 'num9']
 const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+const actionsOf = (keys) => keys.flatMap((item) => keyUnits(item).map(({ value }) => value))
 
 test('T9 presets drive every runtime action exactly once, with no overlapping keys', () => {
   for (const id of [T9_PORTRAIT, T9_LANDSCAPE]) {
     const layout = getLayout(id)
     assert.equal(layout.type, 'phone')
-    assert.deepEqual(layout.keys.map(({ value }) => value).sort(), [...RUNTIME_ACTIONS].sort(), `${id} actions`)
+    assert.deepEqual(actionsOf(layout.keys).sort(), [...RUNTIME_ACTIONS].sort(), `${id} actions`)
+    const wheel = layout.keys.filter(({ shape }) => shape === 'wheel')
+    assert.equal(wheel.length, 1, `${id}: one direction wheel`)
+    assert.equal(wheel[0].width, wheel[0].height, `${id}: the wheel is round`)
+    assert.deepEqual(wheel[0].wheel, { up: 'up', down: 'down', left: 'left', right: 'right', center: 'ok' })
     for (const [index, a] of layout.keys.entries()) {
       for (const b of layout.keys.slice(index + 1)) assert.ok(!overlaps(a, b), `${id}: ${a.id} overlaps ${b.id}`)
     }
@@ -35,7 +41,7 @@ test('T9 halves: navigation above the digits in portrait, left of them with room
     const nav = layoutGroup(layout, 'nav').keys
     const numpad = layoutGroup(layout, 'numpad').keys
     assert.equal(nav.length + numpad.length, layout.keys.length, `${id}: every key is in a half`)
-    assert.deepEqual(nav.map(({ value }) => value).sort(), ['back', 'choice', 'clear', 'down', 'left', 'ok', 'ret', 'right', 'up'])
+    assert.deepEqual(actionsOf(nav).sort(), ['back', 'choice', 'clear', 'down', 'left', 'ok', 'ret', 'right', 'up'])
   }
   const portrait = getLayout(T9_PORTRAIT)
   assert.ok(extent(layoutGroup(portrait, 'nav').keys).bottom <= extent(layoutGroup(portrait, 'numpad').keys).top)

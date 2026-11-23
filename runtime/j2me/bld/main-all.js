@@ -1094,7 +1094,19 @@ Native["org/mozilla/internal/Sys.stopProfile.()V"] = function(addr) {
  
 };
 function load(file, responseType) {
-  
+  // The React host starts the big downloads (java/classes.jar) before the runtime scripts run, so they overlap the
+  // script downloads instead of starting after them. A failed prefetch falls back to a normal request, which then
+  // reports the error.
+  var prefetched = window.__XIAOCHAO_PREFETCH__ && window.__XIAOCHAO_PREFETCH__[file];
+  if (prefetched && responseType === "arraybuffer") {
+    delete window.__XIAOCHAO_PREFETCH__[file];
+    return prefetched.catch(function() {
+      return requestFile(file, responseType);
+    });
+  }
+  return requestFile(file, responseType);
+}
+function requestFile(file, responseType) {
   var progressBar = document.getElementById('download-bar');
   return new Promise(function(resolve, reject) {
     var xhr = new XMLHttpRequest({mozSystem:true});
@@ -8254,9 +8266,14 @@ var currentlyFocusedTextEditor;
   };
   Native["com/sun/midp/lcdui/DisplayDevice.gainedForeground0.(II)V"] = function(addr, hardwareId, displayId) {
     hideSplashScreen();
-    if (!emoji.loaded) {
-      asyncImpl("V", Promise.all(loadingFGPromises));
-    } 
+    // The emoji sheets (~400KB) are only for text that contains emoji. They used to hold the MIDlet's first frame
+    // until all of them downloaded; now they load after it, and text drawn before then shows its emoji as plain text.
+    if (!emoji.loaded && !emoji.loading) {
+      emoji.loading = true;
+      setTimeout(function() {
+        emoji.loadData();
+      }, 0);
+    }
   };
   Native["com/sun/midp/lcdui/DisplayDeviceAccess.vibrate0.(IZ)Z"] = function(addr, displayId, on) {
     return 1;
@@ -8658,6 +8675,10 @@ var currentlyFocusedTextEditor;
     context.fontSize = size;
   };
   function calcStringWidth(fontContext, str) {
+    // Until the emoji sheets load (after the first frame), emoji are drawn as plain text: measure them that way.
+    if (!emoji.loaded) {
+      return fontContext.measureText(str).width | 0;
+    }
     var emojiLen = 0;
     var len = fontContext.measureText(str.replace(emoji.regEx, function() {
       emojiLen += fontContext.fontSize;
@@ -9505,7 +9526,7 @@ Native["com/nokia/mid/ui/DirectGraphicsImp.fillPolygon.([II[IIII)V"] = function(
     var fontContext = NativeMap.get(info.currentFont);
     var fontSize = fontContext.fontSize;
     var finalText;
-    if (!emoji.regEx.test(str)) {
+    if (!emoji.loaded || !emoji.regEx.test(str)) {
       finalText = str;
     } else {
       var match;
@@ -10162,7 +10183,7 @@ var TextEditorProvider = function() {
       return '<object style="' + style + '" name="' + str + '"></object>';
     }.bind(this);
     html = html.replace(/\n/g, "<br>");
-    html = html.replace(emoji.regEx, toImg) + "<br>";
+    html = (emoji.loaded ? html.replace(emoji.regEx, toImg) : html) + "<br>";
     this.textEditorElem.innerHTML = html;
     this.html = html;
   }, _getNodeTextLength:function(node) {
@@ -14132,7 +14153,6 @@ if (config.downloadJAD) {
 if (config.jad || config.downloadJAD) {
   //Promise.all(loadingMIDletPromises).then(backgroundCheck);
 }
-var loadingFGPromises = [emoji.loadData()];
 if (jars.indexOf("tests/tests.jar") !== -1) {
   loadingPromises.push(loadScript("tests/native.js"), loadScript("tests/mozactivitymock.unprivileged.js"), loadScript("tests/config.js"));
 }

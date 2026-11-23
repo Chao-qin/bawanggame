@@ -39,21 +39,21 @@ export function FlashControls({ target }) {
     }
   }, [target])
 
-  function press(event, key) {
-    event.preventDefault()
-    if (pointers.current.has(event.pointerId)) return
-    target.focus({ preventScroll: true })
-    pointers.current.set(event.pointerId, key)
+  // Every finger is tracked from where it lands in the controls until it lifts (pointerId → key under it, or null
+  // between keys). Touch pointers stay captured by the controls, so the key under the finger is found by position:
+  // sliding off a key releases it and sliding onto another presses that one.
+  function keyAt(event) {
+    const element = document.elementFromPoint(event.clientX, event.clientY)?.closest?.('.flashKey')
+    return element && event.currentTarget.contains(element) ? element.dataset.key : null
+  }
+
+  function hold(key) {
     const count = counts.current.get(key) || 0
     counts.current.set(key, count + 1)
     if (count === 0) sendKey(target, key, 'keydown')
-    try { event.currentTarget.setPointerCapture?.(event.pointerId) } catch (_) {}
   }
 
-  function release(event) {
-    const key = pointers.current.get(event.pointerId)
-    if (!key) return
-    pointers.current.delete(event.pointerId)
+  function letGo(key) {
     const count = (counts.current.get(key) || 1) - 1
     if (count > 0) counts.current.set(key, count)
     else {
@@ -62,9 +62,36 @@ export function FlashControls({ target }) {
     }
   }
 
+  function press(event) {
+    if (pointers.current.has(event.pointerId)) return
+    const key = keyAt(event)
+    event.preventDefault()
+    target.focus({ preventScroll: true })
+    pointers.current.set(event.pointerId, key)
+    if (key) hold(key)
+    try { event.currentTarget.setPointerCapture?.(event.pointerId) } catch (_) {}
+  }
+
+  function slide(event) {
+    if (!pointers.current.has(event.pointerId)) return
+    const previous = pointers.current.get(event.pointerId)
+    const key = keyAt(event)
+    if (key === previous) return
+    pointers.current.set(event.pointerId, key)
+    if (previous) letGo(previous)
+    if (key) hold(key)
+  }
+
+  function release(event) {
+    if (!pointers.current.has(event.pointerId)) return
+    const key = pointers.current.get(event.pointerId)
+    pointers.current.delete(event.pointerId)
+    if (key) letGo(key)
+  }
+
   if (!target) return null
-  const keyButton = (key, label, className, content) => <button key={label} className={`flashKey ${className}`} type="button" aria-label={label} onPointerDown={(event) => press(event, key)} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}>{content}</button>
-  return <div className="flashControls" aria-label="Flash 触屏按键">
+  const keyButton = (key, label, className, content) => <button key={label} className={`flashKey ${className}`} type="button" aria-label={label} data-key={key}>{content}</button>
+  return <div className="flashControls" aria-label="Flash 触屏按键" onPointerDown={press} onPointerMove={slide} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}>
     <div className="flashDpad" aria-label="方向键">
       {DIRECTIONS.map(({ id, key, label, Icon }) => keyButton(key, label, `flashKey-${id}`, <Icon aria-hidden="true" />))}
     </div>

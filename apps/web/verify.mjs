@@ -320,10 +320,14 @@ try {
   await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: escapePoint.x, y: escapePoint.y })
   await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: escapePoint.x, y: escapePoint.y, button: 'left', buttons: 1, clickCount: 1 })
   requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.includes('Esc') && document.querySelector('.keyboardLastEvent')?.textContent.includes('按下 · Escape')"), 'physical keyboard press was not reflected')
+  // A held pointer slides: onto F1 it leaves Esc and presses F1, off the keyboard it releases F1.
+  const f1Point = { x: escapePoint.x + await evaluate(`(() => { const host = document.querySelector('.keyboardCanvas').getBoundingClientRect(); return 2 * Math.min(host.width / 27.5, host.height / 6) })()`), y: escapePoint.y }
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: f1Point.x, y: f1Point.y, button: 'left', buttons: 1 })
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.trim() === 'F1' && document.querySelector('.keyboardLastEvent')?.textContent.includes('按下 · F1')"), 'sliding onto the next key did not move the press')
   await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5, button: 'left', buttons: 1 })
-  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.includes('Esc')"), 'pointer leaving the key released it before pointerup')
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.trim() === '无' && document.querySelector('.keyboardLastEvent')?.textContent.includes('抬起 · F1')"), 'pointer leaving the keys did not release the key')
   await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 5, y: 5, button: 'left', buttons: 0, clickCount: 1 })
-  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.trim() === '无' && document.querySelector('.keyboardLastEvent')?.textContent.includes('抬起 · Escape')"), 'physical keyboard release was not reflected')
+  requireCheck(await evaluate("document.querySelector('.keyboardHeldValues')?.textContent.trim() === '无'"), 'physical keyboard release was not reflected')
 
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
   const touchPoints = await evaluate(`(() => {

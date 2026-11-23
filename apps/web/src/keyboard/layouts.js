@@ -136,37 +136,52 @@ const T9_DIGITS = [
   ['num7', '7', 'pqrs'], ['num8', '8', 'tuv'], ['num9', '9', 'wxyz'],
   ['star', '*', '+'], ['num0', '0', '␣'], ['pound', '#', '⇧'],
 ]
-const phoneKey = (id, label, x, y, width, height, block, group, secondaryLegend) =>
-  ({ ...key(id, label, id, x, y, width, block, 0, secondaryLegend), height, group })
+const phoneKey = (id, label, x, y, width, height, block, group, secondaryLegend, extra) =>
+  ({ ...key(id, label, id, x, y, width, block, 0, secondaryLegend), height, group, ...extra })
 
-const t9Navigation = ({ x = 0, y = 0, side, sideHeight, sideGap, cross, crossX, crossY }) => {
-  const step = cross + 0.04
-  return [
-    phoneKey('choice', '左软', x, y, side, sideHeight, 'soft', 'nav'),
-    phoneKey('ret', '挂机', x, y + sideHeight + sideGap, side, sideHeight, 'soft', 'nav'),
-    phoneKey('back', '右软', x + crossX * 2 + step * 3 - 0.04 - side, y, side, sideHeight, 'soft', 'nav'),
-    phoneKey('clear', '清除', x + crossX * 2 + step * 3 - 0.04 - side, y + sideHeight + sideGap, side, sideHeight, 'soft', 'nav'),
-    phoneKey('up', '▲', x + crossX + step, y + crossY, cross, cross, 'dpad', 'nav'),
-    phoneKey('left', '◀', x + crossX, y + crossY + step, cross, cross, 'dpad', 'nav'),
-    phoneKey('ok', 'OK', x + crossX + step, y + crossY + step, cross, cross, 'dpad', 'nav'),
-    phoneKey('right', '▶', x + crossX + step * 2, y + crossY + step, cross, cross, 'dpad', 'nav'),
-    phoneKey('down', '▼', x + crossX + step, y + crossY + step * 2, cross, cross, 'dpad', 'nav'),
-  ]
+// The soft keys and the end/clear keys of a candybar phone. `tone` picks the legend colour, `indicator` draws the
+// short bar a phone prints over its soft keys.
+const t9SoftKeys = { indicator: true }
+const t9Side = {
+  choice: ['左软键', undefined, t9SoftKeys],
+  back: ['右软键', undefined, t9SoftKeys],
+  ret: ['挂机', undefined, { tone: 'danger' }],
+  clear: ['C', '清除', { tone: 'warning' }],
 }
+const sideKey = (id, x, y, width, height) => {
+  const [label, legend, extra] = t9Side[id]
+  return phoneKey(id, label, x, y, width, height, 'soft', 'nav', legend, extra)
+}
+
+// The 8-way direction wheel: one round key for up / down / left / right with OK at its hub (hit-test.js).
+const navWheel = (x, y, size) => phoneKey('dpad', 'OK', x, y, size, size, 'dpad', 'nav', undefined, {
+  value: 'dpad', shape: 'wheel', wheel: { up: 'up', down: 'down', left: 'left', right: 'right', center: 'ok' },
+})
 
 const t9Digits = ({ x, y, width, height, stepX, stepY }) => T9_DIGITS.map(([id, label, legend], index) =>
   phoneKey(id, label, x + (index % 3) * stepX, y + Math.floor(index / 3) * stepY, width, height, 'numpad', 'numpad', legend))
 
-// Portrait: soft and end keys flank a D-pad, digits below — the front of a candybar phone.
+// Portrait: soft and end keys flank the wheel, digits below — the front of a candybar phone. The navigation row is
+// exactly as wide as the digits (5 units).
 const t9Portrait = [
-  ...t9Navigation({ side: 1.15, sideHeight: 1.16, sideGap: 0.1, cross: 0.78, crossX: 1.29, crossY: 0 }),
-  ...t9Digits({ x: 0, y: 2.62, width: 1.6, height: 0.66, stepX: 1.7, stepY: 0.74 }),
+  sideKey('choice', 0, 0, 1.2, 1.14),
+  sideKey('ret', 0, 1.26, 1.2, 1.14),
+  navWheel(1.3, 0, 2.4),
+  sideKey('back', 3.8, 0, 1.2, 1.14),
+  sideKey('clear', 3.8, 1.26, 1.2, 1.14),
+  ...t9Digits({ x: 0, y: 2.64, width: 1.6, height: 0.66, stepX: 1.7, stepY: 0.74 }),
 ]
 
-// Landscape: navigation on the left, digits on the right, a gap between them for the game screen.
+// Landscape: soft keys above and end / clear below the wheel on the left, digits on the right, a gap between the
+// two halves for the game screen. The navigation half is kept short for its width (3.54 × 2.8), so in the side
+// column it is sized by the column's width and leaves room above it for the collapsed runtime toolbar.
 const t9Landscape = [
-  ...t9Navigation({ side: 1.2, sideHeight: 0.8, sideGap: 2.14, cross: 0.82, crossX: 0.9, crossY: 0.3 }),
-  ...t9Digits({ x: 7.3, y: 0, width: 1.15, height: 0.86, stepX: 1.25, stepY: 0.96 }),
+  sideKey('choice', 0, 0, 1.35, 0.55),
+  sideKey('back', 1.45, 0, 1.35, 0.55),
+  navWheel(0.3, 0.67, 2.2),
+  sideKey('ret', 0, 2.99, 1.35, 0.55),
+  sideKey('clear', 1.45, 2.99, 1.35, 0.55),
+  ...t9Digits({ x: 5.3, y: 0, width: 1.15, height: 0.86, stepX: 1.25, stepY: 0.96 }),
 ]
 
 export const T9_PORTRAIT = 't9-portrait'

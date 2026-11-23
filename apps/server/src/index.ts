@@ -224,18 +224,30 @@ function mappedPath(urlPath: string) {
   return safeWebPath(urlPath)
 }
 
-const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.svg', '.wasm'])
+// .uc2 / .ext are the MRP runtime's bitmap fonts and native library (vmrp_v1.0/fs): ~3.6MB that gzip to ~0.9MB and
+// are fetched on every MRP launch. JARs, MRPs and images are already compressed.
+const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.svg', '.wasm', '.uc2', '.ext'])
 
-async function sendFile(req: IncomingMessage, res: ServerResponse, target: string) {
+// Names that change whenever their content does: Vite's hashed bundles (/assets/), Ruffle's hashed core and wasm
+// (/ruffle/, staged by apps/web/scripts/stage-flash-assets.mjs) and runtime scripts requested with the runtime
+// version (?v=, apps/web/src/runtime/loadScript.js; /ruffle/ruffle.js is one of them). Bump RUNTIME_VERSION whenever
+// a runtime script changes or Ruffle is upgraded. The browser may keep these without revalidating — a launch
+// otherwise spends one round trip per runtime file on 304s.
+const HASHED_RUFFLE = /^\/ruffle\/(core\.ruffle\.[0-9a-f]{16,}\.js|[0-9a-f]{16,}\.wasm)$/
+function immutableRequest(url: URL) {
+  return url.searchParams.has('v') || url.pathname.startsWith('/assets/') || HASHED_RUFFLE.test(url.pathname)
+}
+
+async function sendFile(req: IncomingMessage, res: ServerResponse, target: string, immutable = false) {
   try {
     const stat = await fs.stat(target)
     if (!stat.isFile()) return false
-    // no-cache keeps every request revalidated; the ETag turns an unchanged runtime file into a 304 instead
+    // no-cache keeps every other request revalidated; the ETag turns an unchanged runtime file into a 304 instead
     // of a full download (the J2ME runtime is several MB of scripts loaded on every game launch).
     const etag = `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`
     const headers: Record<string, string> = {
       'Content-Type': MIME[extname(target)] ?? 'application/octet-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
       ETag: etag,
       Vary: 'Accept-Encoding',
     }
@@ -407,7 +419,7 @@ const server = createServer(async (req, res) => {
     }
   }
   const target = mappedPath(url.pathname === '/' ? '/index.html' : url.pathname)
-  if (!target || !(await sendFile(req, res, target))) res.writeHead(404).end('Not found')
+  if (!target || !(await sendFile(req, res, target, immutableRequest(url)))) res.writeHead(404).end('Not found')
 })
 
 const wss = new WebSocketServer({ noServer: true })
