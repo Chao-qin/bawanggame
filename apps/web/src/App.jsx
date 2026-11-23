@@ -7,6 +7,7 @@ import { J2MEPlayer } from './runtime/J2MEPlayer.jsx'
 import { MrpPlayer } from './runtime/MrpPlayer.jsx'
 import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
 import { FlashPlayer } from './runtime/FlashPlayer.jsx'
+import { RuntimeLoading } from './runtime/RuntimeStatus.jsx'
 import { InputMappingPopup } from './runtime/InputMappingPopup.jsx'
 import { KeypadSettingsPopup } from './runtime/KeypadSettingsPopup.jsx'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
@@ -1138,6 +1139,8 @@ function RuntimeFrame({ route, nativeBackSignal, onBack, onCancelBack }) {
   const frame = useRef(null)
   const lastBackSignal = useRef(nativeBackSignal)
   const pendingBack = useRef(false)
+  // The frame loads the whole app before its own loading screen can render; cover that time here.
+  const [frameReady, setFrameReady] = useState(false)
   const url = new URL(window.location.href)
   url.searchParams.set('runtime-frame', '1')
   url.hash = routePath(route)
@@ -1152,6 +1155,7 @@ function RuntimeFrame({ route, nativeBackSignal, onBack, onCancelBack }) {
       if (event.data === RUNTIME_EXIT_MESSAGE) onBack()
       if (event.data === RUNTIME_CANCEL_EXIT_MESSAGE) onCancelBack?.()
       if (event.data === RUNTIME_READY_MESSAGE) {
+        setFrameReady(true)
         syncInsets()
         event.source.focus()
         if (pendingBack.current) {
@@ -1176,7 +1180,10 @@ function RuntimeFrame({ route, nativeBackSignal, onBack, onCancelBack }) {
     else pendingBack.current = true
   }, [nativeBackSignal])
 
-  return <iframe ref={frame} className="runtimeFrame" title={route.game.name} src={url.href} allow="autoplay; fullscreen" />
+  return <>
+    <iframe ref={frame} className="runtimeFrame" title={route.game.name} src={url.href} allow="autoplay; fullscreen" />
+    {!frameReady && <div className="runtimeFrameBoot"><RuntimeLoading /></div>}
+  </>
 }
 
 export default function App() {

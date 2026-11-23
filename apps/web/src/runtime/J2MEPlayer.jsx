@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { PhoneMarkup } from './PhoneMarkup.jsx'
-import { createRuntimeSession, loadClassic, loadStyle } from './loadScript.js'
+import { createRuntimeSession, loadClassicInOrder, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
 import { claimRuntimeDocument, RUNTIME_ALREADY_BOOTED } from './runtime-boot.js'
@@ -11,6 +11,7 @@ const scripts = ['/config/i18n.js', '/ui-feedback.js', '/debug-graphics.js', '/l
 export function J2MEPlayer({ game, onExit, onReady }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [progress, setProgress] = useState(null)
   // Latest callbacks without restarting the runtime when a parent re-renders with new function identities.
   const callbacks = useRef({ onExit, onReady })
   callbacks.current = { onExit, onReady }
@@ -49,10 +50,10 @@ export function J2MEPlayer({ game, onExit, onReady }) {
           if (!alive || !session.active) throw new Error('运行时已退出')
         }
         await Promise.all(styles.map((src) => loadStyle(src, session)))
-        for (const src of scripts) {
-          await loadClassic(src, session)
-          ensureActive()
-        }
+        await loadClassicInOrder(scripts, session, (done, total) => {
+          if (alive) setProgress({ done, total })
+        })
+        ensureActive()
         if (window.TouchLayout?.forGame && window.config?.gameId) {
           window.__XIAOCHAO_TOUCH_LAYOUT_ADAPTER__ = window.TouchLayout.forGame(window.config.gameId)
         }
@@ -115,5 +116,6 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     }
     // Only a different game restarts the runtime (and then it is refused: one game per runtime frame).
   }, [game.file, game.local])
-  return <div className="runtime-view">{loading && !error ? <RuntimeLoading /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup /></div>
+  // A failed boot has already removed the runtime stylesheets: the phone markup would show as raw text.
+  return <div className="runtime-view">{loading && !error ? <RuntimeLoading label={progress ? `正在加载模拟器（${progress.done}/${progress.total}）…` : undefined} /> : null}{error ? <RuntimeFailure message={error} /> : <PhoneMarkup />}</div>
 }

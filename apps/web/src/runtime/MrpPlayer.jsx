@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { PhoneMarkup } from './PhoneMarkup.jsx'
-import { createRuntimeSession, loadClassic, loadStyle } from './loadScript.js'
+import { createRuntimeSession, loadClassicInOrder, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
 import { claimRuntimeDocument, RUNTIME_ALREADY_BOOTED } from './runtime-boot.js'
@@ -26,10 +26,7 @@ export function MrpPlayer({ game, onReady }) {
     ;(async () => {
       try {
         await Promise.all(styles.map((src) => loadStyle(src, session)))
-        for (const src of ['/config/i18n.js', '/config/settings.js', '/runtime/j2me/touch-layout.js', '/ui-feedback.js', '/keypad-canvas.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/maopao/vmrp_v1.0/vmrp.js']) {
-          await loadClassic(src, session)
-          if (!alive || !session.active) return
-        }
+        await loadClassicInOrder(['/config/i18n.js', '/config/settings.js', '/runtime/j2me/touch-layout.js', '/ui-feedback.js', '/keypad-canvas.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/maopao/vmrp_v1.0/vmrp.js'], session)
         if (!alive || !session.active) return
         setLoading(false)
         callbacks.current.onReady?.()
@@ -54,5 +51,5 @@ export function MrpPlayer({ game, onReady }) {
       cleanupRuntimeArtifacts()
     }
   }, [game.file])
-  return <div className="runtime-view">{loading && !error ? <RuntimeLoading label="正在启动冒泡社区…" /> : null}{error ? <RuntimeFailure message={error} /> : null}<PhoneMarkup mrp /></div>
+  return <div className="runtime-view">{loading && !error ? <RuntimeLoading label="正在启动冒泡社区…" /> : null}{error ? <RuntimeFailure message={error} /> : <PhoneMarkup mrp />}</div>
 }
