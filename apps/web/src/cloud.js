@@ -35,10 +35,12 @@ export function recordPlay(game) {
     created_at: now,
     count: 1,
   }
+  // Records written before `local` was stored count as this game too, so its play count is not split.
+  const sameGame = (entry) => keyOf(entry) === keyOf(item) || (entry.local === undefined && entry.kind === item.kind && entry.file === item.file)
   const history = readHistory()
-  const previous = history.find((entry) => keyOf(entry) === keyOf(item))
-  if (previous) item.count = (previous.count || 1) + 1
-  writeHistory([item, ...history.filter((entry) => keyOf(entry) !== keyOf(item))])
+  const previous = history.filter(sameGame)
+  if (previous.length) item.count = previous.reduce((sum, entry) => sum + (entry.count || 1), 0) + 1
+  writeHistory([item, ...history.filter((entry) => !sameGame(entry))])
 }
 
 /** 当前浏览器最近打开的游戏。 */

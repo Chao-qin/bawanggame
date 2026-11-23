@@ -448,8 +448,9 @@ function Library({ kind, onPlay }) {
       if (item.kind !== kind) return []
       const where = item.local === true ? ['local'] : item.local === false ? ['server'] : ['local', 'server']
       const game = where.map((place) => historySources.get(`${item.kind}:${place}:${item.file}`)).find(Boolean)
-      // The same identity the library groups by: a JAR installed in the browser and on the server is one game.
-      const key = game && (window.LocalJars?.identity?.(game) || gameKey(game))
+      // The same identity the library groups by: a JAR installed in the browser and on the server is one game. Only
+      // the Java library groups that way (MRP hall games can share a name and vendor and still be different files).
+      const key = game && ((kind === 'j2me' && window.LocalJars?.identity?.(game)) || gameKey(game))
       if (!game || seen.has(key)) return []
       seen.add(key)
       return [{ ...item, ...game }]

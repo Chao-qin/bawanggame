@@ -228,11 +228,13 @@ function mappedPath(urlPath: string) {
 // are fetched on every MRP launch. JARs, MRPs and images are already compressed.
 const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.svg', '.wasm', '.uc2', '.ext'])
 
-// Names that change whenever their content does: Vite's hashed bundles (/assets/) and runtime scripts requested with
-// the runtime version (?v=, apps/web/src/runtime/loadScript.js). The browser may keep them without revalidating —
-// a launch otherwise spends one round trip per runtime file on 304s.
+// Names that change whenever their content does: Vite's hashed bundles (/assets/), Ruffle's hashed core and wasm
+// (/ruffle/, staged by apps/web/scripts/stage-flash-assets.mjs) and runtime scripts requested with the runtime
+// version (?v=, apps/web/src/runtime/loadScript.js — bump RUNTIME_VERSION whenever a runtime script changes). The
+// browser may keep them without revalidating — a launch otherwise spends one round trip per runtime file on 304s.
+const HASHED_RUFFLE = /^\/ruffle\/(core\.ruffle\.[0-9a-f]{16,}\.js|[0-9a-f]{16,}\.wasm)$/
 function immutableRequest(url: URL) {
-  return url.searchParams.has('v') || url.pathname.startsWith('/assets/')
+  return url.searchParams.has('v') || url.pathname.startsWith('/assets/') || HASHED_RUFFLE.test(url.pathname)
 }
 
 async function sendFile(req: IncomingMessage, res: ServerResponse, target: string, immutable = false) {

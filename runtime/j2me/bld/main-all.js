@@ -8267,7 +8267,7 @@ var currentlyFocusedTextEditor;
   Native["com/sun/midp/lcdui/DisplayDevice.gainedForeground0.(II)V"] = function(addr, hardwareId, displayId) {
     hideSplashScreen();
     // The emoji sheets (~400KB) are only for text that contains emoji. They used to hold the MIDlet's first frame
-    // until all of them downloaded; now they load after it, and emoji drawn before then are skipped.
+    // until all of them downloaded; now they load after it, and text drawn before then shows its emoji as plain text.
     if (!emoji.loaded && !emoji.loading) {
       emoji.loading = true;
       setTimeout(function() {

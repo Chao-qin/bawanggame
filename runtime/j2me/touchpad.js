@@ -348,7 +348,9 @@
       if (excluded(e)) return;
       var prev = held[e.pointerId] && held[e.pointerId].ids || [];
       var h = hit(e.clientX, e.clientY, contactRadius(e), prev);
-      if (h.kind === null) return;
+      // A touch that lands in a gap between the keys is tracked without pressing anything, so sliding onto a key
+      // presses it — the same as landing on the key and sliding.
+      if (h.kind === null && !(e.target && e.target.closest && e.target.closest("#nav, #numpad"))) return;
       e.preventDefault();
       clearSelection();
       if (onActivate) onActivate(e);
