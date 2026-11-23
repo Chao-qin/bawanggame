@@ -363,7 +363,7 @@ function GameRow({ title, items, onOpen }) {
       <h2 className="rowTitle">{title}</h2>
       <div className="rowScroll">
         {items.map((it) => (
-          <RecentGameEntry key={it.kind + ':' + it.file} game={it} onOpen={onOpen} />
+          <RecentGameEntry key={gameKey(it)} game={it} onOpen={onOpen} />
         ))}
       </div>
     </section>
@@ -433,15 +433,28 @@ function Library({ kind, onPlay }) {
   const historySources = useMemo(() => {
     const entries = new Map()
     for (const game of [...local.games, ...server.games]) {
-      const key = `${game.kind}:${game.file}`
+      const key = `${game.kind}:${game.local ? 'local' : 'server'}:${game.file}`
       if (!entries.has(key)) entries.set(key, game)
     }
     return entries
   }, [local.games, server.games])
-  const withHistoryArtwork = (items) => items.map((item) => {
-    const game = historySources.get(`${item.kind}:${item.file}`)
-    return game ? { ...item, ...game } : item
-  })
+  // Play history only records what was opened; the game itself comes from this tab's library, which says where it
+  // lives (a browser-installed JAR is not on the server). Records of other tabs and of games no longer in the library
+  // (uninstalled, or older records the library cannot place) are left out instead of opening a game that fails to load.
+  const historyGames = (items) => {
+    if (loading) return []
+    const seen = new Set()
+    return items.flatMap((item) => {
+      if (item.kind !== kind) return []
+      const where = item.local === true ? ['local'] : item.local === false ? ['server'] : ['local', 'server']
+      const game = where.map((place) => historySources.get(`${item.kind}:${place}:${item.file}`)).find(Boolean)
+      // The same identity the library groups by: a JAR installed in the browser and on the server is one game.
+      const key = game && (window.LocalJars?.identity?.(game) || gameKey(game))
+      if (!game || seen.has(key)) return []
+      seen.add(key)
+      return [{ ...item, ...game }]
+    })
+  }
   const selectedGames = localGames.filter((game) => picked.has(gameKey(game)))
 
   useEffect(() => {
@@ -583,8 +596,8 @@ function Library({ kind, onPlay }) {
         )}
       </div>
       {notice && <div className={notice.failed ? 'status statusError' : 'status statusSuccess'} role={notice.failed ? 'alert' : 'status'}>{notice.text}</div>}
-      {!selectMode && kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={withHistoryArtwork(popular)} onOpen={openGame} />}
-      {!selectMode && kind !== 'flash' && <GameRow title="🕘 最近在玩" items={withHistoryArtwork(recent)} onOpen={openGame} />}
+      {!selectMode && kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={historyGames(popular)} onOpen={openGame} />}
+      {!selectMode && kind !== 'flash' && <GameRow title="🕘 最近在玩" items={historyGames(recent)} onOpen={openGame} />}
       {server.error && <div className="status statusError" role="alert">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>}
       {(kind === 'j2me' ? local.error : localFlash.error) && (
         <div className="status statusError" role="alert">{kind === 'j2me' ? local.error : localFlash.error}</div>

@@ -24,15 +24,16 @@ export function KeyboardTestPage() {
     if (nextLayout) setLayoutId(nextLayout.id)
   }
 
+  // One pointer can hold several keys (a diagonal on the direction wheel), so holds are per pointer and key.
   function keyDown(key, pointerId) {
-    heldPointers.current.set(pointerId, key)
+    heldPointers.current.set(`${pointerId}|${key.id}`, key)
     const keys = [...new Map([...heldPointers.current.values()].map((item) => [item.id, item])).values()]
     setHeld(keys)
     setLatestEvent({ action: '按下', key, pointerId })
   }
 
   function keyUp(key, pointerId) {
-    heldPointers.current.delete(pointerId)
+    heldPointers.current.delete(`${pointerId}|${key.id}`)
     const keys = [...new Map([...heldPointers.current.values()].map((item) => [item.id, item])).values()]
     setHeld(keys)
     setLatestEvent({ action: '抬起', key, pointerId })

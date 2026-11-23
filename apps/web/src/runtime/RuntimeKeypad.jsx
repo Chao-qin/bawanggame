@@ -44,9 +44,12 @@ function useRuntimeOrientation() {
 }
 
 // Same rule as the classic keypad (touchpad.js): touch input only, the runtime's vibrate setting (24ms if unset),
-// through the native host when there is one.
+// through the native host when there is one. A diagonal on the wheel presses two directions in one move: one pulse.
+let lastHaptic = -Infinity
 function haptic(event) {
   if (event?.pointerType && event.pointerType !== 'touch') return
+  if (event?.timeStamp != null && Math.abs(event.timeStamp - lastHaptic) < 30) return
+  lastHaptic = event?.timeStamp ?? 0
   const setting = window.config?.vibrate
   const requested = setting == null ? 24 : Number(setting)
   if (!(requested > 0)) return
@@ -56,11 +59,12 @@ function haptic(event) {
 }
 
 // Both runtimes route every input source through one InputMapping controller (keymap.js for J2ME, mrp-runtime.js
-// for MRP); each finger is its own source, so two fingers on one key release it only when both lift.
+// for MRP). A source holds one action at a time, and one finger can hold two (a diagonal on the wheel), so each
+// finger-and-action pair is its own source; two fingers on one key release it only when both lift.
 function sendAction(action, pressed, pointerId) {
   const controller = window.__XIAOCHAO_INPUT_CONTROLLER__
   if (!controller) return
-  const source = `t9:${pointerId}`
+  const source = `t9:${pointerId}:${action}`
   if (pressed) controller.press(source, action)
   else controller.release(source, action)
 }

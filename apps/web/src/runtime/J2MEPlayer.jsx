@@ -44,6 +44,15 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     let alive = true
     const session = createRuntimeSession()
     window.__XIAOCHAO_RUNTIME_SESSION__ = session
+    // java/classes.jar (2.3MB) is the biggest download of a launch, and bld/main-all.js only requests it once every
+    // script before it has run. Start it now so it downloads alongside the scripts; main-all.js's load() takes it.
+    const prefetch = new AbortController()
+    const classes = fetch('/java/classes.jar', { signal: prefetch.signal }).then((response) => {
+      if (!response.ok) throw new Error(`java/classes.jar: HTTP ${response.status}`)
+      return response.arrayBuffer()
+    })
+    classes.catch(() => {}) // an unused or aborted prefetch is not an error; load() retries a failed one
+    window.__XIAOCHAO_PREFETCH__ = { 'java/classes.jar': classes }
     ;(async () => {
       try {
         const ensureActive = () => {
@@ -104,6 +113,8 @@ export function J2MEPlayer({ game, onExit, onReady }) {
     return () => {
       alive = false
       session.invalidate()
+      prefetch.abort()
+      delete window.__XIAOCHAO_PREFETCH__
       try { window.myflushAll && window.myflushAll() } catch (_) {}
       try { window.__XIAOCHAO_J2ME_CTX && window.__XIAOCHAO_J2ME_CTX.runtime.stop() } catch (_) {}
       document.body.classList.remove('runtime-active')

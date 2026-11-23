@@ -18,8 +18,9 @@ function writeHistory(items) {
   } catch (_) {}
 }
 
+// A browser-installed game and a server game can share a file name; they are different games.
 function keyOf(game) {
-  return `${game.kind}:${game.file}`
+  return `${game.kind}:${game.local ? 'local' : 'server'}:${game.file}`
 }
 
 /** 记录一次游玩到当前浏览器。 */
@@ -28,6 +29,7 @@ export function recordPlay(game) {
   const item = {
     kind: game.kind,
     file: game.file,
+    local: !!game.local,
     name: game.name || game.file,
     vendor: game.vendor || '',
     created_at: now,

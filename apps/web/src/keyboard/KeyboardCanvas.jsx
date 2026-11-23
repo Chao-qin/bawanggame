@@ -1,8 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Group, Layer, Rect, Stage, Text } from 'react-konva'
-import { createPointerState, pointerCancel, pointerDown, pointerUp, pressedKeyIds, releaseAll } from './pointer-state.js'
+import { Arc, Circle, Group, Layer, Line, Rect, RegularPolygon, Stage, Text } from 'react-konva'
+import { hitTest, layoutUnits, WHEEL_HUB, wheelGeometry } from './hit-test.js'
+import { createPointerState, pointerDown, pointerMove, pointerTarget, pointerUp, pressedKeyIds, releaseAll } from './pointer-state.js'
 
-const KEY_FILL = { abxy: '#d28b63', dpad: '#75a9c8', soft: '#34445a' }
+// Key body colours, top → bottom of the face. Depth comes from a solid edge under each key, not shadowBlur: a blurred
+// shadow per key over a DPR-3 canvas cost seconds per frame on a 4x-throttled CPU and froze the game beside it.
+const FACE = {
+  default: ['#3a4554', '#262f3b'],
+  soft: ['#334050', '#202935'],
+  numpad: ['#3a4554', '#262f3b'],
+  dpad: ['#3d5d73', '#2a4253'],
+  abxy: ['#c98a66', '#a46647'],
+}
+const EDGE = '#090d13'
+const RIM = 'rgba(255,255,255,0.13)'
+const PRESSED = ['#8ff0d4', '#4cc7a4']
+const PRESSED_RIM = '#e4fff6'
+const LEGEND = '#f3f6fa'
+const LEGEND_DIM = '#9fb0c4'
+const LEGEND_PRESSED = '#0d2a22'
+const TONE = { danger: '#ff7b7b', warning: '#ffc46b' }
+const FONT = 'system-ui, -apple-system, "PingFang SC", "Noto Sans SC", sans-serif'
 
 /** Legend placement for any key height: centred, with the secondary legend under the main one — or, on keys much
  *  wider than tall (a phone's digit keys), beside it, the way "2 abc" is printed on a candybar phone. */
@@ -18,39 +36,47 @@ export function legendLayout(item) {
     }
   }
   return {
-    main: { x: 0.06, y: face * 0.13, width: item.width - 0.2, size, align: 'center' },
-    secondary: { x: 0.12, y: face * 0.68, width: item.width - 0.2, size: small, align: 'left' },
+    main: { x: 0.06, y: face * 0.2, width: item.width - 0.2, size, align: 'center' },
+    secondary: { x: 0.06, y: face * 0.62, width: item.width - 0.2, size: small, align: 'center' },
   }
 }
 
+const gradient = (height, [top, bottom]) => ({
+  fillLinearGradientStartPoint: { x: 0, y: 0 },
+  fillLinearGradientEndPoint: { x: 0, y: height },
+  fillLinearGradientColorStops: [0, top, 1, bottom],
+})
+
 /** One key, drawn in device pixels rather than by scaling a group of 1-unit keys: legends would otherwise be laid
- *  out at a ~0.3px font size, where CJK glyph measurement collapses and labels overlap. Depth comes from a solid
- *  edge, not shadowBlur — a blurred shadow per key over a DPR-3 canvas cost seconds per frame on a 4x-throttled
- *  CPU and froze the game beside it. */
+ *  out at a ~0.3px font size, where CJK glyph measurement collapses and labels overlap. */
 function KeyFace({ item, scale, pressed }) {
   const legend = legendLayout(item)
   const u = (value) => value * scale
-  const face = { width: u(item.width - 0.08), height: u(item.height - 0.08), cornerRadius: u(0.12), perfectDrawEnabled: false }
+  const width = u(item.width - 0.08)
+  const height = u(item.height - 0.08)
+  const face = { width, height, cornerRadius: u(Math.min(0.16, item.height * 0.2)), perfectDrawEnabled: false, listening: false }
+  const ink = pressed ? LEGEND_PRESSED : TONE[item.tone] || LEGEND
+  const indicator = item.indicator ? u(0.05) : 0
   return <>
-    {!pressed && <Rect {...face} y={u(0.06)} fill="#0b1118" listening={false} />}
     {/* The held face sits exactly on the resting one (no sink offset), so nothing of the resting key shows. */}
-    <Rect
-      {...face}
-      fill={pressed ? '#74d8bd' : KEY_FILL[item.block] || '#273444'}
-      stroke={pressed ? '#dbfff4' : '#65748a'}
-      strokeWidth={u(0.035)}
-    />
+    {!pressed && <Rect {...face} y={u(0.06)} fill={EDGE} />}
+    <Rect {...face} {...gradient(height, pressed ? PRESSED : FACE[item.block] || FACE.default)} stroke={pressed ? PRESSED_RIM : RIM} strokeWidth={u(0.025)} />
+    {!pressed && <Rect x={face.cornerRadius} y={u(0.02)} width={Math.max(0, width - face.cornerRadius * 2)} height={u(0.018)} fill="rgba(255,255,255,0.10)" cornerRadius={u(0.01)} listening={false} />}
+    {indicator > 0 && (
+      <Rect x={width / 2 - u(0.2)} y={u(legend.main.y) - u(0.1)} width={u(0.4)} height={indicator} cornerRadius={indicator / 2}
+        fill={pressed ? LEGEND_PRESSED : '#7fd6ff'} listening={false} />
+    )}
     <Text
       x={u(legend.main.x)}
-      y={u(legend.main.y)}
+      y={u(legend.main.y) + indicator}
       width={u(legend.main.width)}
       text={item.label}
-      fontFamily="system-ui, sans-serif"
+      fontFamily={FONT}
       fontSize={u(legend.main.size)}
       fontStyle="600"
       align={legend.main.align}
       wrap="none"
-      fill={pressed ? '#102720' : '#f2f6fb'}
+      fill={ink}
       listening={false}
     />
     {legend.secondary && (
@@ -59,14 +85,74 @@ function KeyFace({ item, scale, pressed }) {
         y={u(legend.secondary.y)}
         width={u(legend.secondary.width)}
         text={item.secondaryLegend}
-        fontFamily="system-ui, sans-serif"
+        fontFamily={FONT}
         fontSize={u(legend.secondary.size)}
         align={legend.secondary.align}
         wrap="none"
-        fill={pressed ? '#102720' : '#aebacf'}
+        fill={pressed ? LEGEND_PRESSED : LEGEND_DIM}
         listening={false}
       />
     )}
+  </>
+}
+
+// Direction centres in screen degrees (clockwise from the right), and where hit-test.js puts the sector edges.
+const WHEEL_DIRECTIONS = { right: 0, down: 90, left: 180, up: 270 }
+const SECTOR_EDGES = [30, 60, 120, 150, 210, 240, 300, 330]
+
+/** The 8-way wheel at rest: a ring with sector grooves, a raised arrow for each main direction, a dot for each
+ *  diagonal, and the OK hub. Coordinates are relative to the wheel's centre. */
+function WheelFace({ item, scale }) {
+  const radius = (Math.min(item.width, item.height) / 2 - 0.04) * scale
+  const hub = radius * WHEEL_HUB
+  const toXY = (degrees, distance) => [Math.cos((degrees * Math.PI) / 180) * distance, Math.sin((degrees * Math.PI) / 180) * distance]
+  return <>
+    <Circle y={scale * 0.06} radius={radius} fill={EDGE} listening={false} />
+    <Circle radius={radius} {...gradient(radius, ['#344253', '#1d252f'])} fillLinearGradientStartPoint={{ x: 0, y: -radius }}
+      fillLinearGradientEndPoint={{ x: 0, y: radius }} stroke={RIM} strokeWidth={scale * 0.025} listening={false} />
+    {SECTOR_EDGES.map((degrees) => (
+      <Line key={degrees} points={[...toXY(degrees, hub * 1.18), ...toXY(degrees, radius * 0.9)]} stroke="rgba(255,255,255,0.07)"
+        strokeWidth={scale * 0.02} lineCap="round" listening={false} />
+    ))}
+    {Object.entries(WHEEL_DIRECTIONS).map(([part, degrees]) => {
+      const [x, y] = toXY(degrees, radius * 0.67)
+      return <RegularPolygon key={part} x={x} y={y} sides={3} radius={radius * 0.12} rotation={degrees + 90} fill="#cfe3f2" listening={false} />
+    })}
+    {[45, 135, 225, 315].map((degrees) => {
+      const [x, y] = toXY(degrees, radius * 0.67)
+      return <Circle key={degrees} x={x} y={y} radius={radius * 0.035} fill="#8396ab" listening={false} />
+    })}
+    <Circle y={scale * 0.04} radius={hub} fill={EDGE} listening={false} />
+    <HubFace item={item} scale={scale} hub={hub} pressed={false} />
+  </>
+}
+
+function HubFace({ item, scale, hub, pressed }) {
+  const size = Math.min(hub * 0.62, scale * 0.3)
+  return <>
+    <Circle radius={hub * 0.94} {...gradient(hub, pressed ? PRESSED : ['#4a5a6d', '#2e3947'])} fillLinearGradientStartPoint={{ x: 0, y: -hub }}
+      fillLinearGradientEndPoint={{ x: 0, y: hub }} stroke={pressed ? PRESSED_RIM : 'rgba(255,255,255,0.18)'} strokeWidth={scale * 0.025} listening={false} />
+    <Text x={-hub} y={-size / 2} width={hub * 2} text={item.label} align="center" fontFamily={FONT} fontStyle="700" fontSize={size}
+      fill={pressed ? LEGEND_PRESSED : LEGEND} listening={false} />
+  </>
+}
+
+/** The held parts of a wheel: a lit sector per held direction (a diagonal lights both), or the lit hub. */
+function WheelPressed({ item, scale, parts }) {
+  const radius = (Math.min(item.width, item.height) / 2 - 0.04) * scale
+  const hub = radius * WHEEL_HUB
+  return <>
+    {parts.filter((part) => part in WHEEL_DIRECTIONS).map((part) => {
+      const degrees = WHEEL_DIRECTIONS[part]
+      const x = Math.cos((degrees * Math.PI) / 180) * radius * 0.67
+      const y = Math.sin((degrees * Math.PI) / 180) * radius * 0.67
+      return <Group key={part}>
+        <Arc innerRadius={hub * 1.08} outerRadius={radius * 0.97} angle={60} rotation={degrees - 30} fill="rgba(110,231,198,0.88)"
+          stroke={PRESSED_RIM} strokeWidth={scale * 0.02} listening={false} />
+        <RegularPolygon x={x} y={y} sides={3} radius={radius * 0.12} rotation={degrees + 90} fill={LEGEND_PRESSED} listening={false} />
+      </Group>
+    })}
+    {parts.includes('center') && <HubFace item={item} scale={scale} hub={hub} pressed />}
   </>
 }
 
@@ -79,14 +165,19 @@ function boundsFor(keys) {
   }), { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity })
 }
 
+/**
+ * A keyboard drawn on a canvas. Keys press when a pointer lands on them, and a pointer that slides across the
+ * keyboard releases the key it leaves and presses the key it enters (onKeyUp / onKeyDown per key). On the 8-way
+ * wheel each direction is its own key, so a diagonal holds two at once.
+ */
 export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = 'Keyboard layout' }) {
   const hostRef = useRef(null)
   const pointerState = useRef(createPointerState())
-  const pointerTargets = useRef(new Map())
   const callbacks = useRef({ onKeyDown, onKeyUp })
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [pressed, setPressed] = useState(new Set())
   const bounds = useMemo(() => boundsFor(layout.keys), [layout])
+  const unitsById = useMemo(() => layoutUnits(layout), [layout])
   const designWidth = bounds.right - bounds.left
   const designHeight = bounds.bottom - bounds.top
   const height = size.height || 360
@@ -95,6 +186,9 @@ export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = '
     : 0
   const offsetX = (size.width - designWidth * scale) / 2 - bounds.left * scale
   const offsetY = (height - designHeight * scale) / 2 - bounds.top * scale
+  // The latest geometry for the pointer handlers, which are bound once per layout.
+  const geometry = useRef({ scale, offsetX, offsetY })
+  geometry.current = { scale, offsetX, offsetY }
 
   useEffect(() => { callbacks.current = { onKeyDown, onKeyUp } }, [onKeyDown, onKeyUp])
 
@@ -111,77 +205,108 @@ export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = '
     return () => observer.disconnect()
   }, [])
 
-  const syncPressed = useCallback(() => setPressed(pressedKeyIds(pointerState.current)), [])
-
-  const release = useCallback((pointerId, cancel = false) => {
-    const state = pointerState.current
-    const keyId = state.pointers[pointerId]
-    if (keyId === undefined) return
-    pointerState.current = cancel ? pointerCancel(state, pointerId) : pointerUp(state, pointerId)
-    const keyData = layout.keys.find((item) => item.id === keyId)
-    if (keyData) callbacks.current.onKeyUp?.(keyData, pointerId)
-    const target = pointerTargets.current.get(pointerId)
-    if (target?.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId)
-    pointerTargets.current.delete(pointerId)
-    syncPressed()
-  }, [layout, syncPressed])
-
   useEffect(() => {
     const host = hostRef.current
     if (!host) return undefined
-    const handleUp = (event) => release(event.pointerId)
-    const handleCancel = (event) => release(event.pointerId, true)
+    const syncPressed = () => setPressed(pressedKeyIds(pointerState.current))
+    const keyUp = (unitIds, pointerId) => {
+      for (const id of unitIds) {
+        const unit = unitsById.get(id)
+        if (unit) callbacks.current.onKeyUp?.(unit, pointerId)
+      }
+    }
+    const keyDown = (unitIds, pointerId, event) => {
+      for (const id of unitIds) {
+        const unit = unitsById.get(id)
+        if (unit) callbacks.current.onKeyDown?.(unit, pointerId, event)
+      }
+    }
+    // The point in layout units; null until the canvas has a size.
+    const layoutPoint = (event) => {
+      const { scale: s, offsetX: ox, offsetY: oy } = geometry.current
+      if (!(s > 0)) return null
+      const rect = host.getBoundingClientRect()
+      return [(event.clientX - rect.left - ox) / s, (event.clientY - rect.top - oy) / s]
+    }
+    const handleDown = (event) => {
+      if (Object.hasOwn(pointerState.current.pointers, event.pointerId)) return
+      const point = layoutPoint(event)
+      if (!point) return
+      event.preventDefault()
+      // Capture, so the keyboard keeps seeing this pointer after it leaves the canvas (and releases its key).
+      try { host.setPointerCapture(event.pointerId) } catch {}
+      const result = pointerDown(pointerState.current, event.pointerId, hitTest(layout, point[0], point[1]))
+      pointerState.current = result.state
+      keyDown(result.pressed, event.pointerId, event)
+      if (result.pressed.length) syncPressed()
+    }
+    const handleMove = (event) => {
+      if (!Object.hasOwn(pointerState.current.pointers, event.pointerId)) return
+      const point = layoutPoint(event)
+      if (!point) return
+      const previous = pointerTarget(pointerState.current, event.pointerId)
+      const result = pointerMove(pointerState.current, event.pointerId, hitTest(layout, point[0], point[1], previous))
+      pointerState.current = result.state
+      if (!result.pressed.length && !result.released.length) return
+      keyUp(result.released, event.pointerId)
+      keyDown(result.pressed, event.pointerId, event)
+      syncPressed()
+    }
+    const handleUp = (event) => {
+      const result = pointerUp(pointerState.current, event.pointerId)
+      pointerState.current = result.state
+      try { if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId) } catch {}
+      if (!result.released.length) return
+      keyUp(result.released, event.pointerId)
+      syncPressed()
+    }
     const handleBlur = () => {
       const { state, released } = releaseAll(pointerState.current)
       pointerState.current = state
-      for (const item of released) {
-        const keyData = layout.keys.find((keyItem) => keyItem.id === item.keyId)
-        const pointerId = Number(item.pointerId)
-        if (keyData) callbacks.current.onKeyUp?.(keyData, pointerId)
-        const target = pointerTargets.current.get(pointerId)
-        if (target?.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId)
-      }
-      pointerTargets.current.clear()
-      syncPressed()
+      for (const { pointerId, unitId } of released) keyUp([unitId], Number(pointerId))
+      if (released.length) syncPressed()
     }
+    const onVisibility = () => { if (document.hidden) handleBlur() }
+    host.addEventListener('pointerdown', handleDown)
+    host.addEventListener('pointermove', handleMove)
     host.addEventListener('pointerup', handleUp)
-    host.addEventListener('pointercancel', handleCancel)
+    host.addEventListener('pointercancel', handleUp)
+    host.addEventListener('lostpointercapture', handleUp)
     window.addEventListener('blur', handleBlur)
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
+      host.removeEventListener('pointerdown', handleDown)
+      host.removeEventListener('pointermove', handleMove)
       host.removeEventListener('pointerup', handleUp)
-      host.removeEventListener('pointercancel', handleCancel)
+      host.removeEventListener('pointercancel', handleUp)
+      host.removeEventListener('lostpointercapture', handleUp)
       window.removeEventListener('blur', handleBlur)
+      document.removeEventListener('visibilitychange', onVisibility)
       handleBlur()
     }
-  }, [layout, release, syncPressed])
-
-  const press = useCallback((keyData, event) => {
-    const pointerId = event.evt.pointerId
-    if (pointerState.current.pointers[pointerId] !== undefined) return
-    event.evt.preventDefault()
-    pointerState.current = pointerDown(pointerState.current, pointerId, keyData.id)
-    const canvas = hostRef.current?.querySelector('canvas')
-    if (canvas?.setPointerCapture) {
-      try {
-        canvas.setPointerCapture(pointerId)
-        pointerTargets.current.set(pointerId, canvas)
-      } catch {
-        pointerTargets.current.delete(pointerId)
-      }
-    }
-    callbacks.current.onKeyDown?.(keyData, pointerId, event.evt)
-    syncPressed()
-  }, [syncPressed])
+  }, [layout, unitsById])
 
   const restingKeys = useMemo(() => (
-    <Group x={offsetX} y={offsetY}>
-      {layout.keys.map((item) => (
-        <Group key={item.id} x={item.x * scale} y={item.y * scale} onPointerDown={(event) => press(item, event)}>
+    <Group x={offsetX} y={offsetY} listening={false}>
+      {layout.keys.map((item) => item.shape === 'wheel' ? (
+        <Group key={item.id} x={(item.x + item.width / 2) * scale} y={(item.y + item.height / 2) * scale}>
+          <WheelFace item={item} scale={scale} />
+        </Group>
+      ) : (
+        <Group key={item.id} x={item.x * scale} y={item.y * scale}>
           <KeyFace item={item} scale={scale} pressed={false} />
         </Group>
       ))}
     </Group>
-  ), [layout, offsetX, offsetY, scale, press])
+  ), [layout, offsetX, offsetY, scale])
+
+  // Held units grouped by key: a wheel can hold two directions (or its hub) at once.
+  const heldKeys = new Map()
+  for (const id of pressed) {
+    const unit = unitsById.get(id)
+    if (!unit) continue
+    heldKeys.set(unit.keyId, [...(heldKeys.get(unit.keyId) || []), unit.part])
+  }
 
   return (
     <div
@@ -189,17 +314,22 @@ export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = '
       className="keyboardCanvas"
       data-layout-id={layout.id}
       data-key-count={layout.keys.length}
+      data-pressed={[...pressed].join(' ')}
       role="img"
       aria-label={accessibleLabel}
     >
       {scale > 0 && (
-        <Stage width={size.width} height={height} listening>
+        <Stage width={size.width} height={height} listening={false}>
           {/* Two layers: every key at rest, drawn once per layout and size, and only the held keys on top. A press
               then redraws one or two keys instead of the whole keyboard. */}
-          <Layer>{restingKeys}</Layer>
+          <Layer listening={false}>{restingKeys}</Layer>
           <Layer listening={false}>
             <Group x={offsetX} y={offsetY}>
-              {layout.keys.filter((item) => pressed.has(item.id)).map((item) => (
+              {layout.keys.filter((item) => heldKeys.has(item.id)).map((item) => item.shape === 'wheel' ? (
+                <Group key={item.id} x={(item.x + item.width / 2) * scale} y={(item.y + item.height / 2) * scale}>
+                  <WheelPressed item={item} scale={scale} parts={heldKeys.get(item.id)} />
+                </Group>
+              ) : (
                 <Group key={item.id} x={item.x * scale} y={item.y * scale}><KeyFace item={item} scale={scale} pressed /></Group>
               ))}
             </Group>
