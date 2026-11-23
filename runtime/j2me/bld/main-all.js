@@ -14286,7 +14286,7 @@ window.onload = function() {
   Promise.all(loadingPromises).then(start, function(reason) {
     console.error(reason);
     var title = document.querySelector("#download-screen .title");
-    if (title) title.textContent = tr("Не удалось загрузить игру", "Could not load the game");
+    if (title) title.textContent = tr("Не удалось загрузить игру", "Could not load the game", "游戏加载失败");
     var detail = document.querySelector("#download-screen .download-error-detail");
     if (!detail && title) {
       detail = document.createElement("div");

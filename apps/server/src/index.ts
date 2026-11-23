@@ -6,6 +6,7 @@ import { networkInterfaces } from 'node:os'
 import { connect as tlsConnect } from 'node:tls'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { URL } from 'node:url'
+import { createGzip } from 'node:zlib'
 import { WebSocketServer, WebSocket } from 'ws'
 import yauzl from 'yauzl'
 import { parseFlashArchiveDetail, parseFlashArchiveGames, type FlashArchiveGame } from './flashCatalog.js'
@@ -223,12 +224,33 @@ function mappedPath(urlPath: string) {
   return safeWebPath(urlPath)
 }
 
-async function sendFile(res: ServerResponse, target: string) {
+const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.svg', '.wasm'])
+
+async function sendFile(req: IncomingMessage, res: ServerResponse, target: string) {
   try {
     const stat = await fs.stat(target)
     if (!stat.isFile()) return false
-    res.writeHead(200, { 'Content-Type': MIME[extname(target)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' })
-    createReadStream(target).pipe(res)
+    // no-cache keeps every request revalidated; the ETag turns an unchanged runtime file into a 304 instead
+    // of a full download (the J2ME runtime is several MB of scripts loaded on every game launch).
+    const etag = `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`
+    const headers: Record<string, string> = {
+      'Content-Type': MIME[extname(target)] ?? 'application/octet-stream',
+      'Cache-Control': 'no-cache',
+      ETag: etag,
+      Vary: 'Accept-Encoding',
+    }
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, headers).end()
+      return true
+    }
+    const gzip = COMPRESSIBLE.has(extname(target)) && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))
+    if (gzip) headers['Content-Encoding'] = 'gzip'
+    else headers['Content-Length'] = String(stat.size)
+    res.writeHead(200, headers)
+    const file = createReadStream(target)
+    file.on('error', () => res.destroy())
+    if (gzip) file.pipe(createGzip()).pipe(res)
+    else file.pipe(res)
     return true
   } catch { return false }
 }
@@ -385,7 +407,7 @@ const server = createServer(async (req, res) => {
     }
   }
   const target = mappedPath(url.pathname === '/' ? '/index.html' : url.pathname)
-  if (!target || !(await sendFile(res, target))) res.writeHead(404).end('Not found')
+  if (!target || !(await sendFile(req, res, target))) res.writeHead(404).end('Not found')
 })
 
 const wss = new WebSocketServer({ noServer: true })

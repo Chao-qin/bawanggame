@@ -50,8 +50,8 @@ export function PhoneMarkup({ mrp = false }) {
             <div className="bar"><button id="mrp-dialog-ok" type="button">确定</button><span id="mrp-dialog-info" /><button id="mrp-dialog-cancel" type="button">取消</button></div>
           </div>
         </> : <>
-          <div id="download-screen" className="screen"><h1 className="title">Загрузка…</h1><div className="download-progress-container"><progress className="pack-activity" id="download-bar" value="0" max="100" /></div></div>
-          <div id="splash-screen" className="screen"><h1 className="title">Запуск…</h1><div className="splash-progress-container"><progress /></div></div>
+          <div id="download-screen" className="screen"><h1 className="title">下载中…</h1><div className="download-progress-container"><progress className="pack-activity" id="download-bar" value="0" max="100" /></div></div>
+          <div id="splash-screen" className="screen"><h1 className="title">启动中…</h1><div className="splash-progress-container"><progress /></div></div>
           <div id="exit-screen" className="screen" />
           <div id="background-screen" />
         </>}
