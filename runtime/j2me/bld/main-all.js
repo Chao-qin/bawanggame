@@ -14035,6 +14035,7 @@ var profile = 0;
 var jvm = new JVM;
 
 var jars = config.jars ? [config.jars] : [];
+var runtimeLoadFailed = false;
 
 
 var mobileInfo = {icc:{}, network:{}};
@@ -14052,7 +14053,13 @@ jars.forEach(function(jar) {
   loadingMIDletPromises.push((LocalJars.isLocal(jar) ? LocalJars.load(jar) : load(encodeURI(jar).replace(/[#?]/g, encodeURIComponent), "arraybuffer")).then(function(data) {
     JARStore.addBuiltIn(jar, data, false);
     ScreenSetup.jarLoaded(jar, data);
-    hideDownloadScreen();
+    // After a failed load the download screen carries the error; leave it there.
+    if (!runtimeLoadFailed) {
+      hideDownloadScreen();
+      // The JVM still has to boot before the MIDlet paints; keep "启动中" over the black canvas until
+      // DisplayDevice.gainedForeground0 hides it.
+      showSplashScreen();
+    }
     isLoadJarFinished = true;
   }));
 });
@@ -14285,6 +14292,10 @@ MIDP.updateCanvas();
 window.onload = function() {
   Promise.all(loadingPromises).then(start, function(reason) {
     console.error(reason);
+    runtimeLoadFailed = true;
+    // The game jar may already have swapped the download screen for the splash; the error goes on the former.
+    hideSplashScreen();
+    showDownloadScreen();
     var title = document.querySelector("#download-screen .title");
     if (title) title.textContent = tr("Не удалось загрузить игру", "Could not load the game", "游戏加载失败");
     var detail = document.querySelector("#download-screen .download-error-detail");
