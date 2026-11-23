@@ -356,6 +356,8 @@ function duplicateMessage(name) {
   return `已安装过「${name}」，无需重复安装`
 }
 
+const HISTORY_ROW_SIZE = 12
+
 function GameRow({ title, items, onOpen }) {
   if (!items || items.length === 0) return null
   return (
@@ -441,6 +443,7 @@ function Library({ kind, onPlay }) {
   // Play history only records what was opened; the game itself comes from this tab's library, which says where it
   // lives (a browser-installed JAR is not on the server). Records of other tabs and of games no longer in the library
   // (uninstalled, or older records the library cannot place) are left out instead of opening a game that fails to load.
+  // The rows are limited after this filtering, so other tabs' records do not crowd this tab's games out.
   const historyGames = (items) => {
     if (loading) return []
     const seen = new Set()
@@ -454,7 +457,7 @@ function Library({ kind, onPlay }) {
       if (!game || seen.has(key)) return []
       seen.add(key)
       return [{ ...item, ...game }]
-    })
+    }).slice(0, HISTORY_ROW_SIZE)
   }
   const selectedGames = localGames.filter((game) => picked.has(gameKey(game)))
 
@@ -471,8 +474,8 @@ function Library({ kind, onPlay }) {
 
   function refreshHistory() {
     if (kind === 'flash') return
-    fetchRecent().then(setRecent)
-    fetchPopular().then(setPopular)
+    fetchRecent(Infinity).then(setRecent)
+    fetchPopular(Infinity).then(setPopular)
   }
   useEffect(refreshHistory, [kind])
 

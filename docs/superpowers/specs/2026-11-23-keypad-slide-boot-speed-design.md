@@ -113,6 +113,16 @@ diff review、validation 为 `pass`，feature audit 为 `fix_required`（1 条 P
 | feature audit | P3 | Flash 未测、Ruffle 哈希文件仍每次 304 | Ruffle 哈希 core / wasm 改长缓存（`ruffle.js` 仍 `no-cache`）；Flash 启动时间未测，列入未覆盖 |
 | feature audit | P3 | Flash 方向键无斜向 | 未做：八向轮的要求针对 T9；记录为后续 |
 
+## R2 评审处理
+
+diff review、feature audit 均为 `pass`，只有 P3。
+
+| 来源 | 问题 | 处理 |
+|---|---|---|
+| feature audit | 历史先按全部类别取前 12 条再按标签过滤，另一类别玩得多时本标签的行会消失 | 改为先按标签过滤、以库还原、去重，再取前 12 条；探针：12 条更新的冒泡记录下 J2ME 标签仍显示 Diamond Rush |
+| diff review | 同一款 Java 游戏本机版与服务器版各有记录时，「大家都在玩」按其中一条的次数排序，不是两者之和 | 记录：只影响排序，不影响启动 |
+| feature audit | 精致化只覆盖 T9（默认键盘），经典键盘与 Flash 触屏键外观未改 | 记录：用户反馈的 T9 键盘已重做；经典与 Flash 外观列为后续 |
+
 ## 未覆盖
 
 - 没有 Android / iOS 真机与 APK 验证，只在桌面无头 Chromium 的手机视口、CPU 降速与网络限速下测量；真机 GPU、真实网络和 RN WebView 的数值会不同。
