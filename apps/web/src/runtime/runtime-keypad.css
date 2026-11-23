@@ -1,0 +1,91 @@
+/* T9 runtime keypad (RuntimeKeypad.jsx). It lives inside #keypad, so it takes the classic keypad's place in the
+   runtime layout: below the screen in portrait; in landscape #keypad is a full-stage three-column grid beside an
+   absolutely positioned #display-container (runtime/j2me/style/main.css, end of file), and the T9 halves take its
+   side columns. The classic keypad's DOM stays — touchpad.js, keypad-canvas.js and the MRP runtime find its
+   buttons by id — and is only hidden. Selectors carry the body flags so they outrank the runtime stylesheet,
+   which arrives later and uses !important.
+
+   Landscape is what the runtime stylesheet calls landscape: body[data-orientation="landscape"] (J2ME's screen.js,
+   a game's forced orientation) or body.viewport-landscape (the viewport; all MRP has). RuntimeKeypad.jsx picks
+   the landscape preset by the same rule. */
+
+.t9Keypad {
+  box-sizing: border-box;
+  min-width: 0;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.t9Keypad .keyboardCanvas {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+}
+.t9Keypad canvas { display: block; }
+
+body.runtime-active[data-keypad-style="t9"] #keypad > :is(#keypad-canvas, #nav, #numpad) {
+  display: none !important;
+}
+
+/* ---- Docked: the keypad takes its own space, the game screen fits the rest. ---- */
+body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]):not(.viewport-landscape) .t9KeypadFull {
+  width: 100%;
+  aspect-ratio: 5 / 5.5;
+  max-height: min(50vh, 460px);
+  padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+}
+
+body.runtime-active[data-keypad-style="t9"]:is([data-orientation="landscape"], .viewport-landscape) :is(.t9KeypadNav, .t9KeypadNumpad) {
+  grid-row: 1;
+  align-self: center;
+  width: 100%;
+  height: min(100%, 86vh, 320px);
+  padding: 6px;
+  pointer-events: auto;
+}
+body.runtime-active[data-keypad-style="t9"]:is([data-orientation="landscape"], .viewport-landscape) .t9KeypadNav {
+  grid-column: 1;
+  padding-left: max(6px, env(safe-area-inset-left, 0px));
+}
+body.runtime-active[data-keypad-style="t9"]:is([data-orientation="landscape"], .viewport-landscape) .t9KeypadNumpad {
+  grid-column: 3;
+  padding-right: max(6px, env(safe-area-inset-right, 0px));
+}
+
+/* ---- Floating: the game screen gets the whole stage, a translucent keypad floats over it. ---- */
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"] .t9Keypad {
+  z-index: 6;
+  opacity: 0.6;
+}
+
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]):not(.viewport-landscape) #keypad {
+  position: absolute !important;
+  inset: auto 0 0 0;
+  z-index: 6;
+  min-height: 0 !important;
+  background: transparent !important;
+}
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]):not(.viewport-landscape) .t9KeypadFull {
+  max-height: min(44vh, 400px);
+}
+/* Screen at the top, so the keypad covers as little of it as it can. */
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]):not(.viewport-landscape) #display-container {
+  align-items: flex-start;
+}
+
+/* The screen spans the stage instead of the middle column; the halves float at its edges. */
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:is([data-orientation="landscape"], .viewport-landscape) #display-container {
+  left: 0;
+  right: 0;
+}
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:is([data-orientation="landscape"], .viewport-landscape) :is(.t9KeypadNav, .t9KeypadNumpad) {
+  position: absolute;
+  top: 50%;
+  width: min(28vw, 280px);
+  height: min(80vh, 280px);
+  transform: translateY(-50%);
+}
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:is([data-orientation="landscape"], .viewport-landscape) .t9KeypadNav { left: 0; }
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:is([data-orientation="landscape"], .viewport-landscape) .t9KeypadNumpad { right: 0; }

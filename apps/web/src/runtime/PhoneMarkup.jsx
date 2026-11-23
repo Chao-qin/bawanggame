@@ -1,5 +1,6 @@
 import React from 'react'
 import { CheckOutline, CloseOutline, DownOutline, LeftOutline, MinusOutline, RightOutline, UndoOutline, UpOutline } from 'antd-mobile-icons'
+import { RuntimeKeypad, useKeypadPrefs, useKeypadStage } from './RuntimeKeypad.jsx'
 
 function KeyIcon({ as: Icon }) {
   return <Icon className="keypadIcon" aria-hidden="true" />
@@ -20,6 +21,8 @@ const initialEditorLayerStyle = {
 }
 
 export function PhoneMarkup({ mrp = false }) {
+  const [keypadPrefs] = useKeypadPrefs()
+  useKeypadStage(keypadPrefs)
   const blockRuntimeGesture = (event) => {
     const target = event.target
     if (!target.closest?.('#keypad')) return
@@ -70,6 +73,7 @@ export function PhoneMarkup({ mrp = false }) {
         <button id="clear" className="key mini" title="清除"><KeyIcon as={CloseOutline} /></button>
       </div>
       <div id="numpad" data-runtime-control="numpad">{[['1','.,?'],['2','abc'],['3','def'],['4','ghi'],['5','jkl'],['6','mno'],['7','pqrs'],['8','tuv'],['9','wxyz'],['*','+'],['0','␣'],['#','⇧']].map(([n, sub]) => <button key={n} id={n === '*' ? 'star' : n === '#' ? 'pound' : `num${n}`} className="key"><b>{n}</b><i>{sub}</i></button>)}</div>
+      <RuntimeKeypad prefs={keypadPrefs} />
     </div>
     </div>
   </div>

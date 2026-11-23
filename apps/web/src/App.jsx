@@ -8,6 +8,7 @@ import { MrpPlayer } from './runtime/MrpPlayer.jsx'
 import { LocalRevivalPlayer } from './runtime/LocalRevivalPlayer.jsx'
 import { FlashPlayer } from './runtime/FlashPlayer.jsx'
 import { InputMappingPopup } from './runtime/InputMappingPopup.jsx'
+import { KeypadSettingsPopup } from './runtime/KeypadSettingsPopup.jsx'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
 import { fetchArtwork, validArtwork } from './artwork.js'
 import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
@@ -30,6 +31,9 @@ const GAME_KINDS = new Set(['j2me', 'maopao', 'local-revival', 'flash'])
 const FRAME_RUNTIME_KINDS = new Set(['j2me', 'maopao'])
 const RUNTIME_EXIT_MESSAGE = 'xiaochao:runtime-exit'
 const RUNTIME_READY_MESSAGE = 'xiaochao:runtime-ready'
+// The runtime frame owns the exit confirmation. When the user keeps playing, the parent must release the
+// navigation it blocked, or every later back gesture is swallowed by a blocker that never resets.
+const RUNTIME_CANCEL_EXIT_MESSAGE = 'xiaochao:runtime-cancel-exit'
 const noopCleanup = () => {}
 const FLASH_GAMES = [
   { kind: 'flash', file: 'fruit-madness.swf', name: 'Fruit Madness', vendor: 'Vladimir Belyaev · MIT', desc: '躲避水果并收集松饼', size: 2236139, iconUrl: null, local: false, catalogId: 'fruit-madness' },
@@ -911,6 +915,7 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
   const [toolbarLandscape, setToolbarLandscape] = useState(() => window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
   const [toolbarChoice, setToolbarChoice] = useState(null)
   const [inputMappingOpen, setInputMappingOpen] = useState(false)
+  const [keypadSettingsOpen, setKeypadSettingsOpen] = useState(false)
   const toolbarCollapsed = toolbarChoice?.landscape === toolbarLandscape ? toolbarChoice.collapsed : toolbarLandscape
   const playerRef = useRef(null)
   const stageRef = useRef(null)
@@ -1050,7 +1055,7 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
     onBack()
   }
   return (
-    <div ref={playerRef} className={`player${game.kind === 'j2me' ? ' j2mePlayer' : ''}${game.kind === 'flash' ? ' flashPlayer' : ''}${game.kind === 'flash' && isFullscreen ? ' flashPlayerFullscreen' : ''}${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
+    <div ref={playerRef} className={`player${game.kind === 'j2me' ? ' j2mePlayer' : ''}${game.kind === 'j2me' || game.kind === 'maopao' ? ' phoneRuntimePlayer' : ''}${game.kind === 'flash' ? ' flashPlayer' : ''}${game.kind === 'flash' && isFullscreen ? ' flashPlayerFullscreen' : ''}${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
       <div className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <Button className="runtimeToolbarToggle" onClick={() => setToolbarChoice({ landscape: toolbarLandscape, collapsed: !toolbarCollapsed })} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}><MoreOutline aria-hidden="true" /></Button>
         {!toolbarCollapsed && <div className="runtimeToolbarContent">
@@ -1058,15 +1063,17 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
           <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
           <span className="runtimeToolbarSpacer" />
           {game.kind === 'j2me' && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={openSettings} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><SetOutline aria-hidden="true" /></Button>}
+          {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => setKeypadSettingsOpen(true)} aria-label="键盘设置" title="键盘设置"><AppstoreOutline aria-hidden="true" /></Button>}
           {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => setInputMappingOpen(true)} aria-label="按键映射" title="按键映射" disabled={runtimeReadyFor !== game.file}><CalculatorOutline aria-hidden="true" /></Button>}
           <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? <ShrinkOutline aria-hidden="true" /> : <ArrowsAltOutline aria-hidden="true" />}</Button>
         </div>}
       </div>
       <div ref={stageRef} className={game.kind === 'flash' ? 'playerStage flashPlayerStage' : 'playerStage'}>
-        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} />}
+        {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
       <InputMappingPopup visible={inputMappingOpen} onClose={() => setInputMappingOpen(false)} />
+      {(game.kind === 'j2me' || game.kind === 'maopao') && <KeypadSettingsPopup visible={keypadSettingsOpen} onClose={() => setKeypadSettingsOpen(false)} />}
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true" aria-label="退出当前游戏？">
           <div className="exitBox">
@@ -1099,10 +1106,14 @@ export function RuntimeFramePage() {
   const query = new URLSearchParams(location.search)
   const [nativeBackSignal, requestBack] = useNativeBackRequest()
   const leave = useCallback(() => window.parent.postMessage(RUNTIME_EXIT_MESSAGE, window.location.origin), [])
+  const keepPlaying = useCallback(() => window.parent.postMessage(RUNTIME_CANCEL_EXIT_MESSAGE, window.location.origin), [])
   const name = query.get('name') || file.split('/').pop() || file
-  const game = GAME_KINDS.has(kind) && file
-    ? { kind, file, name, vendor: '', desc: '', size: 0, iconUrl: null, local: query.get('local') === '1' }
-    : null
+  const local = query.get('local') === '1'
+  // One object per game, not per render: the players boot the runtime when the game changes, and classic
+  // runtime scripts cannot run twice in one document.
+  const game = useMemo(() => (GAME_KINDS.has(kind) && file
+    ? { kind, file, name, vendor: '', desc: '', size: 0, iconUrl: null, local }
+    : null), [kind, file, name, local])
 
   useLayoutEffect(() => {
     const parent = window.parent
@@ -1119,11 +1130,11 @@ export function RuntimeFramePage() {
   }, [requestBack])
 
   return game && FRAME_RUNTIME_KINDS.has(game.kind)
-    ? <Player game={game} nativeBackSignal={nativeBackSignal} onBack={leave} />
+    ? <Player game={game} nativeBackSignal={nativeBackSignal} onBack={leave} onCancelBack={keepPlaying} />
     : null
 }
 
-function RuntimeFrame({ route, nativeBackSignal, onBack }) {
+function RuntimeFrame({ route, nativeBackSignal, onBack, onCancelBack }) {
   const frame = useRef(null)
   const lastBackSignal = useRef(nativeBackSignal)
   const pendingBack = useRef(false)
@@ -1139,6 +1150,7 @@ function RuntimeFrame({ route, nativeBackSignal, onBack }) {
     const receive = (event) => {
       if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow) return
       if (event.data === RUNTIME_EXIT_MESSAGE) onBack()
+      if (event.data === RUNTIME_CANCEL_EXIT_MESSAGE) onCancelBack?.()
       if (event.data === RUNTIME_READY_MESSAGE) {
         syncInsets()
         event.source.focus()
@@ -1154,7 +1166,7 @@ function RuntimeFrame({ route, nativeBackSignal, onBack }) {
       window.removeEventListener('message', receive)
       window.removeEventListener('xiaochao:hostinsets', syncInsets)
     }
-  }, [onBack])
+  }, [onBack, onCancelBack])
 
   useEffect(() => {
     if (lastBackSignal.current === nativeBackSignal) return
@@ -1182,18 +1194,12 @@ export default function App() {
   const tab = TAB_IDS.has(tabParam) ? tabParam : 'j2me'
   const gameFile = params['*'] || ''
   const gameName = query.get('name') || gameFile.split('/').pop() || gameFile
-  const game = routeType === 'play' && GAME_KINDS.has(params.kind) && gameFile
-    ? {
-      kind: params.kind,
-      file: gameFile,
-      name: gameName,
-      vendor: '',
-      desc: '',
-      size: 0,
-      iconUrl: null,
-      local: query.get('local') === '1',
-    }
-    : null
+  const gameLocal = query.get('local') === '1'
+  const gameKind = params.kind
+  // Same object for the same game across renders (see RuntimeFramePage).
+  const game = useMemo(() => (routeType === 'play' && GAME_KINDS.has(gameKind) && gameFile
+    ? { kind: gameKind, file: gameFile, name: gameName, vendor: '', desc: '', size: 0, iconUrl: null, local: gameLocal }
+    : null), [routeType, gameKind, gameFile, gameName, gameLocal])
   const route = routeType === 'play' && game
     ? routeForGame(game, query.get('tab') || tab)
     : routeType === 'keyboard-test'
@@ -1204,9 +1210,18 @@ export default function App() {
   const playing = route.type === 'play'
   const keyboardTest = route.type === 'keyboard-test'
   const directEntryStarted = useRef(false)
-  const shouldBlock = useCallback(({ currentLocation, nextLocation, historyAction }) =>
-    currentLocation.pathname.startsWith('/play/') && currentLocation.pathname !== nextLocation.pathname, [])
+  const pendingDirectPlay = useRef(null)
+  // Set while the app itself leaves a game: only navigations the user starts (back button, swipe, native back)
+  // go through the exit confirmation. Without it the app's own exit was blocked and turned into another
+  // back request, so "退出游戏" never left the game.
+  const exitingRef = useRef(false)
+  const shouldBlock = useCallback(({ currentLocation, nextLocation }) =>
+    !exitingRef.current && currentLocation.pathname.startsWith('/play/') && currentLocation.pathname !== nextLocation.pathname, [])
   const blocker = useBlocker(shouldBlock)
+
+  useEffect(() => {
+    if (!playing) exitingRef.current = false
+  }, [playing])
 
   useLayoutEffect(() => {
     if (!playing && libraryScroll.current !== null) {
@@ -1235,25 +1250,27 @@ export default function App() {
     requestBack()
   }, [blocker.state, requestBack])
 
+  // A game opened by direct link gets a library entry beneath it, so back and exit land in the lobby. The
+  // pending game lives in a ref, not in that entry's history state: state survives, and returning to the
+  // entry later (back from the game) would launch the game again.
   useEffect(() => {
     if (route.type === 'play' && !location.state?.xiaochaoGameEntry && !directEntryStarted.current) {
       directEntryStarted.current = true
-      navigate(routePath(routeForLibrary(route.tab)), {
-        replace: true,
-        state: { pendingDirectPlay: routePath(route) },
-      })
+      pendingDirectPlay.current = routePath(route)
+      navigate(routePath(routeForLibrary(route.tab)), { replace: true })
       return
     }
-    if (route.type === 'library' && location.state?.pendingDirectPlay) {
-      navigate(location.state.pendingDirectPlay, {
-        state: { xiaochaoGameEntry: true, originTab: route.tab },
-      })
+    if (route.type === 'library' && pendingDirectPlay.current) {
+      const target = pendingDirectPlay.current
+      pendingDirectPlay.current = null
+      navigate(target, { state: { xiaochaoGameEntry: true, originTab: route.tab } })
     }
   }, [location.state, navigate, route])
 
+  // Tabs replace rather than push: a back gesture leaves the lobby instead of walking through every tab visited.
   function switchTab(id) {
     const next = routeForLibrary(id)
-    navigate(routePath(next))
+    navigate(routePath(next), { replace: true })
     localStorage.setItem('xiaochao-tab', id)
   }
 
@@ -1264,11 +1281,17 @@ export default function App() {
   }
 
   const leaveGame = useCallback(() => {
+    // Once: a second request (double tap, a back gesture during the exit) would step back past the lobby.
+    if (exitingRef.current) return
     const originTab = TAB_IDS.has(location.state?.originTab) ? location.state.originTab : tab
     const next = routeForLibrary(originTab)
-    if (blocker.state === 'blocked') blocker.proceed()
-    else navigate(routePath(next), { replace: true })
     localStorage.setItem('xiaochao-tab', next.tab)
+    // The user's own back navigation is waiting at the blocker: let it through.
+    if (blocker.state === 'blocked') return blocker.proceed()
+    exitingRef.current = true
+    // Entered from the lobby: step back to that entry instead of stacking a second lobby entry on top of it.
+    if (location.state?.xiaochaoGameEntry) navigate(-1)
+    else navigate(routePath(next), { replace: true })
   }, [blocker, location.state, navigate, tab])
   const cancelBlockedBack = useCallback(() => {
     if (blocker.state === 'blocked') blocker.reset()
@@ -1292,7 +1315,7 @@ export default function App() {
     </div>
     {keyboardTest && <Suspense fallback={null}><KeyboardTestPage /></Suspense>}
     {playing && (FRAME_RUNTIME_KINDS.has(route.game.kind)
-      ? <RuntimeFrame key={routePath(route)} route={route} nativeBackSignal={nativeBackSignal} onBack={leaveGame} />
+      ? <RuntimeFrame key={routePath(route)} route={route} nativeBackSignal={nativeBackSignal} onBack={leaveGame} onCancelBack={cancelBlockedBack} />
       : <Player game={route.game} nativeBackSignal={nativeBackSignal} onBack={leaveGame} onCancelBack={cancelBlockedBack} />)}
   </>
 }

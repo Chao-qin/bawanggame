@@ -2,6 +2,74 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Group, Layer, Rect, Stage, Text } from 'react-konva'
 import { createPointerState, pointerCancel, pointerDown, pointerUp, pressedKeyIds, releaseAll } from './pointer-state.js'
 
+const KEY_FILL = { abxy: '#d28b63', dpad: '#75a9c8', soft: '#34445a' }
+
+/** Legend placement for any key height: centred, with the secondary legend under the main one — or, on keys much
+ *  wider than tall (a phone's digit keys), beside it, the way "2 abc" is printed on a candybar phone. */
+export function legendLayout(item) {
+  const face = item.height - 0.08
+  const size = Math.min(0.28, item.width * 0.32, face * 0.48)
+  if (!item.secondaryLegend) return { main: { x: 0.06, y: (face - size) / 2, width: item.width - 0.2, size, align: 'center' } }
+  const small = Math.min(0.18, face * 0.3)
+  if (item.width >= item.height * 1.6) {
+    return {
+      main: { x: 0, y: (face - size) / 2, width: item.width * 0.5, size, align: 'right' },
+      secondary: { x: item.width * 0.56, y: (face - small) / 2 + size * 0.08, width: item.width * 0.4, size: small, align: 'left' },
+    }
+  }
+  return {
+    main: { x: 0.06, y: face * 0.13, width: item.width - 0.2, size, align: 'center' },
+    secondary: { x: 0.12, y: face * 0.68, width: item.width - 0.2, size: small, align: 'left' },
+  }
+}
+
+/** One key, drawn in device pixels rather than by scaling a group of 1-unit keys: legends would otherwise be laid
+ *  out at a ~0.3px font size, where CJK glyph measurement collapses and labels overlap. Depth comes from a solid
+ *  edge, not shadowBlur — a blurred shadow per key over a DPR-3 canvas cost seconds per frame on a 4x-throttled
+ *  CPU and froze the game beside it. */
+function KeyFace({ item, scale, pressed }) {
+  const legend = legendLayout(item)
+  const u = (value) => value * scale
+  const face = { width: u(item.width - 0.08), height: u(item.height - 0.08), cornerRadius: u(0.12), perfectDrawEnabled: false }
+  return <>
+    {!pressed && <Rect {...face} y={u(0.06)} fill="#0b1118" listening={false} />}
+    {/* The held face sits exactly on the resting one (no sink offset), so nothing of the resting key shows. */}
+    <Rect
+      {...face}
+      fill={pressed ? '#74d8bd' : KEY_FILL[item.block] || '#273444'}
+      stroke={pressed ? '#dbfff4' : '#65748a'}
+      strokeWidth={u(0.035)}
+    />
+    <Text
+      x={u(legend.main.x)}
+      y={u(legend.main.y)}
+      width={u(legend.main.width)}
+      text={item.label}
+      fontFamily="system-ui, sans-serif"
+      fontSize={u(legend.main.size)}
+      fontStyle="600"
+      align={legend.main.align}
+      wrap="none"
+      fill={pressed ? '#102720' : '#f2f6fb'}
+      listening={false}
+    />
+    {legend.secondary && (
+      <Text
+        x={u(legend.secondary.x)}
+        y={u(legend.secondary.y)}
+        width={u(legend.secondary.width)}
+        text={item.secondaryLegend}
+        fontFamily="system-ui, sans-serif"
+        fontSize={u(legend.secondary.size)}
+        align={legend.secondary.align}
+        wrap="none"
+        fill={pressed ? '#102720' : '#aebacf'}
+        listening={false}
+      />
+    )}
+  </>
+}
+
 function boundsFor(keys) {
   return keys.reduce((bounds, item) => ({
     left: Math.min(bounds.left, item.x),
@@ -101,9 +169,19 @@ export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = '
         pointerTargets.current.delete(pointerId)
       }
     }
-    callbacks.current.onKeyDown?.(keyData, pointerId)
+    callbacks.current.onKeyDown?.(keyData, pointerId, event.evt)
     syncPressed()
   }, [syncPressed])
+
+  const restingKeys = useMemo(() => (
+    <Group x={offsetX} y={offsetY}>
+      {layout.keys.map((item) => (
+        <Group key={item.id} x={item.x * scale} y={item.y * scale} onPointerDown={(event) => press(item, event)}>
+          <KeyFace item={item} scale={scale} pressed={false} />
+        </Group>
+      ))}
+    </Group>
+  ), [layout, offsetX, offsetY, scale, press])
 
   return (
     <div
@@ -116,50 +194,14 @@ export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = '
     >
       {scale > 0 && (
         <Stage width={size.width} height={height} listening>
-          <Layer>
-            <Group x={offsetX} y={offsetY} scaleX={scale} scaleY={scale}>
-              {layout.keys.map((item) => {
-                const isPressed = pressed.has(item.id)
-                return (
-                  <Group key={item.id} x={item.x} y={item.y} onPointerDown={(event) => press(item, event)}>
-                    <Rect
-                      width={item.width - 0.08}
-                      height={item.height - 0.08}
-                      cornerRadius={0.12}
-                      fill={isPressed ? '#74d8bd' : item.block === 'abxy' ? '#d28b63' : item.block === 'dpad' ? '#75a9c8' : '#273444'}
-                      stroke={isPressed ? '#dbfff4' : '#65748a'}
-                      strokeWidth={0.035}
-                      shadowColor="#000000"
-                      shadowBlur={isPressed ? 0 : 0.12}
-                      shadowOffsetY={isPressed ? 0 : 0.08}
-                    />
-                    <Text
-                      x={0.06}
-                      y={item.secondaryLegend ? 0.12 : 0.31}
-                      width={item.width - 0.2}
-                      height={0.36}
-                      text={item.label}
-                      fontFamily="system-ui, sans-serif"
-                      fontSize={Math.min(0.28, item.width * 0.32)}
-                      fontStyle="600"
-                      align="center"
-                      fill={isPressed ? '#102720' : '#f2f6fb'}
-                      listening={false}
-                    />
-                    {item.secondaryLegend && (
-                      <Text
-                        x={0.12}
-                        y={0.66}
-                        text={item.secondaryLegend}
-                        fontFamily="system-ui, sans-serif"
-                        fontSize={0.18}
-                        fill={isPressed ? '#102720' : '#aebacf'}
-                        listening={false}
-                      />
-                    )}
-                  </Group>
-                )
-              })}
+          {/* Two layers: every key at rest, drawn once per layout and size, and only the held keys on top. A press
+              then redraws one or two keys instead of the whole keyboard. */}
+          <Layer>{restingKeys}</Layer>
+          <Layer listening={false}>
+            <Group x={offsetX} y={offsetY}>
+              {layout.keys.filter((item) => pressed.has(item.id)).map((item) => (
+                <Group key={item.id} x={item.x * scale} y={item.y * scale}><KeyFace item={item} scale={scale} pressed /></Group>
+              ))}
             </Group>
           </Layer>
         </Stage>
