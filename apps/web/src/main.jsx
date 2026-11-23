@@ -2,15 +2,18 @@ import React from 'react'
 import { ConfigProvider } from 'antd-mobile'
 import zhCN from 'antd-mobile/es/locales/zh-CN'
 import { createRoot } from 'react-dom/client'
+import { RouterProvider } from 'react-router-dom'
 import '@unocss/reset/tailwind.css'
 import 'virtual:uno.css'
 import './mobile-ui.css'
-import App, { isRuntimeFrame, RuntimeFramePage } from './App.jsx'
+import { isRuntimeFrame } from './App.jsx'
+import { createApplicationRouter } from './router.jsx'
 
 const runtimeFrame = isRuntimeFrame()
+const router = createApplicationRouter(runtimeFrame)
 
 function render() {
-  createRoot(document.getElementById('root')).render(<ConfigProvider locale={zhCN}>{runtimeFrame ? <RuntimeFramePage /> : <App />}</ConfigProvider>)
+  createRoot(document.getElementById('root')).render(<ConfigProvider locale={zhCN}><RouterProvider router={router} /></ConfigProvider>)
 }
 
 async function clearLegacyBrowserState() {
