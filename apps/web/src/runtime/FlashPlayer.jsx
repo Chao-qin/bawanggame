@@ -78,6 +78,8 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
           scale: 'showAll',
           letterbox: 'on',
           align: 'center',
+          // 触屏长按不弹 Ruffle 菜单，桌面右键保留。
+          contextMenu: 'rightClickOnly',
         }
         if (!window.RufflePlayer.newest) await loadClassic('/ruffle/ruffle.js', session)
         ensureActive()

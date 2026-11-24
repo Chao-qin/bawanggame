@@ -24,6 +24,21 @@ body {
   background: var(--ui-background);
   color: var(--ui-text);
 }
+/* 应用界面不是文档：长按不选字、不弹系统菜单；输入控件保留选择和粘贴。JS 兜底见 selection-guard.js。 */
+html,
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+input,
+textarea,
+[contenteditable]:not([contenteditable="false"]) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
 body, :root:root {
   --adm-color-primary: var(--ui-accent);
   --adm-color-danger: #ff9aa3;
@@ -265,6 +280,8 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
   font-weight: 800;
 }
 .gameArtwork img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* 游戏图标只做展示：长按不弹「保存图片/识图」，点击落到外层按钮。 */
+.gameArtwork img { -webkit-user-drag: none; pointer-events: none; }
 .gameEntryInfo { display: grid; flex: 1 1 auto; min-width: 0; gap: 4px; }
 .cardName, .cardMeta, .optionTitle strong, .storeInfoTitle, .storeInfoDesc {
   display: block;
