@@ -456,11 +456,12 @@ try {
     return { bottom: nav.getBoundingClientRect().bottom, height: innerHeight, active: nav.querySelector('[aria-current="page"]')?.innerText, overflow: document.documentElement.scrollWidth > innerWidth }
   })()`)
   requireCheck(!mobileNav.overflow && Math.abs(mobileNav.bottom - mobileNav.height) < 2 && mobileNav.active === 'J2ME', 'mobile navigation overflows or lost its active state')
+  // Tabs replace the history entry (App.jsx switchTab): a back gesture leaves the lobby instead of walking back through
+  // every tab visited.
+  const historyBeforeTab = await evaluate("({ length: history.length, idx: history.state?.idx })")
   await evaluate(`[...document.querySelectorAll('.tab')].find(node => node.textContent === 'Flash').click()`)
   requireCheck(await evaluate("location.hash === '#/library/flash'"), 'mobile tab did not update route')
-  await evaluate("history.back()")
-  await sleep(300)
-  requireCheck(await evaluate("document.querySelector('.tab[aria-current=page]')?.textContent === 'J2ME'"), 'browser Back did not restore selected tab')
+  requireCheck(await evaluate(`history.length === ${historyBeforeTab.length} && history.state?.idx === ${JSON.stringify(historyBeforeTab.idx ?? null)}`), 'switching tabs added a history entry')
   await send('Emulation.clearDeviceMetricsOverride')
 
   const optionTarget = await evaluate(`(() => {
@@ -488,28 +489,41 @@ try {
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
   requireCheck(await evaluate(`JSON.stringify(window.__flashKeyEvents) === JSON.stringify([['keydown','ArrowRight'],['keyup','ArrowRight']])`), 'physical keyboard events did not reach Ruffle exactly once')
+  // The Flash gamepad (FlashKeypad.jsx) follows the Flash keypad choice; a mouse device defaults to no on-screen keys,
+  // so pick the gamepad as a touch player would.
+  await evaluate(`localStorage.setItem('xiaochao.flashKeypad.v1', JSON.stringify({ style: 'gamepad', placement: 'docked' })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); true`)
   for (const [width, height] of [[390, 844], [844, 390]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
     await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
-    await sleep(180)
+    await sleep(250)
     const layout = await evaluate(`(() => {
       const read = (selector) => { const node = document.querySelector(selector); if (!node) return null; const r = node.getBoundingClientRect(); return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height} }
-      const toolbar = read('.runtimeToolbar')
-      const stage = read('.playerStage')
-      const canvas = read('ruffle-player')
-      const controls = read('.flashControls')
-      const collapsed = document.querySelector('.runtimeToolbar')?.classList.contains('runtimeToolbarCollapsed')
-      return {toolbar, stage, canvas, controls, controlsDisplay: getComputedStyle(document.querySelector('.flashControls')).display, collapsed, scrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth, viewportHeight: innerHeight}
+      return {toolbar: read('.runtimeToolbar'), stage: read('.playerStage'), canvas: read('ruffle-player'), full: read('.flashKeypadFull'), nav: read('.flashKeypadNav'), actions: read('.flashKeypadActions'),
+        orientation: document.querySelector('.flashRuntimeView')?.dataset.orientation, scrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth, viewportHeight: innerHeight}
     })()`)
     console.log(`Flash layout ${width}x${height}:`, JSON.stringify(layout))
     requireCheck(layout.stage && layout.canvas && layout.stage.width > 0 && layout.stage.height > 0, `Flash stage is unstable at ${width}x${height}`)
     requireCheck(layout.scrollWidth <= layout.viewportWidth + 1, `Flash layout overflows horizontally at ${width}x${height}`)
-    requireCheck(layout.controlsDisplay !== 'none', `Touch controls are hidden at ${width}x${height}`)
-    if (width > height) requireCheck(layout.stage.height >= height - 2 && layout.stage.left >= 110 && layout.stage.right <= width - 110, 'Landscape Flash stage did not reserve side keypad areas')
-    else requireCheck(layout.stage.width >= width - 2 && layout.controls.top >= layout.stage.bottom - 1, 'Portrait Flash stage/keypad layout is invalid')
-    const keyButton = await evaluate(`(() => { const r=document.querySelector('.flashKey-left').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2} })()`)
+    if (width > height) {
+      requireCheck(layout.orientation === 'landscape' && layout.nav && layout.actions, 'Landscape Flash gamepad halves missing')
+      requireCheck(layout.canvas.left >= layout.nav.right - 1 && layout.canvas.right <= layout.actions.left + 1, 'Landscape Flash screen overlaps the side keypads')
+    } else {
+      requireCheck(layout.orientation === 'portrait' && layout.full, 'Portrait Flash gamepad missing')
+      requireCheck(layout.canvas.width >= width - 2 && layout.full.top >= layout.canvas.bottom - 1, 'Portrait Flash stage/keypad layout is invalid')
+    }
+    // Left on the wheel: the wheel is the whole landscape nav half, and the left part of the portrait keypad.
+    const keyButton = await evaluate(`(() => {
+      const host = document.querySelector('.flashKeypadNav .keyboardCanvas, .flashKeypadFull .keyboardCanvas').getBoundingClientRect()
+      const [w, h, wheelX, wheelY, wheelSize] = document.querySelector('.flashKeypadNav') ? [2.6, 2.6, 0, 0, 2.6] : [6.95, 3.4, 0, 0, 3.4]
+      const scale = Math.min(host.width / w, host.height / h)
+      const left = host.x + (host.width - w * scale) / 2
+      const top = host.y + (host.height - h * scale) / 2
+      return { x: left + (wheelX + wheelSize * 0.17) * scale, y: top + (wheelY + wheelSize / 2) * scale }
+    })()`)
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [keyButton] })
+    await sleep(60)
     await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await sleep(60)
     const touchEvents = await evaluate(`window.__flashKeyEvents.slice(-2)`)
     requireCheck(JSON.stringify(touchEvents) === JSON.stringify([['keydown','ArrowLeft'],['keyup','ArrowLeft']]), `touch keypad did not send a paired key event: ${JSON.stringify(touchEvents)}`)
   }
@@ -518,13 +532,14 @@ try {
   await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [fullscreenButton] })
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await sleep(250)
-  const fullscreenControls = await evaluate(`({ fullscreen: !!document.fullscreenElement, hidden: getComputedStyle(document.querySelector('.flashControls')).display === 'none', stage: (() => { const r=document.querySelector('.playerStage').getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom} })() })`)
+  // Fullscreen keeps the chosen keypad, the same as the J2ME and MRP runtimes; the screen fits between the halves.
+  const fullscreenControls = await evaluate(`({ fullscreen: !!document.fullscreenElement, keypad: document.querySelectorAll('.flashKeypad').length, stage: (() => { const r=document.querySelector('.playerStage').getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom} })() })`)
   console.log('Flash fullscreen:', JSON.stringify(fullscreenControls))
-  requireCheck(fullscreenControls.fullscreen && fullscreenControls.hidden && fullscreenControls.stage.left <= 1 && fullscreenControls.stage.top <= 1, 'landscape fullscreen should auto-fit without touch controls')
+  requireCheck(fullscreenControls.fullscreen && fullscreenControls.keypad === 2 && fullscreenControls.stage.top <= 1, 'landscape fullscreen should fit the screen between the gamepad halves')
   requireCheck(await evaluate(`document.activeElement?.matches('ruffle-player')`), 'Flash did not regain keyboard focus when entering fullscreen')
   await evaluate('document.exitFullscreen()')
   await sleep(150)
-  requireCheck(await evaluate(`getComputedStyle(document.querySelector('.flashControls')).display !== 'none'`), 'touch controls did not return after fullscreen exit')
+  requireCheck(await evaluate(`document.querySelectorAll('.flashKeypad').length === 2`), 'gamepad missing after fullscreen exit')
   await send('Emulation.setTouchEmulationEnabled', { enabled: false })
   await send('Emulation.clearDeviceMetricsOverride')
   await evaluate(`window.__XIAOCHAO_NATIVE_BACK_REQUEST__?.(); true`)
@@ -539,33 +554,52 @@ try {
   await navigate('#/play/j2me/layout-probe.jar?tab=j2me&name=Layout%20Probe', 800)
   await waitFor("document.querySelector('.runtimeFrame')?.contentDocument?.querySelector('#phone')", 'J2ME runtime markup')
   await waitFor("!![...document.querySelector('.runtimeFrame').contentDocument.styleSheets].find((sheet) => sheet.href?.includes('/style/main.css'))", 'J2ME runtime stylesheet')
-  for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
-    if (height > width) {
-      console.log(`SKIP: synthetic J2ME portrait geometry requires a game fixture (${width}x${height})`)
-      continue
-    }
-    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
-    const layout = await evaluate(`(() => {
-      const frame = document.querySelector('.runtimeFrame')
-      const doc = frame.contentDocument
-      doc.body.dataset.orientation = '${width > height ? 'landscape' : 'portrait'}'
-      const keypad = doc.querySelector('#keypad')
-      keypad.className = 'keypad-4'
-      const read = (selector) => {
-        const node = doc.querySelector(selector)
-        const r = node.getBoundingClientRect()
-        return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height}
+  // Both keypad styles (keypad-prefs.js; T9 is the default): the visible controls take the side columns in
+  // landscape and the game surface sits between them.
+  const setKeypadStyle = (style) => evaluate(`(() => {
+    const frame = document.querySelector('.runtimeFrame')
+    frame.contentWindow.localStorage.setItem('xiaochao.runtimeKeypad.v1', JSON.stringify({ style: '${style}', placement: 'docked' }))
+    frame.contentWindow.dispatchEvent(new frame.contentWindow.CustomEvent('xiaochao:keypadprefs'))
+    return true
+  })()`)
+  for (const style of ['t9', 'classic']) {
+    await setKeypadStyle(style)
+    for (const [width, height] of [[844, 390], [667, 375], [390, 844]]) {
+      if (height > width) {
+        console.log(`SKIP: synthetic J2ME portrait geometry requires a game fixture (${width}x${height})`)
+        continue
       }
-      const nav = read('#nav'), numpad = read('#numpad'), display = read('#display-container')
-      const overlaps = (a,b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1
-      return {nav, numpad, display, scrollWidth:doc.documentElement.scrollWidth, navColumn:frame.contentWindow.getComputedStyle(doc.querySelector('#nav')).gridColumnStart, numpadColumn:frame.contentWindow.getComputedStyle(doc.querySelector('#numpad')).gridColumnStart, navDisplay:overlaps(nav,display), numpadDisplay:overlaps(numpad,display)}
-    })()`)
-    console.log(`J2ME layout ${width}x${height}:`, JSON.stringify(layout))
-    requireCheck(layout.scrollWidth <= width + 1, `J2ME runtime overflows horizontally at ${width}x${height}`)
-    requireCheck(!layout.navDisplay && !layout.numpadDisplay, `J2ME controls overlap game surface at ${width}x${height}`)
-    requireCheck(layout.navColumn === '1' && layout.numpadColumn === '3', `J2ME landscape controls are not on the agreed sides at ${width}x${height}`)
-    requireCheck(layout.display.left >= layout.nav.right - 1 && layout.display.right <= layout.numpad.left + 1, `J2ME game surface is not between controls at ${width}x${height}`)
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+      await sleep(200)
+      const layout = await evaluate(`(() => {
+        const frame = document.querySelector('.runtimeFrame')
+        const doc = frame.contentDocument
+        doc.body.dataset.orientation = '${width > height ? 'landscape' : 'portrait'}'
+        const keypad = doc.querySelector('#keypad')
+        keypad.className = 'keypad-4'
+        const t9 = doc.body.dataset.keypadStyle === 't9'
+        const [navSelector, numpadSelector] = t9 ? ['.t9KeypadNav', '.t9KeypadNumpad'] : ['#nav', '#numpad']
+        const read = (selector) => {
+          const node = doc.querySelector(selector)
+          if (!node) return null
+          const r = node.getBoundingClientRect()
+          return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height}
+        }
+        const nav = read(navSelector), numpad = read(numpadSelector), display = read('#display-container')
+        if (!nav || !numpad) return { style: doc.body.dataset.keypadStyle, missing: true }
+        const overlaps = (a,b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1
+        const column = (selector) => frame.contentWindow.getComputedStyle(doc.querySelector(selector)).gridColumnStart
+        return {style: doc.body.dataset.keypadStyle, nav, numpad, display, scrollWidth:doc.documentElement.scrollWidth, navColumn:column(navSelector), numpadColumn:column(numpadSelector), navDisplay:overlaps(nav,display), numpadDisplay:overlaps(numpad,display)}
+      })()`)
+      console.log(`J2ME layout ${style} ${width}x${height}:`, JSON.stringify(layout))
+      requireCheck(layout.style === style && !layout.missing && layout.nav.width > 0 && layout.numpad.width > 0, `J2ME ${style} keypad is not shown at ${width}x${height}`)
+      requireCheck(layout.scrollWidth <= width + 1, `J2ME runtime overflows horizontally at ${width}x${height}`)
+      requireCheck(!layout.navDisplay && !layout.numpadDisplay, `J2ME ${style} controls overlap game surface at ${width}x${height}`)
+      requireCheck(layout.navColumn === '1' && layout.numpadColumn === '3', `J2ME ${style} landscape controls are not on the agreed sides at ${width}x${height}`)
+      requireCheck(layout.display.left >= layout.nav.right - 1 && layout.display.right <= layout.numpad.left + 1, `J2ME ${style} game surface is not between controls at ${width}x${height}`)
+    }
   }
+  await setKeypadStyle('t9')
   await send('Emulation.clearDeviceMetricsOverride')
   await evaluate(`(() => {
     const frame = document.querySelector('.runtimeFrame')
@@ -577,6 +611,11 @@ try {
   await waitFor("!document.querySelector('.runtimeFrame')", 'J2ME runtime cleanup')
   await navigate('#/play/flash/fruit-madness.swf?tab=flash&name=Fruit%20Madness', 1200)
   requireCheck(await evaluate("!!document.querySelector('.playerStage')"), 'Flash re-entry did not mount')
+  // The lobby tabs are hidden during play: leave the game through its exit confirmation first.
+  await evaluate(`window.__XIAOCHAO_NATIVE_BACK_REQUEST__?.(); true`)
+  await waitFor("!!document.querySelector('.exitConfirm')", 'Flash re-entry exit confirmation')
+  await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
+  await waitFor("!document.querySelector('.playerStage')", 'Flash re-entry exit')
   await evaluate(`[...document.querySelectorAll('.tab')].find(node => node.textContent.includes('Flash 商城'))?.click()`)
   await sleep(3000)
   const flashStore = await evaluate(`(() => ({ images: [...document.querySelectorAll('.flashCover img')].filter((image) => !!image.getAttribute('src')).length, failedImages: [...document.querySelectorAll('.flashCover img')].filter((image) => image.hidden).length, importCollapsed: !document.querySelector('.flashAdvanced')?.open }))()`)
@@ -614,6 +653,11 @@ try {
     console.log('J2ME startup:', JSON.stringify(j2me))
     requireCheck(j2me.player && j2me.phone && j2me.editor, 'J2ME player did not mount')
     requireCheck(j2me.states.includes('boot') || j2me.states.includes('failure') || j2me.boot || j2me.failure, 'J2ME startup state was never rendered')
+    // The checks below cover the classic keypad's own features (custom touch layouts, side swap, soft-key gaps), so
+    // they run with the classic keypad chosen; the T9 keypad (the default) is checked after them.
+    const chooseKeypad = (style) => evaluate(`localStorage.setItem('xiaochao.runtimeKeypad.v1', JSON.stringify({ style: '${style}', placement: 'docked' })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); true`)
+    await chooseKeypad('classic')
+    await sleep(150)
     const viewports = [[844, 390], [1280, 720], [390, 844], [320, 568], [375, 667]]
     for (const [width, height] of viewports) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
@@ -678,6 +722,21 @@ try {
     const standard = await rectSnapshot()
     requireCheck(!standard.navBeforeNumpad, 'standard side layout should keep navigation on the right')
     await evaluate(`window.TouchLayout.apply(window.TouchLayout.defaults()); window.ScreenSetup?.refit?.(); true`)
+    await chooseKeypad('t9')
+    for (const [width, height] of [[844, 390], [375, 667]]) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+      await evaluate(`document.body.dataset.orientation='${width > height ? 'landscape' : 'portrait'}'; window.ScreenSetup?.refit?.(); true`)
+      await sleep(250)
+      const t9 = await evaluate(`(() => {
+        const read = (selector) => { const node = document.querySelector(selector); if (!node) return null; const r = node.getBoundingClientRect(); return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height} }
+        return { style: document.body.dataset.keypadStyle, full: read('.t9KeypadFull'), nav: read('.t9KeypadNav'), numpad: read('.t9KeypadNumpad'), display: read('#display'), classicNav: getComputedStyle(document.querySelector('#nav')).display }
+      })()`)
+      console.log(`J2ME T9 ${width}x${height}:`, JSON.stringify(t9))
+      requireCheck(t9.style === 't9' && t9.classicNav === 'none', `T9 keypad not active at ${width}x${height}`)
+      if (width > height) requireCheck(t9.nav && t9.numpad && t9.nav.right <= t9.display.left + 1 && t9.numpad.left >= t9.display.right - 1, `T9 halves do not frame the screen at ${width}x${height}`)
+      // Short screens cap the keypad height (runtime-keypad.css), which can leave narrow side gutters.
+      else requireCheck(t9.full && t9.full.top >= t9.display.bottom - 1 && t9.full.width >= width * 0.9 && Math.abs(t9.full.left + t9.full.right - width) <= 2, `T9 portrait keypad is not centred under the screen at ${width}x${height}`)
+    }
     await send('Emulation.clearDeviceMetricsOverride')
     await clickPlayerBack()
     await sleep(150)
@@ -701,10 +760,19 @@ try {
   if (!MRP_FILE) {
     console.log('SKIP: no MRP fixture (set VERIFY_MRP_FILE)')
   } else {
-    await navigate(`#/play/maopao/${encodeURIComponent(MRP_FILE)}?tab=maopao&name=Verify%20MRP`, 1800)
-    const mrp = await evaluate(`(() => ({ player: !!document.querySelector('.player'), dialogText: !!document.querySelector('#mrp-dialog-text'), bridgeContainsDialog: !!document.querySelector('#editor-layer #mrp-dialog-text'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure') }))()`)
+    // MRP runs in the runtime frame, like J2ME.
+    inRuntimeFrame = true
+    await navigate(`#/play/maopao/${encodeURIComponent(MRP_FILE)}?tab=maopao&name=Verify%20MRP`, 2500)
+    const mrp = await evaluate(`(() => ({ player: !!document.querySelector('.player'), dialogText: !!document.querySelector('#mrp-dialog-text'), bridgeContainsDialog: !!document.querySelector('#editor-layer #mrp-dialog-text'), boot: !!document.querySelector('.runtimeBoot'), failure: !!document.querySelector('.runtimeFailure'), keypad: document.body.dataset.keypadStyle }))()`)
     console.log('MRP startup:', JSON.stringify(mrp))
     requireCheck(mrp.player && mrp.dialogText && !mrp.bridgeContainsDialog, 'MRP dialog/editor structure is invalid')
+    requireCheck(mrp.keypad === 't9', 'MRP does not share the T9 keypad choice')
+    await clickPlayerBack()
+    await sleep(150)
+    await evaluate(`document.querySelector('.exitConfirm .optionDanger')?.click(); true`)
+    inRuntimeFrame = false
+    await sleep(1000)
+    requireCheck(await evaluate("location.hash === '#/library/maopao' && !document.querySelector('.runtimeFrame')"), 'MRP exit did not return to its library')
   }
   }
 

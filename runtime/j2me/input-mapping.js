@@ -118,7 +118,7 @@
         root.dispatchEvent(new root.CustomEvent("xiaochao:inputbinding", { detail: { action: action, control: capturedKey, kind: "keyboard" } }));
         return;
       }
-      if (target && target.closest && target.closest("input, textarea, select, [contenteditable=true], #panel, #btroom, #files, #mrp-dialog, .inputMappingSheet, .exitConfirm")) return;
+      if (target && target.closest && target.closest("input, textarea, select, [contenteditable=true], #panel, #btroom, #files, #mrp-dialog, .runtimeSheet, .exitConfirm")) return;
       var action = event.key === "*" ? "star" : event.key === "#" ? "pound" : keyboardAction(event);
       if (!validAction(action)) return;
       event.preventDefault();

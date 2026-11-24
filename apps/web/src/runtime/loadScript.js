@@ -1,6 +1,6 @@
 const entries = new Map()
 let nextSessionId = 1
-const RUNTIME_VERSION = '20261123-4'
+const RUNTIME_VERSION = '20261124-1'
 const DEFAULT_TIMEOUT_MS = 45_000
 
 function versioned(src) {

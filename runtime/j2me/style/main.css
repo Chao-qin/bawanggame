@@ -955,7 +955,6 @@ body.runtime-active[data-orientation="landscape"] #nav {
 }
 
 body.runtime-active[data-orientation="landscape"] #numpad {
-  grid-column: 3 !important;
   --u: var(--control-unit);
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(4, minmax(30px, calc(var(--u) * 0.95)));
@@ -965,7 +964,6 @@ body.runtime-active[data-orientation="landscape"] #numpad {
 }
 
 body.runtime-active[data-orientation="landscape"] #nav {
-  grid-column: 1 !important;
   --u: var(--control-unit);
   height: calc(var(--u) * 4.6);
   min-height: calc(var(--u) * 4.6);
@@ -1703,8 +1701,11 @@ body[data-dpad-layout="rotate-ccw"] #right { grid-area: 1 / 2; }
 body[data-dpad-layout="rotate-ccw"] #down { grid-area: 2 / 3; }
 body[data-dpad-layout="rotate-ccw"] #left { grid-area: 3 / 2; }
 
-body.runtime-active[data-orientation="landscape"][data-side-layout="swapped"] #numpad { grid-column: 3 !important; }
-body.runtime-active[data-orientation="landscape"][data-side-layout="swapped"] #nav { grid-column: 1 !important; }
+/* Which side each half takes is the touch layout's choice (touch-layout.js sets data-side-layout): "standard" keeps
+   the navigation on the right (the landscape rules near the end of this file), "swapped" — the default — puts it on
+   the left. Landscape is either rule the stage uses: J2ME's data-orientation or the viewport (all MRP has). */
+body.runtime-active:is([data-orientation="landscape"], .viewport-landscape)[data-side-layout="swapped"] #numpad { grid-column: 3 !important; }
+body.runtime-active:is([data-orientation="landscape"], .viewport-landscape)[data-side-layout="swapped"] #nav { grid-column: 1 !important; }
 
 .layout-note {
   margin: 0;

@@ -55,7 +55,9 @@ function KeyFace({ item, scale, pressed }) {
   const u = (value) => value * scale
   const width = u(item.width - 0.08)
   const height = u(item.height - 0.08)
-  const face = { width, height, cornerRadius: u(Math.min(0.16, item.height * 0.2)), perfectDrawEnabled: false, listening: false }
+  // `radius` rounds a key into a pill or a circle (the Flash gamepad's action keys).
+  const radius = item.radius == null ? Math.min(0.16, item.height * 0.2) : Math.min(item.radius, (Math.min(item.width, item.height) - 0.08) / 2)
+  const face = { width, height, cornerRadius: u(radius), perfectDrawEnabled: false, listening: false }
   const ink = pressed ? LEGEND_PRESSED : TONE[item.tone] || LEGEND
   const indicator = item.indicator ? u(0.05) : 0
   return <>

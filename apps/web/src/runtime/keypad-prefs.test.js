@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DEFAULT_KEYPAD_PREFS, KEYPAD_PREFS_EVENT, KEYPAD_PREFS_KEY, normalizeKeypadPrefs, readKeypadPrefs, writeKeypadPrefs } from './keypad-prefs.js'
+import { DEFAULT_KEYPAD_PREFS, effectivePlacement, KEYPAD_PREFS_EVENT, KEYPAD_PREFS_KEY, normalizeKeypadPrefs, readKeypadPrefs, writeKeypadPrefs } from './keypad-prefs.js'
 
 const memoryStorage = (initial = {}) => {
   const values = new Map(Object.entries(initial))
@@ -26,4 +26,22 @@ test('a change is merged, saved and announced to the document', () => {
     [KEYPAD_PREFS_EVENT, { style: 't9', placement: 'floating' }],
     [KEYPAD_PREFS_EVENT, { style: 'classic', placement: 'floating' }],
   ])
+})
+
+test('Flash keeps its own keypad choice, apart from the J2ME / MRP one', () => {
+  const storage = memoryStorage()
+  const target = { dispatchEvent: () => {} }
+  writeKeypadPrefs({ style: 'classic' }, { storage, target })
+  assert.deepEqual(readKeypadPrefs(storage, 'flash'), { style: 'gamepad', placement: 'docked' }, 'phone choice does not leak into Flash')
+  writeKeypadPrefs({ style: 'hidden' }, { storage, target, family: 'flash' })
+  assert.deepEqual(readKeypadPrefs(storage, 'flash'), { style: 'hidden', placement: 'docked' })
+  assert.deepEqual(readKeypadPrefs(storage), { style: 'classic', placement: 'docked' }, 'Flash choice does not leak into phones')
+  assert.deepEqual(normalizeKeypadPrefs({ style: 't9' }, 'flash').style, 'gamepad', 'a phone style is not a Flash style')
+})
+
+test('only a keypad that can float is placed floating', () => {
+  assert.equal(effectivePlacement({ style: 't9', placement: 'floating' }), 'floating')
+  assert.equal(effectivePlacement({ style: 'classic', placement: 'floating' }), 'docked')
+  assert.equal(effectivePlacement({ style: 'gamepad', placement: 'floating' }, 'flash'), 'floating')
+  assert.equal(effectivePlacement({ style: 'hidden', placement: 'floating' }, 'flash'), 'docked')
 })

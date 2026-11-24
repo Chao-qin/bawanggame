@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { createRuntimeSession, loadClassic } from './loadScript.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
 import { get as getLocalFlash } from '../localFlash.js'
-import { FlashControls } from './FlashControls.jsx'
+import { FlashKeypad } from './FlashKeypad.jsx'
+import { useKeypadPrefs, useRuntimeOrientation } from './RuntimeKeypad.jsx'
+import { effectivePlacement } from './keypad-prefs.js'
 
 export function FlashPlayer({ game, onCleanupReady, onExit }) {
   const hostRef = useRef(null)
@@ -10,6 +12,8 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [canReturn, setCanReturn] = useState(false)
+  const [keypadPrefs] = useKeypadPrefs('flash')
+  const orientation = useRuntimeOrientation()
 
   useEffect(() => {
     let alive = true
@@ -85,10 +89,13 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
     }
   }, [game.file, game.local, onCleanupReady])
 
-  return <div className="runtime-view flashRuntimeView">
+  // The same stage contract as the phone runtimes: docked keys take their own space (under the screen in portrait, the
+  // side columns in landscape) and the screen fits the rest; floating keys sit over a full-stage screen.
+  return <div className="runtime-view flashRuntimeView" data-orientation={orientation}
+    data-keypad={playerElement ? keypadPrefs.style : 'hidden'} data-placement={effectivePlacement(keypadPrefs, 'flash')}>
     {loading && !error ? <RuntimeLoading label="正在启动 Flash 播放器…" /> : null}
     {error ? <RuntimeFailure message={error} onAction={canReturn ? onExit : undefined} actionLabel={canReturn ? '返回 Flash 库' : undefined} /> : null}
     <div ref={hostRef} className="flashRuffleHost" />
-    <FlashControls target={playerElement} />
+    <FlashKeypad target={playerElement} prefs={keypadPrefs} />
   </div>
 }
