@@ -101,6 +101,12 @@
       var requested = fb.vibrate == null ? 24 : Number(fb.vibrate);
       if (!(requested > 0)) return;
       var duration = Math.max(8, Math.min(40, Math.round(requested)));
+      // The app's shared channel (apps/web/src/runtime/haptics.js): native host looked up at press time, else the
+      // Vibration API. The fallback below keeps the standalone runtime pages working.
+      var shared = window.__XIAOCHAO_HAPTIC_PULSE__;
+      if (typeof shared === "function") {
+        try { shared(duration); return; } catch (_) {}
+      }
       var host = window.__XIAOCHAO_RN_HOST__;
       if (host && typeof host.haptic === "function") {
         try {

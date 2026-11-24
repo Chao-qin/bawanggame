@@ -44,10 +44,8 @@ export default defineConfig({
     deviceStatusRight: 'flex items-center gap-1.5 text-white/70',
   },
   preflights: [{
-    getCSS: () => ':root{--safe-area-top:env(safe-area-inset-top,0px);--safe-area-right:env(safe-area-inset-right,0px);--safe-area-bottom:env(safe-area-inset-bottom,0px);--safe-area-left:env(safe-area-inset-left,0px)}@media (orientation:landscape){.player .runtimeToolbarToggle{display:grid}.player.runtimePlayerToolbarCollapsed .playerStage{left:calc(56px + var(--safe-area-left,env(safe-area-inset-left,0px)));right:var(--safe-area-right,env(safe-area-inset-right,0px))}}.runtimeToolbar.runtimeToolbarCollapsed{border:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;left:max(8px,var(--safe-area-left,env(safe-area-inset-left,0px)));right:auto;transform:none}.player.runtimePlayerToolbarCollapsed .playerStage{top:max(8px,var(--safe-area-top,env(safe-area-inset-top,0px)))}.player:fullscreen.runtimePlayerToolbarCollapsed .playerStage{inset:max(8px,var(--safe-area-top,env(safe-area-inset-top,0px))) var(--safe-area-right,env(safe-area-right,0px)) 0 calc(56px + var(--safe-area-left,env(safe-area-left,0px)))}',
-  }, {
-    getCSS: () => '.player.runtimePlayerToolbarCollapsed .playerStage{left:calc(56px + var(--safe-area-left,env(safe-area-inset-left,0px)));right:var(--safe-area-right,env(safe-area-inset-right,0px))}',
-  }, {
-    getCSS: () => '.player.runtimePlayerToolbarCollapsed .playerStage{top:0}.player:fullscreen.runtimePlayerToolbarCollapsed .playerStage,.player:-webkit-full-screen.runtimePlayerToolbarCollapsed .playerStage{inset:0 var(--safe-area-right,env(safe-area-inset-right,0px)) 0 calc(56px + var(--safe-area-left,env(safe-area-inset-left,0px)))}',
+    // The player's stage and toolbar room are laid out in mobile-ui.css (fixed, whether the toolbar is collapsed or
+    // not); only the collapsed toolbar's own look lives here.
+    getCSS: () => ':root{--safe-area-top:env(safe-area-inset-top,0px);--safe-area-right:env(safe-area-inset-right,0px);--safe-area-bottom:env(safe-area-inset-bottom,0px);--safe-area-left:env(safe-area-inset-left,0px)}.runtimeToolbar.runtimeToolbarCollapsed{border:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;left:max(8px,var(--safe-area-left,env(safe-area-inset-left,0px)));right:auto;transform:none}',
   }],
 })

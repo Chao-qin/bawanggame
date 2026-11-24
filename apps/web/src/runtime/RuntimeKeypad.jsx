@@ -1,61 +1,62 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { KeyboardCanvas } from '../keyboard/KeyboardCanvas.jsx'
 import { getLayout, layoutGroup, T9_LANDSCAPE, T9_PORTRAIT } from '../keyboard/layouts.js'
-import { KEYPAD_PREFS_EVENT, readKeypadPrefs, writeKeypadPrefs } from './keypad-prefs.js'
+import { effectiveLayout, effectiveOpacity, effectivePlacement, KEYPAD_PREFS_EVENT, readKeypadPrefs, writeKeypadPrefs } from './keypad-prefs.js'
+import { keyHaptic } from './haptics.js'
 import './runtime-keypad.css'
 
-/** The keypad choice, kept in sync across every component of this document that shows or edits it. */
-export function useKeypadPrefs() {
-  const [prefs, setPrefs] = useState(readKeypadPrefs)
+/** The keypad choice of a runtime family ('phone' for J2ME and MRP, 'flash'), kept in sync across every component
+ *  of this document that shows or edits it. */
+export function useKeypadPrefs(family = 'phone') {
+  const [prefs, setPrefs] = useState(() => readKeypadPrefs(undefined, family))
   useEffect(() => {
-    const sync = () => setPrefs(readKeypadPrefs())
+    const sync = () => setPrefs(readKeypadPrefs(undefined, family))
+    sync()
     window.addEventListener(KEYPAD_PREFS_EVENT, sync)
     window.addEventListener('storage', sync)
     return () => {
       window.removeEventListener(KEYPAD_PREFS_EVENT, sync)
       window.removeEventListener('storage', sync)
     }
-  }, [])
-  return [prefs, useCallback((patch) => setPrefs(writeKeypadPrefs(patch)), [])]
+  }, [family])
+  return [prefs, useCallback((patch) => setPrefs(writeKeypadPrefs(patch, { family })), [family])]
 }
 
-// The same rule the runtime stylesheet lays the stage out by (runtime/j2me/style/main.css): landscape when J2ME's
-// screen.js says so (body[data-orientation], a game's forced orientation) or the viewport is landscape
-// (.viewport-landscape from responsive.js — all MRP has). Any other rule would put a portrait keypad into the
-// landscape side column, or the reverse.
+/** The orientation of the viewport itself (responsive.js). */
+export function viewportOrientation() {
+  return document.body.classList.contains('viewport-landscape') ? 'landscape' : 'portrait'
+}
+
+// The one layout rule every runtime lays its stage, keypad and toolbar out by: body[data-orientation]. J2ME's
+// screen.js sets it (a game's forced orientation, else the 「布局方向」 choice, else the viewport), the MRP stage
+// (useKeypadStage) and the Flash player set it from the 「布局方向」 choice or the viewport. The stylesheets
+// (runtime/j2me/style/main.css, runtime-keypad.css, mobile-ui.css) key on the same attribute; any other rule would
+// put a portrait keypad into the landscape side column, or the reverse.
 function currentOrientation() {
-  const body = document.body
-  return body.dataset.orientation === 'landscape' || body.classList.contains('viewport-landscape') ? 'landscape' : 'portrait'
+  const value = document.body.dataset.orientation
+  return value === 'landscape' || value === 'portrait' ? value : viewportOrientation()
 }
 
-function useRuntimeOrientation() {
-  const [orientation, setOrientation] = useState(currentOrientation)
+/** The runtime layout (body[data-orientation], else the viewport). */
+export const useRuntimeOrientation = () => useOrientation(currentOrientation)
+/** The viewport's own orientation, for a player that sets body[data-orientation] itself (Flash). */
+export const useViewportOrientation = () => useOrientation(viewportOrientation)
+
+function useOrientation(read) {
+  const [orientation, setOrientation] = useState(read)
   useEffect(() => {
-    const sync = () => setOrientation(currentOrientation())
+    const sync = () => setOrientation(read())
     const observer = new MutationObserver(sync)
     observer.observe(document.body, { attributes: true, attributeFilter: ['data-orientation', 'class'] })
     window.addEventListener('resize', sync)
+    window.addEventListener('xiaochao:viewportchange', sync)
     return () => {
       observer.disconnect()
       window.removeEventListener('resize', sync)
+      window.removeEventListener('xiaochao:viewportchange', sync)
     }
-  }, [])
+  }, [read])
   return orientation
-}
-
-// Same rule as the classic keypad (touchpad.js): touch input only, the runtime's vibrate setting (24ms if unset),
-// through the native host when there is one. A diagonal on the wheel presses two directions in one move: one pulse.
-let lastHaptic = -Infinity
-function haptic(event) {
-  if (event?.pointerType && event.pointerType !== 'touch') return
-  if (event?.timeStamp != null && Math.abs(event.timeStamp - lastHaptic) < 30) return
-  lastHaptic = event?.timeStamp ?? 0
-  const setting = window.config?.vibrate
-  const requested = setting == null ? 24 : Number(setting)
-  if (!(requested > 0)) return
-  const duration = Math.max(8, Math.min(40, Math.round(requested)))
-  try { if (window.__XIAOCHAO_RN_HOST__?.haptic?.(duration)) return } catch {}
-  try { navigator.vibrate?.(duration) } catch {}
 }
 
 // Both runtimes route every input source through one InputMapping controller (keymap.js for J2ME, mrp-runtime.js
@@ -69,20 +70,36 @@ function sendAction(action, pressed, pointerId) {
   else controller.release(source, action)
 }
 
-/** Lays out the classic keypad / T9 keypad and docked / floating placement for the runtime stage. */
-export function useKeypadStage(prefs) {
-  useEffect(() => {
+/** Lays out the phone runtime stage from the 「游戏表现」 choice: keypad style, shown or hidden, docked or
+ *  floating, its opacity, the layout direction and how the game screen fills its box. */
+export function useKeypadStage(prefs, { mrp = false } = {}) {
+  const placement = effectivePlacement(prefs, 'phone')
+  const opacity = effectiveOpacity(prefs, 'phone')
+  useLayoutEffect(() => {
     const body = document.body
     body.dataset.keypadStyle = prefs.style
-    body.dataset.keypadPlacement = prefs.style === 't9' ? prefs.placement : 'docked'
+    body.dataset.keypadPlacement = placement
+    body.dataset.keypadVisible = String(prefs.visible)
+    body.dataset.screenFit = prefs.fit
+    body.style.setProperty('--runtime-keypad-opacity', String(opacity))
+    // J2ME's screen.js resolves the layout itself (a game's forced orientation wins); MRP has only this choice.
+    window.__XIAOCHAO_LAYOUT_PREFERENCE__ = prefs.layout
+    const syncLayout = () => {
+      if (mrp) body.dataset.orientation = effectiveLayout(prefs, viewportOrientation())
+    }
+    syncLayout()
+    window.addEventListener('xiaochao:viewportchange', syncLayout)
     // The game screen fits whatever space the keypad leaves: refit once the new layout is in.
     const frame = requestAnimationFrame(() => {
       try { window.ScreenSetup?.refit?.() } catch {}
       window.dispatchEvent(new Event('resize'))
       window.dispatchEvent(new CustomEvent('xiaochao:viewportchange'))
     })
-    return () => cancelAnimationFrame(frame)
-  }, [prefs.style, prefs.placement])
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('xiaochao:viewportchange', syncLayout)
+    }
+  }, [prefs.style, prefs.visible, placement, opacity, prefs.layout, prefs.fit, mrp])
 }
 
 export function RuntimeKeypad({ prefs }) {
@@ -96,11 +113,11 @@ export function RuntimeKeypad({ prefs }) {
     ]
   }, [orientation])
   const keyDown = useCallback((key, pointerId, event) => {
-    haptic(event)
+    keyHaptic(event, window.config?.vibrate)
     sendAction(key.value, true, pointerId)
   }, [])
   const keyUp = useCallback((key, pointerId) => sendAction(key.value, false, pointerId), [])
-  if (prefs.style !== 't9') return null
+  if (prefs.style !== 't9' || !prefs.visible) return null
   return layouts.map(([className, layout, label]) => (
     <div key={layout.id} className={`t9Keypad ${className}`} data-runtime-control="t9-keypad">
       <KeyboardCanvas layout={layout} accessibleLabel={label} onKeyDown={keyDown} onKeyUp={keyUp} />

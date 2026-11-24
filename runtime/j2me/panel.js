@@ -603,7 +603,7 @@
   }
 
   function render() {
-    if (panel.hidden) return;
+    if (!shown()) return;
     var scroll = box.scrollTop;
     box.textContent = "";
     if (page === "props") {
@@ -647,7 +647,19 @@
     if (!box.contains(document.activeElement)) box.focus({ preventScroll: true });
   }
 
+  // While the app shows this panel in its own sheet (apps/web/src/runtime/GameSettingsSheet.jsx), the sheet owns
+  // opening and closing: closing from here asks the sheet to close, and the sheet detaches the panel when it does.
+  var hostClose = null;
+
+  function shown() {
+    return hostClose !== null || !panel.hidden;
+  }
+
   function toggle(open) {
+    if (hostClose) {
+      if (!open) hostClose();
+      return;
+    }
     if (!open) page = "main";
     panel.hidden = !open;
     document.body.classList.toggle("settings-open", open);
@@ -656,11 +668,25 @@
     else if (panel.contains(document.activeElement)) document.activeElement.blur();
   }
 
-  window.__XIAOCHAO_OPEN_SETTINGS__ = function () {
-    toggle(panel.hidden);
-  };
-  window.__XIAOCHAO_CLOSE_SETTINGS__ = function () {
-    if (!panel.hidden) toggle(false);
+  window.__XIAOCHAO_SETTINGS_HOST__ = {
+    attach: function (element, close) {
+      if (!panel.hidden) toggle(false);
+      hostClose = close;
+      page = "main";
+      element.appendChild(box);
+      document.body.classList.add("settings-open");
+      gear.classList.add("on");
+      render();
+    },
+    detach: function () {
+      if (!hostClose) return;
+      hostClose = null;
+      page = "main";
+      if (box.contains(document.activeElement)) document.activeElement.blur();
+      panel.appendChild(box);
+      document.body.classList.remove("settings-open");
+      gear.classList.remove("on");
+    }
   };
 
   function place() {
@@ -672,7 +698,7 @@
 
   BtRoom.watch(function (st) {
     gear.dataset.bt = !st.room ? "" : !st.peers ? "off" : st.via ? "direct" : "server";
-    if (panel.hidden) return;
+    if (!shown()) return;
     if (btStatus && roomKey(st) === btKey) btStatus.textContent = linkText(st);
     else render();
   });
@@ -696,9 +722,10 @@
   panel.addEventListener("click", function (e) {
     if (e.target === panel && backdrop) toggle(false);
   });
-  panel.addEventListener("keydown", function (e) {
+  // On the box, not the backdrop: the box is what moves into the app's sheet.
+  box.addEventListener("keydown", function (e) {
     e.stopPropagation();
     if (e.key === "Escape") back();
   });
-  panel.addEventListener("keyup", function (e) { e.stopPropagation(); });
+  box.addEventListener("keyup", function (e) { e.stopPropagation(); });
 })();

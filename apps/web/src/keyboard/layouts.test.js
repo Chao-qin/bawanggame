@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { keyUnits } from './hit-test.js'
-import { cornerIconLayout, getLayout, KEYBOARD_LAYOUTS, layoutGroup, T9_LANDSCAPE, T9_PORTRAIT } from './layouts.js'
+import { cornerClearance, cornerIconLayout, FLASH_LANDSCAPE, FLASH_PORTRAIT, getLayout, KEYBOARD_LAYOUTS, layoutGroup, T9_LANDSCAPE, T9_PORTRAIT, T9_PORTRAIT_DIGITS } from './layouts.js'
 
-test('exports all eight keyboard layouts with required key counts', () => {
-  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ id }) => id), ['full-size', 'tkl', '75-percent', '60-percent', 'dpad-abxy', 'numpad', 't9-portrait', 't9-landscape'])
-  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ keys }) => keys.length), [104, 87, 82, 61, 8, 17, 17, 17])
+test('exports all ten keyboard layouts with required key counts', () => {
+  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ id }) => id), ['full-size', 'tkl', '75-percent', '60-percent', 'dpad-abxy', 'numpad', 't9-portrait', 't9-landscape', 'flash-portrait', 'flash-landscape'])
+  assert.deepEqual(KEYBOARD_LAYOUTS.map(({ keys }) => keys.length), [104, 87, 82, 61, 8, 17, 17, 17, 3, 3])
 })
 
 const RUNTIME_ACTIONS = ['up', 'down', 'left', 'right', 'ok', 'choice', 'back', 'ret', 'clear', 'star', 'pound',
@@ -52,15 +52,20 @@ test('T9 halves: navigation above the digits in portrait, left of them with room
   const portrait = getLayout(T9_PORTRAIT)
   assert.ok(extent(layoutGroup(portrait, 'nav').keys).bottom <= extent(layoutGroup(portrait, 'numpad').keys).top)
   const portraitWheel = portrait.keys.find(({ shape }) => shape === 'wheel')
-  assert.equal(portraitWheel.width, 3.4)
+  assert.equal(portraitWheel.width, 4.2, 'the wheel takes the room the four function keys gave up')
+  assert.ok(portraitWheel.width / 7.4 > 0.55, 'the wheel spans more than half the keypad width')
   assert.deepEqual(
     ['choice', 'back', 'ret', 'clear'].map((id) => portrait.keys.find((key) => key.id === id).y),
-    [0, 0, 2.25, 2.25], 'end/clear keys moved up beside the wheel instead of taking their own row',
+    [0, 0, 2.4, 2.4], 'end/clear keys sit beside the wheel instead of taking their own row',
   )
   const digits = layoutGroup(portrait, 'numpad').keys
   const digitHeight = extent(digits).bottom - extent(digits).top
-  assert.ok(extent(digits).top <= 4, 'digits start where the old function-key row used to be')
-  assert.ok(digitHeight > 3.3 && digits[0].height > 0.75, 'the digits get the height the navigation half gave up')
+  const navBottom = extent(layoutGroup(portrait, 'nav').keys).bottom
+  assert.ok(extent(digits).top - navBottom <= 0.2, 'digits start right under the navigation area')
+  // The bigger wheel must not squeeze the digits: same key size and pitch as before it grew.
+  assert.deepEqual([T9_PORTRAIT_DIGITS.width, T9_PORTRAIT_DIGITS.height, T9_PORTRAIT_DIGITS.stepX, T9_PORTRAIT_DIGITS.stepY], [2.4, 0.8, 2.5, 0.9])
+  assert.ok(digits.every(({ width, height }) => width === 2.4 && height === 0.8), 'digit keys keep their size')
+  assert.ok(digitHeight > 3.3, 'four digit rows')
   // The portrait keypad deliberately spans a phone-width design (7.4 units, not 5) so the uniform canvas scale
   // fills the box instead of leaving side gutters. The wheel stays round and centred in that wider layout.
   const digitWidth = extent(digits).right - extent(digits).left
@@ -236,18 +241,15 @@ test('T9 corner icons centre on the visible sliver and stay clear of the wheel a
       assert.ok(Math.abs(indicator.x + indicator.width / 2 - cx) < 1e-9,
         `${id}/${key.id}: indicator follows the icon centre`)
       assert.ok(indicator.y + indicator.height <= y + 1e-9, `${id}/${key.id}: indicator above the icon`)
-      // The icon starts at the exact box centre and only moves if that centre would touch the wheel's arc, so a
-      // centred position is expected whenever the geometry allows it — no hardcoded "outer corner" offset.
-      const centreClear = (() => {
-        const h = size / 2
-        const nearX = left ? key.width / 2 + h : key.width / 2 - h
-        const nearY = top ? key.height / 2 + h : key.height / 2 - h
-        return Math.hypot(nearX - (key.arc.cx - key.x), nearY - (key.arc.cy - key.y)) >= key.arc.radius
-      })()
-      if (centreClear) {
-        assert.ok(Math.abs(cx - key.width / 2) < 1e-6 && Math.abs(cy - key.height / 2) < 1e-6,
-          `${id}/${key.id}: icon sits at the box centre when that area is visible`)
+      // Visual centre, not the box's geometric centre: the icon sits where the visible part of the key is deepest,
+      // checked against an independent, finer search of the same shape.
+      let deepest = 0
+      for (let i = 0; i <= 300; i++) {
+        for (let j = 0; j <= 300; j++) deepest = Math.max(deepest, cornerClearance(key, (key.width * i) / 300, (key.height * j) / 300))
       }
+      assert.ok(cornerClearance(key, cx, cy) >= deepest * 0.9, `${id}/${key.id}: icon sits at the visual centre of the visible part`)
+      const boxCentreDepth = cornerClearance(key, key.width / 2, key.height / 2)
+      assert.ok(cornerClearance(key, cx, cy) >= boxCentreDepth, `${id}/${key.id}: never less centred than the box centre`)
       anchors.push([anchor.x + key.x, anchor.y + key.y])
     }
     const wheel = layout.keys.find(({ shape }) => shape === 'wheel')
@@ -256,6 +258,21 @@ test('T9 corner icons centre on the visible sliver and stay clear of the wheel a
     for (const [ax, ay] of anchors) {
       assert.ok(anchors.some(([bx, by]) => Math.abs((ax + bx) / 2 - wheelCx) < 1e-6 && Math.abs((ay + by) / 2 - wheelCy) < 1e-6),
         `${id}: icon anchor ${ax},${ay} is mirrored about the wheel`)
+    }
+  }
+})
+
+test('Flash gamepad: a wheel sending arrow keys (Enter at the hub) and A / B, split into halves for landscape', () => {
+  for (const id of [FLASH_PORTRAIT, FLASH_LANDSCAPE]) {
+    const layout = getLayout(id)
+    const wheel = layout.keys.find(({ shape }) => shape === 'wheel')
+    assert.deepEqual(wheel.wheel, { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', center: 'Enter' })
+    assert.equal(wheel.width, wheel.height, `${id}: the wheel is round`)
+    assert.deepEqual(actionsOf(layoutGroup(layout, 'actions').keys).sort(), ['KeyX', 'Space'])
+    assert.deepEqual(layout.keys.filter(({ group }) => group === 'actions').map(({ label, secondaryLegend }) => [label, secondaryLegend]).sort(),
+      [['A', '空格'], ['B', 'X']], `${id}: each action key names the key it sends`)
+    for (const [index, a] of layout.keys.entries()) {
+      for (const b of layout.keys.slice(index + 1)) assert.ok(!overlaps(a, b), `${id}: ${a.id} overlaps ${b.id}`)
     }
   }
 })

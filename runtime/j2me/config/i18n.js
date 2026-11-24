@@ -1,6 +1,7 @@
 var LANG = navigator.language || "";
 var RU = /^(ru|uk|be|kk)\b/i.test(LANG);
-var ZH = /^zh\b/i.test(LANG);
+// The app around the runtime is Chinese for everyone, so is the runtime unless the device asks for Russian.
+var ZH = !RU;
 
 function tr(ru, en, zh) {
   return ZH && zh != null ? zh : RU ? ru : en;

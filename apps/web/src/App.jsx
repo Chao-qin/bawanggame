@@ -1,5 +1,5 @@
 import { Button, DotLoading, Empty, Input, Popup, SearchBar, TextArea } from 'antd-mobile'
-import { AppstoreOutline, ArrowsAltOutline, CalculatorOutline, CloseOutline, CompassOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline, ShrinkOutline } from 'antd-mobile-icons'
+import { AppstoreOutline, ArrowsAltOutline, CalculatorOutline, CloseOutline, CompassOutline, EyeInvisibleOutline, EyeOutline, LeftOutline, MoreOutline, MovieOutline, SetOutline, ShopbagOutline, ShrinkOutline } from 'antd-mobile-icons'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { recordPlay, fetchRecent, fetchPopular } from './cloud.js'
@@ -10,6 +10,8 @@ import { FlashPlayer } from './runtime/FlashPlayer.jsx'
 import { RuntimeLoading } from './runtime/RuntimeStatus.jsx'
 import { InputMappingPopup } from './runtime/InputMappingPopup.jsx'
 import { KeypadSettingsPopup } from './runtime/KeypadSettingsPopup.jsx'
+import { GameSettingsSheet } from './runtime/GameSettingsSheet.jsx'
+import { useKeypadPrefs, useViewportOrientation } from './runtime/RuntimeKeypad.jsx'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
 import { fetchArtwork, validArtwork } from './artwork.js'
 import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
@@ -930,10 +932,17 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(fullscreenElement()))
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
-  const [toolbarLandscape, setToolbarLandscape] = useState(() => window.matchMedia?.('(orientation: landscape)')?.matches ?? false)
+  // The toolbar's room follows the screen itself (mobile-ui.css): a landscape screen starts with it collapsed.
+  const toolbarLandscape = useViewportOrientation() === 'landscape'
   const [toolbarChoice, setToolbarChoice] = useState(null)
-  const [inputMappingOpen, setInputMappingOpen] = useState(false)
-  const [keypadSettingsOpen, setKeypadSettingsOpen] = useState(false)
+  // One in-game sheet at a time: 'game' (J2ME settings), 'keypad' (游戏表现) or 'mapping' (key mapping).
+  const [openSheet, setOpenSheet] = useState(null)
+  const toggleSheet = (name) => setOpenSheet((open) => (open === name ? null : name))
+  const closeSheet = useCallback(() => setOpenSheet(null), [])
+  const phoneRuntime = game.kind === 'j2me' || game.kind === 'maopao'
+  const keypadFamily = phoneRuntime ? 'phone' : game.kind === 'flash' ? 'flash' : null
+  // The toolbar shows or hides the keypad at any time; the same choice as 「游戏表现 → 显示键盘」.
+  const [keypadPrefs, updateKeypadPrefs] = useKeypadPrefs(keypadFamily || 'phone')
   const toolbarCollapsed = toolbarChoice?.landscape === toolbarLandscape ? toolbarChoice.collapsed : toolbarLandscape
   const playerRef = useRef(null)
   const stageRef = useRef(null)
@@ -944,23 +953,6 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
   const registerRuntimeCleanup = useCallback((cleanup) => {
     runtimeCleanupRef.current = typeof cleanup === 'function' ? cleanup : noopCleanup
   }, [])
-  useEffect(() => {
-    const syncToolbarMode = () => {
-      setToolbarLandscape(document.body.classList.contains('viewport-landscape') || (window.matchMedia?.('(orientation: landscape)')?.matches ?? false))
-    }
-    window.addEventListener('xiaochao:viewportchange', syncToolbarMode)
-    return () => {
-      window.removeEventListener('xiaochao:viewportchange', syncToolbarMode)
-    }
-  }, [])
-  // Collapsing or expanding the toolbar changes the stage's available box. Refit once React has committed so the
-  // runtime canvas is measured against the final box, instead of snapping to a stale width/height.
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      try { window.ScreenSetup?.refit?.() } catch {}
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [toolbarCollapsed])
   // An antd Popup portalled to document.body lives outside the fullscreen element, so the browser hides it in
   // fullscreen. The runtime's overlay root sits inside .player and therefore stays visible in fullscreen too.
   const popupContainer = useCallback(() => (
@@ -1058,16 +1050,6 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
       }
     } catch (_) {}
   }
-  const openSettings = () => {
-    setInputMappingOpen(false)
-    setKeypadSettingsOpen(false)
-    if (typeof window.__XIAOCHAO_OPEN_SETTINGS__ === 'function') {
-      window.__XIAOCHAO_OPEN_SETTINGS__()
-      return
-    }
-    const gear = document.getElementById('gear')
-    if (gear) gear.click()
-  }
   const exit = async () => {
     if (exitStartedRef.current) return
     exitStartedRef.current = true
@@ -1088,33 +1070,27 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
     onBack()
   }
   return (
-    <div ref={playerRef} className={`player${game.kind === 'j2me' ? ' j2mePlayer' : ''}${game.kind === 'j2me' || game.kind === 'maopao' ? ' phoneRuntimePlayer' : ''}${game.kind === 'flash' ? ' flashPlayer' : ''}${game.kind === 'flash' && isFullscreen ? ' flashPlayerFullscreen' : ''}${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
+    <div ref={playerRef} className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
       <div className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <Button className="runtimeToolbarToggle" onClick={() => setToolbarChoice({ landscape: toolbarLandscape, collapsed: !toolbarCollapsed })} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}><MoreOutline aria-hidden="true" /></Button>
           {!toolbarCollapsed && <div className="runtimeToolbarContent">
           <Button className="runtimeToolbarButton runtimeToolbarBack" onClick={requestBack} aria-label="返回大厅" title="返回大厅"><LeftOutline aria-hidden="true" /></Button>
           <strong className="runtimeGame" title={game.name || game.file}>{game.name || game.file}</strong>
           <span className="runtimeToolbarSpacer" />
-          {game.kind === 'j2me' && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={openSettings} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><SetOutline aria-hidden="true" /></Button>}
-          {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => {
-            window.__XIAOCHAO_CLOSE_SETTINGS__?.()
-            setInputMappingOpen(false)
-            setKeypadSettingsOpen((open) => !open)
-          }} aria-label="键盘设置" title="键盘设置"><AppstoreOutline aria-hidden="true" /></Button>}
-          {(game.kind === 'j2me' || game.kind === 'maopao') && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => {
-            window.__XIAOCHAO_CLOSE_SETTINGS__?.()
-            setKeypadSettingsOpen(false)
-            setInputMappingOpen((open) => !open)
-          }} aria-label="按键映射" title="按键映射" disabled={runtimeReadyFor !== game.file}><CalculatorOutline aria-hidden="true" /></Button>}
+          {game.kind === 'j2me' && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => toggleSheet('game')} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><SetOutline aria-hidden="true" /></Button>}
+          {keypadFamily && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => updateKeypadPrefs({ visible: !keypadPrefs.visible })} aria-label={keypadPrefs.visible ? '隐藏键盘' : '显示键盘'} aria-pressed={keypadPrefs.visible} title={keypadPrefs.visible ? '隐藏键盘' : '显示键盘'}>{keypadPrefs.visible ? <EyeOutline aria-hidden="true" /> : <EyeInvisibleOutline aria-hidden="true" />}</Button>}
+          {keypadFamily && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => toggleSheet('keypad')} aria-label="游戏表现" title="游戏表现"><AppstoreOutline aria-hidden="true" /></Button>}
+          {phoneRuntime && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => toggleSheet('mapping')} aria-label="按键映射" title="按键映射" disabled={runtimeReadyFor !== game.file}><CalculatorOutline aria-hidden="true" /></Button>}
           <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? <ShrinkOutline aria-hidden="true" /> : <ArrowsAltOutline aria-hidden="true" />}</Button>
         </div>}
       </div>
-      <div ref={stageRef} className={game.kind === 'flash' ? 'playerStage flashPlayerStage' : 'playerStage'}>
+      <div ref={stageRef} className="playerStage">
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
-      <InputMappingPopup visible={inputMappingOpen} onClose={() => setInputMappingOpen(false)} getContainer={popupContainer} />
-      {(game.kind === 'j2me' || game.kind === 'maopao') && <KeypadSettingsPopup visible={keypadSettingsOpen} onClose={() => setKeypadSettingsOpen(false)} getContainer={popupContainer} />}
+      {game.kind === 'j2me' && <GameSettingsSheet visible={openSheet === 'game'} onClose={closeSheet} getContainer={popupContainer} />}
+      {keypadFamily && <KeypadSettingsPopup family={keypadFamily} runtime={game.kind} game={game.file} visible={openSheet === 'keypad'} onClose={closeSheet} getContainer={popupContainer} />}
+      {phoneRuntime && <InputMappingPopup visible={openSheet === 'mapping'} onClose={closeSheet} getContainer={popupContainer} />}
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true" aria-label="退出当前游戏？">
           <div className="exitBox">
@@ -1258,9 +1234,9 @@ export default function App() {
   const keyboardTest = route.type === 'keyboard-test'
   const directEntryStarted = useRef(false)
   const pendingDirectPlay = useRef(null)
-  // Set while the app itself leaves a game: only navigations the user starts (back button, swipe, native back)
-  // go through the exit confirmation. Without it the app's own exit was blocked and turned into another
-  // back request, so "退出游戏" never left the game.
+  // Set while the app itself leaves a play route (exiting a game, or turning a direct link into lobby + game): only
+  // navigations the user starts (back button, swipe, native back) go through the exit confirmation. Without it the
+  // app's own exit was blocked and turned into another back request, so "退出游戏" never left the game.
   const exitingRef = useRef(false)
   const shouldBlock = useCallback(({ currentLocation, nextLocation }) =>
     !exitingRef.current && currentLocation.pathname.startsWith('/play/') && currentLocation.pathname !== nextLocation.pathname, [])
@@ -1304,6 +1280,9 @@ export default function App() {
     if (route.type === 'play' && !location.state?.xiaochaoGameEntry && !directEntryStarted.current) {
       directEntryStarted.current = true
       pendingDirectPlay.current = routePath(route)
+      // The app's own redirect, not the player leaving a game: without this the blocker stopped it, popped an exit
+      // confirmation over a game that had not started, and the lobby navigation that followed relaunched the game.
+      exitingRef.current = true
       navigate(routePath(routeForLibrary(route.tab)), { replace: true })
       return
     }

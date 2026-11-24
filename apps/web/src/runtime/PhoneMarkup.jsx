@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { CheckOutline, CloseOutline, DownOutline, LeftOutline, MinusOutline, RightOutline, UndoOutline, UpOutline } from 'antd-mobile-icons'
 import { RuntimeKeypad, useKeypadPrefs, useKeypadStage } from './RuntimeKeypad.jsx'
+import { keyHaptic } from './haptics.js'
 
 function KeyIcon({ as: Icon }) {
   return <Icon className="keypadIcon" aria-hidden="true" />
@@ -20,9 +21,17 @@ const initialEditorLayerStyle = {
   pointerEvents: 'none',
 }
 
+const classicPulse = (duration) => keyHaptic({ pointerType: 'touch' }, duration)
+
 export function PhoneMarkup({ mrp = false }) {
   const [keypadPrefs] = useKeypadPrefs()
-  useKeypadStage(keypadPrefs)
+  useKeypadStage(keypadPrefs, { mrp })
+  // The classic keypad (touchpad.js) pulses through the same channel and merge window as the T9 keypad; it has
+  // already filtered out mouse and pen and worked out the duration.
+  useEffect(() => {
+    window.__XIAOCHAO_HAPTIC_PULSE__ = classicPulse
+    return () => { if (window.__XIAOCHAO_HAPTIC_PULSE__ === classicPulse) delete window.__XIAOCHAO_HAPTIC_PULSE__ }
+  }, [])
   const blockRuntimeGesture = (event) => {
     const target = event.target
     if (!target.closest?.('#keypad')) return

@@ -1,13 +1,14 @@
-/* T9 runtime keypad (RuntimeKeypad.jsx). It lives inside #keypad, so it takes the classic keypad's place in the
-   runtime layout: below the screen in portrait; in landscape #keypad is a full-stage three-column grid beside an
-   absolutely positioned #display-container (runtime/j2me/style/main.css, end of file), and the T9 halves take its
-   side columns. The classic keypad's DOM stays — touchpad.js, keypad-canvas.js and the MRP runtime find its
-   buttons by id — and is only hidden. Selectors carry the body flags so they outrank the runtime stylesheet,
-   which arrives later and uses !important.
+/* Phone runtime stage (J2ME and MRP) from the 「游戏表现」 choice (useKeypadStage in RuntimeKeypad.jsx sets the body
+   flags). The T9 keypad lives inside #keypad, so it takes the classic keypad's place in the runtime layout: below the
+   screen in portrait; in landscape #keypad is a full-stage three-column grid beside an absolutely positioned
+   #display-container (runtime/j2me/style/main.css, end of file), and the T9 halves take its side columns. The classic
+   keypad's DOM stays — touchpad.js, keypad-canvas.js and the MRP runtime find its buttons by id — and is only
+   hidden. Selectors carry the body flags so they outrank the runtime stylesheet, which arrives later and uses
+   !important.
 
-   Landscape is what the runtime stylesheet calls landscape: body[data-orientation="landscape"] (J2ME's screen.js,
-   a game's forced orientation) or body.viewport-landscape (the viewport; all MRP has). RuntimeKeypad.jsx picks
-   the landscape preset by the same rule. */
+   Landscape is body[data-orientation="landscape"], the one layout attribute both runtimes set: J2ME's screen.js (a
+   game's forced orientation, else the 「布局方向」 choice, else the viewport) and useKeypadStage for MRP.
+   RuntimeKeypad.jsx picks the T9 preset by the same attribute. */
 
 .t9Keypad {
   box-sizing: border-box;
@@ -29,17 +30,23 @@ body.runtime-active[data-keypad-style="t9"] #keypad > :is(#keypad-canvas, #nav, 
   display: none !important;
 }
 
+/* The chosen keypad opacity (「透明度」; auto = opaque docked, translucent floating). */
+body.runtime-active :is(.t9Keypad, #keypad > #keypad-canvas, #keypad > #nav, #keypad > #numpad) {
+  opacity: var(--runtime-keypad-opacity, 1);
+}
+
 /* ---- Docked: the keypad takes its own space, the game screen fits the rest. ---- */
-body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]):not(.viewport-landscape) .t9KeypadFull {
+body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]) .t9KeypadFull {
   width: 100%;
-  /* Match the widened T9 portrait design (7.4 x 7.45 units) so the canvas fills
-     the box instead of scaling by height and leaving empty gutters at the sides. */
-  aspect-ratio: 7.4 / 7.45;
-  max-height: min(50vh, 460px);
+  /* Match the T9 portrait design (7.4 x 7.95 units, layouts.js) so the canvas fills the box instead of scaling by
+     height and leaving empty gutters at the sides. The larger wheel made the design taller; the cap grew with it so
+     the digit keys keep their size. */
+  aspect-ratio: 7.4 / 7.95;
+  max-height: min(54vh, 490px);
   padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
 }
 
-body.runtime-active[data-keypad-style="t9"]:is([data-orientation="landscape"], .viewport-landscape) :is(.t9KeypadNav, .t9KeypadNumpad) {
+body.runtime-active[data-keypad-style="t9"][data-orientation="landscape"] :is(.t9KeypadNav, .t9KeypadNumpad) {
   grid-row: 1;
   align-self: center;
   width: 100%;
@@ -47,47 +54,74 @@ body.runtime-active[data-keypad-style="t9"]:is([data-orientation="landscape"], .
   padding: 6px;
   pointer-events: auto;
 }
-body.runtime-active[data-keypad-style="t9"]:is([data-orientation="landscape"], .viewport-landscape) .t9KeypadNav {
+body.runtime-active[data-keypad-style="t9"][data-orientation="landscape"] .t9KeypadNav {
   grid-column: 1;
   padding-left: max(6px, env(safe-area-inset-left, 0px));
 }
-body.runtime-active[data-keypad-style="t9"]:is([data-orientation="landscape"], .viewport-landscape) .t9KeypadNumpad {
+body.runtime-active[data-keypad-style="t9"][data-orientation="landscape"] .t9KeypadNumpad {
   grid-column: 3;
   padding-right: max(6px, env(safe-area-inset-right, 0px));
 }
 
-/* ---- Floating: the game screen gets the whole stage, a translucent keypad floats over it. ---- */
+/* ---- Floating: the game screen gets the whole stage, the keypad floats over it. ---- */
 body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"] .t9Keypad {
   z-index: 6;
-  opacity: 0.6;
 }
 
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]):not(.viewport-landscape) #keypad {
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]) #keypad {
   position: absolute !important;
   inset: auto 0 0 0;
   z-index: 6;
   min-height: 0 !important;
   background: transparent !important;
 }
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]):not(.viewport-landscape) .t9KeypadFull {
-  max-height: min(44vh, 400px);
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]) .t9KeypadFull {
+  max-height: min(50vh, 460px);
 }
 /* Screen at the top, so the keypad covers as little of it as it can. */
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]):not(.viewport-landscape) #display-container {
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]) #display-container {
   align-items: flex-start;
 }
 
 /* The screen spans the stage instead of the middle column; the halves float at its edges. */
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:is([data-orientation="landscape"], .viewport-landscape) #display-container {
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] #display-container {
   left: 0;
   right: 0;
 }
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:is([data-orientation="landscape"], .viewport-landscape) :is(.t9KeypadNav, .t9KeypadNumpad) {
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] :is(.t9KeypadNav, .t9KeypadNumpad) {
   position: absolute;
   top: 50%;
   width: min(28vw, 280px);
   height: min(80vh, 280px);
   transform: translateY(-50%);
 }
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:is([data-orientation="landscape"], .viewport-landscape) .t9KeypadNav { left: 0; }
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:is([data-orientation="landscape"], .viewport-landscape) .t9KeypadNumpad { right: 0; }
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] .t9KeypadNav { left: 0; }
+body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] .t9KeypadNumpad { right: 0; }
+
+/* ---- Hidden (「显示键盘」 off, or the toolbar's keyboard button): the screen gets the whole stage. The extra
+   [data-keypad-style] outranks the runtime stylesheet's landscape `#keypad { display: grid !important }`, which loads
+   after this file. ---- */
+body.runtime-active[data-keypad-visible="false"][data-keypad-style] #keypad {
+  display: none !important;
+}
+body.runtime-active[data-keypad-visible="false"][data-orientation="landscape"] #display-container {
+  left: 0 !important;
+  right: 0 !important;
+}
+
+/* ---- Screen fit (「画面缩放」): the whole picture (default), or fill the width / the height of the screen box. The
+   runtimes size the canvas for the choice (J2ME's updateCanvas, MRP's fit); here the screen box crops the other axis
+   around the centre instead of the canvas being clamped to the box. ---- */
+body.runtime-active:is([data-screen-fit="width"], [data-screen-fit="height"]) #display-container {
+  overflow: hidden;
+}
+body.runtime-active:is([data-screen-fit="width"], [data-screen-fit="height"]) :is(#display, #canvas) {
+  flex: none;
+  max-width: none !important;
+  max-height: none !important;
+}
+/* MRP's text / confirm dialog fills its screen: it must fill the visible box, not the larger cropped picture, or its
+   title and OK / Cancel bar are cut off. */
+body.runtime-active:is([data-screen-fit="width"], [data-screen-fit="height"]) .mrp-stage #display {
+  position: static;
+}
