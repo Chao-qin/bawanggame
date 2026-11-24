@@ -31,6 +31,15 @@ pnpm mobile:verify-web
 这个包内置 React Native bundle 和 `assets/web`，安装后不需要启动 Metro。
 开发调试仍使用 `pnpm --filter @xiaochao/mobile android`，该命令依赖 Metro。
 
+推送 `v*` 格式的 Git tag（例如 `v1.2.0`）会触发 GitHub Actions：构建已签名 APK、验证签名，并将 `xiaochao-bawang-v1.2.0.apk` 附加到同名 GitHub Release。首次启用前，在仓库 **Settings → Secrets and variables → Actions** 添加以下 secrets：
+
+- `ANDROID_KEYSTORE_BASE64`：Release `.keystore` / `.jks` 文件的 base64 内容
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+可用 `base64 <release.keystore`（macOS 可用 `base64 -i release.keystore`）生成 base64 内容。签名密钥只保存在 GitHub Actions secrets 中，不要提交到仓库。工作流从 tag 设置 Android `versionName`，并用 GitHub Actions run number 设置递增的 `versionCode`。
+
 需要让 APK 使用 52java 商城时，构建前设置 Node 服务的可访问地址：
 
 ```bash
