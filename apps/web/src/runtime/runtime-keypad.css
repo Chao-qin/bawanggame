@@ -98,8 +98,10 @@ body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][da
 body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] .t9KeypadNav { left: 0; }
 body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] .t9KeypadNumpad { right: 0; }
 
-/* ---- Hidden (「显示键盘」 off, or the toolbar's keyboard button): the screen gets the whole stage. ---- */
-body.runtime-active[data-keypad-visible="false"] #keypad {
+/* ---- Hidden (「显示键盘」 off, or the toolbar's keyboard button): the screen gets the whole stage. The extra
+   [data-keypad-style] outranks the runtime stylesheet's landscape `#keypad { display: grid !important }`, which loads
+   after this file. ---- */
+body.runtime-active[data-keypad-visible="false"][data-keypad-style] #keypad {
   display: none !important;
 }
 body.runtime-active[data-keypad-visible="false"][data-orientation="landscape"] #display-container {
@@ -117,4 +119,9 @@ body.runtime-active:is([data-screen-fit="width"], [data-screen-fit="height"]) :i
   flex: none;
   max-width: none !important;
   max-height: none !important;
+}
+/* MRP's text / confirm dialog fills its screen: it must fill the visible box, not the larger cropped picture, or its
+   title and OK / Cancel bar are cut off. */
+body.runtime-active:is([data-screen-fit="width"], [data-screen-fit="height"]) .mrp-stage #display {
+  position: static;
 }
