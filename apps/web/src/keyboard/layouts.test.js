@@ -61,6 +61,12 @@ test('T9 halves: navigation above the digits in portrait, left of them with room
   const digitHeight = extent(digits).bottom - extent(digits).top
   assert.ok(extent(digits).top <= 4, 'digits start where the old function-key row used to be')
   assert.ok(digitHeight > 3.3 && digits[0].height > 0.75, 'the digits get the height the navigation half gave up')
+  // The portrait keypad deliberately spans a phone-width design (7.4 units, not 5) so the uniform canvas scale
+  // fills the box instead of leaving side gutters. The wheel stays round and centred in that wider layout.
+  const digitWidth = extent(digits).right - extent(digits).left
+  assert.ok(digitWidth > 7, 'portrait digits span the full width instead of leaving empty side gutters')
+  assert.equal(portraitWheel.x + portraitWheel.width / 2, digitWidth / 2, 'the wheel stays centred in the wider keypad')
+  assert.equal(portraitWheel.width, portraitWheel.height, 'the widened keypad keeps the wheel circular')
   const landscape = getLayout(T9_LANDSCAPE)
   assert.ok(extent(layoutGroup(landscape, 'numpad').keys).left - extent(layoutGroup(landscape, 'nav').keys).right >= 2, 'a gap for the game screen')
   assert.ok(extent(layoutGroup(landscape, 'nav').keys).bottom < 2.8, 'landscape navigation half is shorter too')
@@ -230,8 +236,18 @@ test('T9 corner icons centre on the visible sliver and stay clear of the wheel a
       assert.ok(Math.abs(indicator.x + indicator.width / 2 - cx) < 1e-9,
         `${id}/${key.id}: indicator follows the icon centre`)
       assert.ok(indicator.y + indicator.height <= y + 1e-9, `${id}/${key.id}: indicator above the icon`)
-      assert.ok(Math.abs(cx - key.width / 2) > 0.05 && Math.abs(cy - key.height / 2) > 0.05,
-        `${id}/${key.id}: icon biased towards the outer corner`)
+      // The icon starts at the exact box centre and only moves if that centre would touch the wheel's arc, so a
+      // centred position is expected whenever the geometry allows it — no hardcoded "outer corner" offset.
+      const centreClear = (() => {
+        const h = size / 2
+        const nearX = left ? key.width / 2 + h : key.width / 2 - h
+        const nearY = top ? key.height / 2 + h : key.height / 2 - h
+        return Math.hypot(nearX - (key.arc.cx - key.x), nearY - (key.arc.cy - key.y)) >= key.arc.radius
+      })()
+      if (centreClear) {
+        assert.ok(Math.abs(cx - key.width / 2) < 1e-6 && Math.abs(cy - key.height / 2) < 1e-6,
+          `${id}/${key.id}: icon sits at the box centre when that area is visible`)
+      }
       anchors.push([anchor.x + key.x, anchor.y + key.y])
     }
     const wheel = layout.keys.find(({ shape }) => shape === 'wheel')

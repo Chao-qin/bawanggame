@@ -175,19 +175,24 @@ const navWheel = (x, y, size) => phoneKey('dpad', 'OK', x, y, size, size, 'dpad'
 const t9Digits = ({ x, y, width, height, stepX, stepY }) => T9_DIGITS.map(([id, label, legend], index) =>
   phoneKey(id, label, x + (index % 3) * stepX, y + Math.floor(index / 3) * stepY, width, height, 'numpad', 'numpad', legend))
 
-// Portrait: four corner function keys around a wheel that fills the (now much shorter) navigation area. Dropping the
-// separate row of end/clear keys frees height for taller, more widely spaced digit keys. The navigation row stays
-// exactly as wide as the digits (5 units), and the whole layout still matches the keypad's 5 / 7.5 aspect ratio.
-const PORTRAIT_WHEEL = { x: 0.8, y: 0.2, size: 3.4 }
+// Portrait: four corner function keys around a wheel that fills the (now much shorter) navigation area. The keypad
+// now spans the phone's full width: 7.4 design units rather than 5, so the digit columns and the arc-cut corner keys
+// reach the sides instead of leaving gutters. KeyboardCanvas scales both axes uniformly, so widening the layout does
+// not oval the wheel — it keeps its 3.4-unit diameter, centred between the two columns of function keys.
+const PORTRAIT_DESIGN_WIDTH = 7.4
+const PORTRAIT_WHEEL_SIZE = 3.4
+const PORTRAIT_WHEEL = { x: (PORTRAIT_DESIGN_WIDTH - PORTRAIT_WHEEL_SIZE) / 2, y: 0.2, size: PORTRAIT_WHEEL_SIZE }
 const portraitArc = t9Arc(PORTRAIT_WHEEL.x + PORTRAIT_WHEEL.size / 2,
   PORTRAIT_WHEEL.y + PORTRAIT_WHEEL.size / 2, PORTRAIT_WHEEL.size)
+const PORTRAIT_CORNER_WIDTH = 3.3
+const PORTRAIT_CORNER_RIGHT = PORTRAIT_DESIGN_WIDTH - PORTRAIT_CORNER_WIDTH
 const t9Portrait = [
   navWheel(PORTRAIT_WHEEL.x, PORTRAIT_WHEEL.y, PORTRAIT_WHEEL.size),
-  cornerKey('choice', 0, 0, 2.05, 1.55, 'top-left', portraitArc),
-  cornerKey('back', 2.95, 0, 2.05, 1.55, 'top-right', portraitArc),
-  cornerKey('ret', 0, 2.25, 2.05, 1.55, 'bottom-left', portraitArc),
-  cornerKey('clear', 2.95, 2.25, 2.05, 1.55, 'bottom-right', portraitArc),
-  ...t9Digits({ x: 0, y: 3.95, width: 1.6, height: 0.8, stepX: 1.7, stepY: 0.9 }),
+  cornerKey('choice', 0, 0, PORTRAIT_CORNER_WIDTH, 1.55, 'top-left', portraitArc),
+  cornerKey('back', PORTRAIT_CORNER_RIGHT, 0, PORTRAIT_CORNER_WIDTH, 1.55, 'top-right', portraitArc),
+  cornerKey('ret', 0, 2.25, PORTRAIT_CORNER_WIDTH, 1.55, 'bottom-left', portraitArc),
+  cornerKey('clear', PORTRAIT_CORNER_RIGHT, 2.25, PORTRAIT_CORNER_WIDTH, 1.55, 'bottom-right', portraitArc),
+  ...t9Digits({ x: 0, y: 3.95, width: 2.4, height: 0.8, stepX: 2.5, stepY: 0.9 }),
 ]
 
 // Landscape: the same four-corner arrangement in the left side column, digits on the right with a gap between the
@@ -224,29 +229,46 @@ export const getLayout = (id) => KEYBOARD_LAYOUTS.find((layout) => layout.id ===
 /** One half of a layout (the keys of `group`), as a layout of its own. */
 export const layoutGroup = (layout, group) => ({ ...layout, id: `${layout.id}:${group}`, keys: layout.keys.filter((item) => item.group === group) })
 
-/** A corner function key is an L-shaped sliver: its inner corner was cut away by the wheel's arc. Centre its icon on
- *  the *visible* sliver — halfway between the outer corner and the arc's 45° point — not on the old full box, and keep
- *  the whole icon box outside the arc. Coordinates are relative to the key's box, in layout units. */
+const cornerIconCache = new WeakMap()
+
+/** Centre each corner icon on its key box, then push it away from the wheel only when the box centre would overlap
+ *  the arc, shrinking as a last resort. The wheel centre and radius come from the key's own geometry, so the same
+ *  rule produces a centred icon in the wide, short portrait corners and a safe nudge in the tight landscape ones —
+ *  no fixed offsets and no hardcoded "outer corner" positions. Keys are immutable and reused, so cache the result. */
 export function cornerIconLayout(item) {
+  const cached = cornerIconCache.get(item)
+  if (cached) return cached
   const { x, y, width, height, corner, arc } = item
   const left = corner.endsWith('left')
   const top = corner.startsWith('top')
-  const diagonal = arc.radius / Math.SQRT2
-  const anchorX = ((left ? 0 : width) + arc.cx + (left ? -diagonal : diagonal) - x) / 2
-  const anchorY = ((top ? 0 : height) + arc.cy + (top ? -diagonal : diagonal) - y) / 2
   const centreX = arc.cx - x
   const centreY = arc.cy - y
 
   const place = (size) => {
     const half = size / 2
-    const cx = Math.min(Math.max(anchorX, half + 0.04), width - half - 0.04)
-    // Leave a strip at the top for the soft-key indicator bar.
-    const cy = Math.min(Math.max(anchorY, half + 0.13), height - half - 0.04)
-    // The corner of the icon box nearest the wheel decides whether it clears the arc.
+    // Start from the geometric centre of the key. All four insets are equal so an icon that the arc forces to move
+    // keeps the arrangement mirror-symmetric; the indicator bar is pinned to the box top, not tied to the icon.
+    const minX = half + 0.04
+    const maxX = width - half - 0.04
+    const minY = half + 0.04
+    const maxY = height - half - 0.04
+    let cx = Math.min(Math.max(width / 2, minX), maxX)
+    let cy = Math.min(Math.max(height / 2, minY), maxY)
+    // Only if the box would cut into the wheel, walk away from the arc centre until the nearest box corner clears it.
+    for (let step = 0; step < 60; step++) {
+      const nearX = left ? cx + half : cx - half
+      const nearY = top ? cy + half : cy - half
+      if (Math.hypot(nearX - centreX, nearY - centreY) >= arc.radius) break
+      const dx = cx - centreX
+      const dy = cy - centreY
+      const length = Math.hypot(dx, dy) || 1
+      cx = Math.min(Math.max(cx + dx / length * 0.02, minX), maxX)
+      cy = Math.min(Math.max(cy + dy / length * 0.02, minY), maxY)
+    }
     const nearX = left ? cx + half : cx - half
     const nearY = top ? cy + half : cy - half
-    return { size, cx, cy, x: cx - half, y: cy - half,
-      clear: Math.hypot(nearX - centreX, nearY - centreY) >= arc.radius }
+    const clear = Math.hypot(nearX - centreX, nearY - centreY) >= arc.radius
+    return { size, cx, cy, x: cx - half, y: cy - half, clear }
   }
 
   let size = Math.min(0.38, width * 0.3, height * 0.4)
@@ -255,9 +277,11 @@ export function cornerIconLayout(item) {
     size *= 0.9
     box = place(size)
   }
-  return {
+  const result = {
     ...box,
-    indicator: { x: box.cx - 0.2, y: 0.04, width: 0.4, height: 0.05 },
-    anchor: { x: anchorX, y: anchorY },
+    indicator: { x: box.cx - box.size / 2, y: 0.04, width: box.size, height: 0.05 },
+    anchor: { x: box.cx, y: box.cy },
   }
+  cornerIconCache.set(item, result)
+  return result
 }

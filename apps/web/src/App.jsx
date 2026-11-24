@@ -961,6 +961,11 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
     })
     return () => cancelAnimationFrame(frame)
   }, [toolbarCollapsed])
+  // An antd Popup portalled to document.body lives outside the fullscreen element, so the browser hides it in
+  // fullscreen. The runtime's overlay root sits inside .player and therefore stays visible in fullscreen too.
+  const popupContainer = useCallback(() => (
+    playerRef.current?.querySelector('.runtime-overlay-root') || document.body
+  ), [])
   useEffect(() => {
     const mountOverlay = (node) => {
       if (!node) return node
@@ -1108,8 +1113,8 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
         {game.kind === 'local-revival' ? <LocalRevivalPlayer onExit={requestBack} onCleanupReady={registerRuntimeCleanup} /> : game.kind === 'j2me' ? <J2MEPlayer game={game} onExit={requestBack} onReady={() => setRuntimeReadyFor(game.file)} /> : game.kind === 'flash' ? <FlashPlayer game={game} onCleanupReady={registerRuntimeCleanup} onExit={onBack} /> : <MrpPlayer game={game} onReady={() => setRuntimeReadyFor(game.file)} />}
       </div>
       <div className="runtime-overlay-root" />
-      <InputMappingPopup visible={inputMappingOpen} onClose={() => setInputMappingOpen(false)} />
-      {(game.kind === 'j2me' || game.kind === 'maopao') && <KeypadSettingsPopup visible={keypadSettingsOpen} onClose={() => setKeypadSettingsOpen(false)} />}
+      <InputMappingPopup visible={inputMappingOpen} onClose={() => setInputMappingOpen(false)} getContainer={popupContainer} />
+      {(game.kind === 'j2me' || game.kind === 'maopao') && <KeypadSettingsPopup visible={keypadSettingsOpen} onClose={() => setKeypadSettingsOpen(false)} getContainer={popupContainer} />}
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true" aria-label="退出当前游戏？">
           <div className="exitBox">

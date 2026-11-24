@@ -11,14 +11,14 @@ const PLACEMENT_OPTIONS = [
 ]
 
 /** Keypad choice for the J2ME and MRP runtimes; saved once for every game. */
-export function KeypadSettingsPopup({ visible, onClose }) {
+export function KeypadSettingsPopup({ visible, onClose, getContainer }) {
   const [prefs, update] = useKeypadPrefs()
   return <Popup
     visible={visible}
     onMaskClick={onClose}
     onClose={onClose}
     closeOnMaskClick
-    destroyOnClose
+    getContainer={getContainer}
     position="bottom"
     maskClassName="runtimeSettingsMask"
     bodyClassName="inputMappingSheet"

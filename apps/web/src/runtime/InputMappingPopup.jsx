@@ -18,7 +18,7 @@ function controlsFor(bindings, action) {
   return Object.keys(bindings || {}).filter((control) => bindings[control] === action).map(controlName).join('、') || '未绑定'
 }
 
-export function InputMappingPopup({ visible, onClose }) {
+export function InputMappingPopup({ visible, onClose, getContainer }) {
   const [controller, setController] = useState(null)
   const [bindings, setBindings] = useState({ keyboard: {}, gamepad: {} })
   const [capturing, setCapturing] = useState('')
@@ -26,6 +26,13 @@ export function InputMappingPopup({ visible, onClose }) {
   const [activeTab, setActiveTab] = useState('devices')
   const layoutHost = useRef(null)
 
+  // Shallow-compare two flat binding maps so an unchanged poll does not create a
+  // fresh object and force a full re-render of the binding rows.
+  const sameBindings = (a, b) => {
+    const keysA = Object.keys(a)
+    const keysB = Object.keys(b)
+    return keysA.length === keysB.length && keysA.every((key) => a[key] === b[key])
+  }
   useEffect(() => {
     if (!visible) {
       setCapturing('')
@@ -35,15 +42,27 @@ export function InputMappingPopup({ visible, onClose }) {
     setController(current || null)
     const refresh = () => {
       if (!current) return
-      setBindings({ keyboard: current.keyboardBindings(), gamepad: current.gamepadBindings() })
-      setConnected(current.hasGamepad())
+      const nextKeyboard = current.keyboardBindings()
+      const nextGamepad = current.gamepadBindings()
+      setBindings((prev) => (
+        sameBindings(prev.keyboard, nextKeyboard) && sameBindings(prev.gamepad, nextGamepad)
+          ? prev
+          : { keyboard: nextKeyboard, gamepad: nextGamepad }
+      ))
+      setConnected((prev) => {
+        const next = current.hasGamepad()
+        return prev === next ? prev : next
+      })
     }
-    const onBinding = (event) => {
+    const onBinding = () => {
       setCapturing('')
       refresh()
     }
     refresh()
-    const timer = current ? window.setInterval(refresh, 500) : 0
+    // Gamepad presence only needs a slow poll, and only while the device tab is
+    // visible. A 500ms no-op poll re-rendered the whole sheet and fought the
+    // runtime canvas for main-thread time on mobile.
+    const timer = current && activeTab === 'devices' ? window.setInterval(refresh, 1000) : 0
     window.addEventListener('xiaochao:inputbinding', onBinding)
     window.addEventListener('xiaochao:gamepadbinding', onBinding)
     return () => {
@@ -52,7 +71,7 @@ export function InputMappingPopup({ visible, onClose }) {
       window.removeEventListener('xiaochao:gamepadbinding', onBinding)
       if (current) current.cancelCapture()
     }
-  }, [visible])
+  }, [visible, activeTab])
 
   const capture = (action) => {
     controller?.captureControl(action)
@@ -84,7 +103,7 @@ export function InputMappingPopup({ visible, onClose }) {
     onMaskClick={onClose}
     onClose={onClose}
     closeOnMaskClick
-    destroyOnClose
+    getContainer={getContainer}
     position="bottom"
     maskClassName="runtimeSettingsMask"
     bodyClassName="inputMappingSheet"
