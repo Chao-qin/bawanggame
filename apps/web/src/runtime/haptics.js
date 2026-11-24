@@ -13,30 +13,53 @@ export function hapticDuration(setting) {
   return requested > 0 ? Math.max(MIN_MS, Math.min(MAX_MS, Math.round(requested))) : 0
 }
 
-/** The native bridge, looked up on every pulse: a runtime frame reads its app window's bridge, which may be injected
- *  after the frame started (a copy taken at boot stayed empty for the rest of the game). */
-export function nativeHost(win = globalThis.window) {
+/** This window and the same-origin windows above it, innermost first (a runtime frame, then the app window). */
+function windowChain(win) {
+  const chain = []
   for (let current = win, depth = 0; current && depth < 4; depth += 1) {
+    chain.push(current)
+    let parent = null
+    try { parent = current.parent } catch {}
+    if (!parent || parent === current) break
+    try { void parent.navigator } catch { break } // another origin: stop
+    current = parent
+  }
+  return chain
+}
+
+/** The native bridge, looked up on every pulse rather than copied once when a runtime frame starts, so the frame
+ *  always reaches the bridge its app window has now. */
+export function nativeHost(win = globalThis.window) {
+  for (const current of windowChain(win)) {
     try {
       const host = current.__XIAOCHAO_RN_HOST__
       if (host && typeof host.haptic === 'function') return host
     } catch {}
-    let parent = null
-    try { parent = current.parent } catch {}
-    if (!parent || parent === current) break
-    current = parent
   }
   return null
 }
 
+/** The Vibration API of the outermost same-origin window. Browsers only vibrate for a document the user has
+ *  interacted with: each game starts in a new runtime frame, and a touch only counts as interaction once it ends,
+ *  so the frame's own navigator ignored at least the first press of every game. The app window got the tap that
+ *  started the game. */
+function vibrationNavigator(win) {
+  const chain = windowChain(win)
+  for (const current of chain.reverse()) {
+    try { if (typeof current.navigator?.vibrate === 'function') return current.navigator } catch {}
+  }
+  return globalThis.navigator
+}
+
 /** One pulse of `duration` ms. Returns whether a channel accepted it. */
-export function pulse(duration, { win = globalThis.window, nav = globalThis.navigator } = {}) {
+export function pulse(duration, { win = globalThis.window, nav } = {}) {
   if (!(duration > 0)) return false
   const host = nativeHost(win)
   if (host) {
     try { if (host.haptic(duration) !== false) return true } catch {}
   }
-  try { return nav?.vibrate?.(duration) === true } catch { return false }
+  const vibration = nav || vibrationNavigator(win)
+  try { return vibration?.vibrate?.(duration) === true } catch { return false }
 }
 
 /** Creates the haptic for key presses. Timing uses the clock at the press, not event.timeStamp, whose origin differs

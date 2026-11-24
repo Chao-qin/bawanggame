@@ -48,3 +48,22 @@ test('the native bridge is looked up at press time, through the runtime frame to
   assert.deepEqual(calls, [24], 'a bridge injected after the frame started is used')
   assert.equal(vibrated, 1)
 })
+
+test('the Vibration API of the app window is used from a runtime frame: the frame has no user activation yet', () => {
+  const calls = []
+  const top = { navigator: { vibrate: (ms) => { calls.push(['app', ms]); return true } } }
+  top.parent = top
+  const frame = { parent: top, navigator: { vibrate: (ms) => { calls.push(['frame', ms]); return false } } }
+  assert.equal(pulse(24, { win: frame }), true)
+  assert.deepEqual(calls, [['app', 24]])
+})
+
+test('a cross-origin parent is not used', () => {
+  const calls = []
+  const foreign = {}
+  Object.defineProperty(foreign, 'navigator', { get() { throw new Error('cross-origin') } })
+  foreign.parent = foreign
+  const frame = { parent: foreign, navigator: { vibrate: (ms) => { calls.push(ms); return true } } }
+  assert.equal(pulse(24, { win: frame }), true)
+  assert.deepEqual(calls, [24])
+})

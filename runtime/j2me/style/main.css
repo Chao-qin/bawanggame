@@ -410,7 +410,9 @@ body.runtime-active #numpad {
 }
 
 #panel,
-#panel * {
+#panel *,
+.runtimeSheet .panel-box,
+.runtimeSheet .panel-box * {
   -webkit-user-select: text !important;
   user-select: text !important;
 }

@@ -737,6 +737,42 @@ try {
       // Short screens cap the keypad height (runtime-keypad.css), which can leave narrow side gutters.
       else requireCheck(t9.full && t9.full.top >= t9.display.bottom - 1 && t9.full.width >= width * 0.9 && Math.abs(t9.full.left + t9.full.right - width) <= 2, `T9 portrait keypad is not centred under the screen at ${width}x${height}`)
     }
+    // A game forced to landscape on an upright phone is laid out as landscape and starts with the toolbar collapsed:
+    // its toggle must still be there.
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+    await evaluate(`window.ScreenSetup.setOrientation('landscape'); true`)
+    await sleep(300)
+    const forced = await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); const r = toggle.getBoundingClientRect(); return { orientation: document.body.dataset.orientation, collapsed: toggle.getAttribute('aria-expanded') === 'false', width: r.width, display: getComputedStyle(toggle).display } })()`)
+    console.log('J2ME forced landscape on a portrait viewport:', JSON.stringify(forced))
+    requireCheck(forced.orientation === 'landscape' && forced.display !== 'none' && forced.width > 0, 'toolbar toggle unreachable in forced landscape')
+    await evaluate(`document.querySelector('.runtimeToolbarToggle').click(); true`)
+    await sleep(150)
+    requireCheck(await evaluate("!!document.querySelector('.runtimeToolbarBack')"), 'toolbar did not expand in forced landscape')
+    await evaluate(`window.ScreenSetup.setOrientation('auto'); true`)
+    // A sheet taller than a landscape screen scrolls with a finger inside the runtime frame.
+    await send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: true })
+    await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
+    await sleep(300)
+    await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); if (toggle?.getAttribute('aria-expanded') === 'false') toggle.click(); return true })()`)
+    await sleep(150)
+    await evaluate(`document.querySelector('[aria-label="键盘设置"]').click(); true`)
+    await sleep(700)
+    const sheetBox = await evaluate(`(() => { const sheet = [...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0); const r = sheet.getBoundingClientRect(); return { x: r.left + r.width / 2, top: r.top, bottom: r.bottom, overflow: sheet.scrollHeight - sheet.clientHeight, touchAction: getComputedStyle(sheet).touchAction } })()`)
+    const frameBox = inRuntimeFrame ? await (async () => { inRuntimeFrame = false; const box = await evaluate(`(() => { const r = document.querySelector('.runtimeFrame').getBoundingClientRect(); return { x: r.left, y: r.top } })()`); inRuntimeFrame = true; return box })() : { x: 0, y: 0 }
+    const startY = frameBox.y + sheetBox.bottom - 30
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: frameBox.x + sheetBox.x, y: startY }] })
+    for (let step = 1; step <= 8; step++) {
+      await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: frameBox.x + sheetBox.x, y: startY - step * 20 }] })
+      await sleep(16)
+    }
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await sleep(400)
+    const scrolled = await evaluate(`[...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0).scrollTop`)
+    console.log('Landscape keypad sheet:', JSON.stringify({ ...sheetBox, scrolled }))
+    requireCheck(sheetBox.overflow > 0 && sheetBox.touchAction === 'pan-y' && scrolled > 0, 'landscape keypad sheet does not scroll by touch')
+    await evaluate(`[...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0).querySelector('.runtimeSheetHeader button').click(); true`)
+    await sleep(400)
+    await send('Emulation.setTouchEmulationEnabled', { enabled: false })
     await send('Emulation.clearDeviceMetricsOverride')
     await clickPlayerBack()
     await sleep(150)

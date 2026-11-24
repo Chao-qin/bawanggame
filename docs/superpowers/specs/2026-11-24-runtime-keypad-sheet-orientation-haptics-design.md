@@ -14,7 +14,7 @@
 | 横屏工具栏收起后仍盖住游戏画面顶部 | J2ME / 冒泡横屏收起态是一条 46vw 宽的空栏 | 横屏浮动工具栏的宽度规则没有排除收起态；Flash 走另一套规则 |
 | J2ME 强制横屏时工具栏仍按竖屏处理 | 视口竖屏 + 游戏强制横屏 | 工具栏只看视口方向，舞台和键盘看 `body[data-orientation]` |
 | Flash 屏幕按键没有震动 | — | `FlashControls` 未调用任何震动 |
-| 按键震动「有时不灵，玩很久才出现」 | 桌面仿真无法复现；`navigator.vibrate` 在每次按下都被调用 | 见下文「震动」 |
+| 按键震动「有时不灵，玩很久才出现」 | 桌面仿真里每次按下都调用了 `navigator.vibrate`；用真实触摸从大厅启动游戏后，新建的运行时 iframe 在它自己的第一次触摸结束前 `userActivation.hasBeenActive` 一直为 `false`，浏览器会拒绝该 iframe 的震动，而大厅主文档已被启动那一下激活 | 已确认一处：每局游戏开头的按键在浏览器里不震。「玩很久才出现」的完整根因未在真机确认 |
 
 ### 冒烟脚本 `apps/web/verify.mjs` 的既有失败
 
@@ -40,7 +40,7 @@ origin/main 上 `verify.mjs` 在第一处就失败。逐处判定是脚本过时
    - Flash 手柄改用与 T9 同一个画布键盘（`KeyboardCanvas`），新增 `flash-portrait` / `flash-landscape` 预设。
    - 键盘设置弹层显示「当前键盘」、适用范围与按键说明。
 5. **横竖屏统一**：工具栏、舞台、键盘都用同一判据（`body[data-orientation="landscape"]` 或 `body.viewport-landscape`）。竖屏：工具栏独占一行，收起后舞台占满；横屏：展开时工具栏浮在画面上方中间，收起时只剩左上角按钮。Flash 竖屏键盘在画面下方、横屏分列两侧，与 J2ME / 冒泡一致；全屏保留所选键盘。
-6. **震动**：所有屏幕键盘（T9、Flash 手柄、经典键盘）走同一个 `haptics.js`：触摸才震、读取运行时震动设置（未设置 24ms）、一次滑动按下两个方向只震一次。原生宿主在每次按下时沿 iframe → 父窗口查找（原实现只在运行时 iframe 启动时复制一次）；合并窗口改用按下时的 `performance.now()`，不再依赖 `event.timeStamp`。
+6. **震动**：所有屏幕键盘（T9、Flash 手柄、经典键盘）走同一个 `haptics.js`：触摸才震、读取运行时震动设置（未设置 24ms）、一次滑动按下两个方向只震一次（经典键盘也一样）。浏览器里改用最外层同源窗口（大厅主文档，已有用户激活）的 `navigator.vibrate`，不再用新建的运行时 iframe 自己的；原生宿主在每次按下时沿 iframe → 父窗口查找；合并窗口改用按下时的 `performance.now()`。这些是已确认问题的修复与加固，「玩很久才出现」的完整根因仍需真机确认。
 
 ## 修改范围
 
@@ -73,9 +73,22 @@ origin/main 上 `verify.mjs` 在第一处就失败。逐处判定是脚本过时
 | 震动 | 单测：触摸才震、合并窗口、设置为 0 时不震、iframe 中能找到后注入的原生宿主 |
 | 冒烟脚本 | `VERIFY_J2ME_FILE=diamond.jar VERIFY_MRP_FILE=1000_240320_gld.mrp node apps/web/verify.mjs` 输出 `RESULT PASS` |
 
+## R1 审查与修复
+
+| 来源 | 级别 | 问题 | 处理 |
+|---|---|---|---|
+| diff review + feature audit | P1 | J2ME 游戏强制横屏、手机竖拿时，工具栏默认收起且展开按钮被隐藏，返回大厅、游戏设置、全屏都不可达（本 PR 引入：工具栏改用统一方向判据，而显示按钮的规则只看视口） | `mobile-ui.css`：`body[data-orientation="landscape"]` 下显示按钮、收起时舞台让出左上角；verify 新增该场景 |
+| diff review | P2 | J2ME / 冒泡横屏打开键盘设置，弹层内容高于屏幕却不能用手指滚动（运行时 `main.css` 对 iframe 内所有元素 `touch-action: none !important`） | `mobile-ui.css`：弹层及其内容 `touch-action: pan-y !important`；verify 新增横屏触摸滚动检查 |
+| diff review | P3 | 游戏设置挪进弹层后，输入框失去 `#panel *` 的文本选择豁免 | `main.css`：豁免扩展到 `.runtimeSheet .panel-box` |
+| diff review | P3 | 经典键盘震动没有走合并窗口；`FLASH_KEY_LEGENDS` 未使用 | 经典键盘经 `keyHaptic` 合并；删除死导出 |
+| feature audit | P2 | 震动根因未证实 | 补充证据与修复（见上「震动」），报告中标注为「加固，完整根因待真机确认」 |
+| feature audit | P3 | 横屏 T9 轮盘未放大；Flash 震动无法关闭；`local-revival` 竖屏工具栏也变为独立一行 | 记录为已知取舍：横屏轮盘已占所在列约 71%；Flash 暂无设置页；`local-revival` 与其他运行时一致 |
+
 ## 残余风险
 
 - 震动「玩很久才出现」未能在真机复现，本 PR 修的是已确认的隐患（宿主只在启动时复制一次、跨文档时间基准、Flash 无震动）。Android Chrome 在静音（铃声模式为静音）时可能忽略网页 `navigator.vibrate`（平台行为，未在本环境核实），APK 内走原生 `Vibration` 不受影响。需要真机确认。
+- Flash 手柄的震动固定 24ms，暂无关闭开关。
+- J2ME 游戏强制竖屏而视口横屏时，仍按横屏布局（既有行为，统一判据中横屏优先）。
 - Flash 部分 SWF 自身设定顶部对齐，画面在竖屏会贴在上方（Ruffle 既有行为，未改）。
 - 同一页面里手动改地址栏哈希离开游戏时，React Router 对不是它创建的历史记录无法拦截，返回不会弹确认（框架限制；从大厅进入、或新开直达链接都会正常弹确认）。
 - 经典键盘横屏的安全区内边距引用了只在 `#display-container` 上定义的 `--landscape-gap`，实际为 0（既有问题，本 PR 未改尺寸）。

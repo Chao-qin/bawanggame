@@ -411,6 +411,15 @@ body.runtime-active[data-orientation="landscape"] .player .runtimeToolbar:not(.r
   border-color: var(--ui-border);
 }
 
+/* A J2ME game's forced landscape on an upright phone is landscape too (useRuntimeOrientation): the toolbar starts
+   collapsed there, so its toggle must stay reachable and the collapsed stage leaves that corner free — the
+   @media (orientation: landscape) rules in uno.config.js only see the viewport. */
+body.runtime-active[data-orientation="landscape"] .player .runtimeToolbarToggle { display: grid; }
+body.runtime-active[data-orientation="landscape"] .player.runtimePlayerToolbarCollapsed .playerStage {
+  left: calc(56px + var(--safe-area-left, 0px));
+  right: var(--safe-area-right, 0px);
+}
+
 body.viewport-landscape .player .runtimeToolbarContent,
 body.runtime-active[data-orientation="landscape"] .player .runtimeToolbarContent {
   min-height: 42px;
@@ -443,6 +452,10 @@ body.runtime-active[data-orientation="landscape"] .player .runtimeToolbar .runti
   color: var(--ui-text);
   touch-action: pan-y;
 }
+/* The runtime stylesheet (runtime/j2me/style/main.css) turns touch panning off for everything in a runtime frame;
+   a sheet taller than the screen must still scroll with a finger. */
+body.runtime-active .runtimeSheet,
+body.runtime-active .runtimeSheet * { touch-action: pan-y !important; }
 /* Every in-game sheet (RuntimeSheet.jsx) sits above the embedded simulator and the runtime toolbar. */
 .adm-mask.runtimeSheetMask { z-index: 1000; }
 .adm-popup:has(.runtimeSheet) { z-index: 1001; }

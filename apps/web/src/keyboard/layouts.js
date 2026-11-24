@@ -223,9 +223,6 @@ const flashWheel = (x, y, size) => phoneKey('flash-dpad', 'OK', x, y, size, size
 })
 const flashAction = (id, label, value, legend, x, y, size) =>
   ({ ...phoneKey(id, label, x, y, size, size, 'abxy', 'actions', legend), value, radius: size / 2 })
-export const FLASH_KEY_LEGENDS = Object.freeze({
-  ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Enter: 'Enter', Space: '空格', KeyX: 'X',
-})
 const flashPortrait = [
   flashWheel(0.3, 0.1, 3.4),
   flashAction('flash-b', 'B', 'KeyX', 'X', 4.1, 1.75, 1.5),
