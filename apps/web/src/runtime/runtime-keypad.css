@@ -32,7 +32,9 @@ body.runtime-active[data-keypad-style="t9"] #keypad > :is(#keypad-canvas, #nav, 
 /* ---- Docked: the keypad takes its own space, the game screen fits the rest. ---- */
 body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]):not(.viewport-landscape) .t9KeypadFull {
   width: 100%;
-  aspect-ratio: 5 / 7.5;
+  /* Match the widened T9 portrait design (7.4 x 7.45 units) so the canvas fills
+     the box instead of scaling by height and leaving empty gutters at the sides. */
+  aspect-ratio: 7.4 / 7.45;
   max-height: min(50vh, 460px);
   padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
 }

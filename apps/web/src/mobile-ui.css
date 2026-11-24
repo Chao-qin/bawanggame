@@ -403,10 +403,10 @@ body.runtime-active[data-orientation="landscape"] .player:not(:has(.flashPlayerS
   width: min(46vw, 520px);
   max-width: calc(100% - 32px);
   transform: translateX(-50%);
-  background: color-mix(in srgb, var(--ui-surface) 78%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-color: color-mix(in srgb, var(--ui-border) 72%, transparent);
+  /* Keep the floating toolbar opaque: backdrop-filter over the constantly
+     repainting runtime canvas is a major source of jank when a sheet opens. */
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
 }
 
 body.viewport-landscape .player:not(:has(.flashPlayerStage)) .runtimeToolbarContent,
@@ -442,6 +442,23 @@ body.runtime-active[data-orientation="landscape"] .player:not(:has(.flashPlayerS
 /* Keep the settings sheet and its mask above the embedded simulator and runtime toolbar. */
 .adm-mask.runtimeSettingsMask { z-index: 1000; }
 .adm-popup:has(.inputMappingSheet) { z-index: 1001; }
+
+/* The runtime sheets sit over a canvas that repaints every frame. antd-mobile's default `transition: all` re-evaluates
+   every animatable property on each of those frames, and an ordinary fixed popup re-composites with the canvas each
+   time. Constrain the transition to just the properties that actually animate and promote each sheet/mask to its own
+   compositor layer so the game canvas can keep repainting without re-blending the whole overlay. This is scoped to the
+   keyboard/key-mapping sheets only — every other Popup keeps antd-mobile's defaults. */
+.adm-mask.runtimeSettingsMask,
+.adm-popup:has(.inputMappingSheet) {
+  transition: opacity 160ms ease-out;
+  will-change: opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+.adm-popup .inputMappingSheet {
+  transition: transform 160ms ease-out;
+  will-change: transform;
+}
 .inputMappingPanel { display: grid; gap: 10px; }
 .inputMappingHeader, .inputMappingFooter { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .inputMappingHeader strong { font-size: 16px; }
