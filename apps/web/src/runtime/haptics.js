@@ -27,10 +27,10 @@ function windowChain(win) {
   return chain
 }
 
-/** The native bridge, looked up on every pulse rather than copied once when a runtime frame starts, so the frame
- *  always reaches the bridge its app window has now. */
+/** The native bridge, looked up on every pulse, outermost window first: the app window holds the bridge the native
+ *  host injected, and a runtime frame's copy of it (taken when the frame started) is only a fallback. */
 export function nativeHost(win = globalThis.window) {
-  for (const current of windowChain(win)) {
+  for (const current of windowChain(win).reverse()) {
     try {
       const host = current.__XIAOCHAO_RN_HOST__
       if (host && typeof host.haptic === 'function') return host

@@ -411,13 +411,21 @@ body.runtime-active[data-orientation="landscape"] .player .runtimeToolbar:not(.r
   border-color: var(--ui-border);
 }
 
-/* A J2ME game's forced landscape on an upright phone is landscape too (useRuntimeOrientation): the toolbar starts
-   collapsed there, so its toggle must stay reachable and the collapsed stage leaves that corner free — the
-   @media (orientation: landscape) rules in uno.config.js only see the viewport. */
+/* Whatever useRuntimeOrientation calls landscape starts with the toolbar collapsed, so its toggle must stay reachable
+   and the collapsed stage leaves that corner free. The @media (orientation: landscape) rules in uno.config.js miss
+   two such cases: a J2ME game forced to landscape on an upright phone, and a square viewport (responsive.js counts
+   width >= height as landscape). */
+body.viewport-landscape .player .runtimeToolbarToggle,
 body.runtime-active[data-orientation="landscape"] .player .runtimeToolbarToggle { display: grid; }
+body.viewport-landscape .player.runtimePlayerToolbarCollapsed .playerStage,
 body.runtime-active[data-orientation="landscape"] .player.runtimePlayerToolbarCollapsed .playerStage {
   left: calc(56px + var(--safe-area-left, 0px));
   right: var(--safe-area-right, 0px);
+}
+/* On an upright phone a forced-landscape game has no room for a 46vw toolbar: give it the screen width. */
+body.runtime-active[data-orientation="landscape"]:not(.viewport-landscape) .player .runtimeToolbar:not(.runtimeToolbarCollapsed) {
+  width: calc(100% - 16px);
+  max-width: 720px;
 }
 
 body.viewport-landscape .player .runtimeToolbarContent,

@@ -67,3 +67,12 @@ test('a cross-origin parent is not used', () => {
   assert.equal(pulse(24, { win: frame }), true)
   assert.deepEqual(calls, [24])
 })
+
+test("the app window's bridge wins over a runtime frame's copy taken at start", () => {
+  const calls = []
+  const top = { __XIAOCHAO_RN_HOST__: { haptic: (ms) => { calls.push(['app', ms]); return true } } }
+  top.parent = top
+  const frame = { parent: top, __XIAOCHAO_RN_HOST__: { haptic: (ms) => { calls.push(['stale copy', ms]); return true } } }
+  pulse(24, { win: frame, nav: { vibrate: () => true } })
+  assert.deepEqual(calls, [['app', 24]])
+})

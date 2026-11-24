@@ -485,7 +485,7 @@ try {
   const flash = await evaluate(`(() => ({ player: !!document.querySelector('.player'), stage: !!document.querySelector('.playerStage'), runtime: !!document.querySelector('ruffle-player'), reloads: window.__XIAOCHAO_RUNTIME_RELOAD_COUNT__ || 0 }))()`)
   console.log('Flash startup:', JSON.stringify(flash))
   requireCheck(flash.player && flash.stage, 'Flash player did not mount')
-  await evaluate(`(() => { const player = document.querySelector('ruffle-player'); window.__flashKeyEvents = []; player?.focus(); for (const type of ['keydown', 'keyup']) document.addEventListener(type, (event) => { if (['ArrowRight','ArrowLeft'].includes(event.key)) window.__flashKeyEvents.push([type, event.key]) }, true); return { player: !!player, focused: document.activeElement === player } })()`)
+  await evaluate(`(() => { const player = document.querySelector('ruffle-player'); window.__flashKeyEvents = []; player?.focus(); for (const type of ['keydown', 'keyup']) document.addEventListener(type, (event) => { if (['ArrowRight','ArrowLeft','Enter',' ','x'].includes(event.key)) window.__flashKeyEvents.push([type, event.key]) }, true); return { player: !!player, focused: document.activeElement === player } })()`)
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 })
   requireCheck(await evaluate(`JSON.stringify(window.__flashKeyEvents) === JSON.stringify([['keydown','ArrowRight'],['keyup','ArrowRight']])`), 'physical keyboard events did not reach Ruffle exactly once')
@@ -526,7 +526,31 @@ try {
     await sleep(60)
     const touchEvents = await evaluate(`window.__flashKeyEvents.slice(-2)`)
     requireCheck(JSON.stringify(touchEvents) === JSON.stringify([['keydown','ArrowLeft'],['keyup','ArrowLeft']]), `touch keypad did not send a paired key event: ${JSON.stringify(touchEvents)}`)
+    if (width < height) {
+      // The hub and both action keys of the portrait gamepad (layouts.js flashPortrait, bounds 0.3..7.25 × 0.1..3.5).
+      for (const [ux, uy, key] of [[1.7, 1.7, 'Enter'], [6.2, 0.9, ' '], [4.55, 2.4, 'x']]) {
+        const point = await evaluate(`(() => {
+          const host = document.querySelector('.flashKeypadFull .keyboardCanvas').getBoundingClientRect()
+          const scale = Math.min(host.width / 6.95, host.height / 3.4)
+          return { x: host.x + (host.width - 6.95 * scale) / 2 + ${ux} * scale, y: host.y + (host.height - 3.4 * scale) / 2 + ${uy} * scale }
+        })()`)
+        await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+        await sleep(60)
+        await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+        await sleep(60)
+        const pair = await evaluate(`window.__flashKeyEvents.slice(-2)`)
+        requireCheck(JSON.stringify(pair) === JSON.stringify([['keydown', key], ['keyup', key]]), `gamepad key ${JSON.stringify(key)} did not send a paired key event: ${JSON.stringify(pair)}`)
+      }
+    }
   }
+  // 「隐藏」: no on-screen keys and the screen takes the whole stage.
+  await evaluate(`localStorage.setItem('xiaochao.flashKeypad.v1', JSON.stringify({ style: 'hidden', placement: 'docked' })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); true`)
+  await sleep(250)
+  const hidden = await evaluate(`(() => { const stage = document.querySelector('.playerStage').getBoundingClientRect(); const screen = document.querySelector('ruffle-player').getBoundingClientRect(); return { keys: document.querySelectorAll('.flashKeypad').length, widthGap: stage.width - screen.width, heightGap: stage.height - screen.height } })()`)
+  console.log('Flash hidden keypad:', JSON.stringify(hidden))
+  requireCheck(hidden.keys === 0 && Math.abs(hidden.widthGap) <= 1 && Math.abs(hidden.heightGap) <= 1, 'hidden Flash keypad did not give the screen the whole stage')
+  await evaluate(`localStorage.setItem('xiaochao.flashKeypad.v1', JSON.stringify({ style: 'gamepad', placement: 'docked' })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); true`)
+  await sleep(250)
   await evaluate(`document.querySelector('.runtimeToolbarToggle[aria-expanded="false"]')?.click(); true`)
   const fullscreenButton = await evaluate(`(() => { const r=document.querySelector('.runtimeToolbarIconButton[aria-label="进入全屏"]').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2} })()`)
   await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [fullscreenButton] })
@@ -744,11 +768,27 @@ try {
     await sleep(300)
     const forced = await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); const r = toggle.getBoundingClientRect(); return { orientation: document.body.dataset.orientation, collapsed: toggle.getAttribute('aria-expanded') === 'false', width: r.width, display: getComputedStyle(toggle).display } })()`)
     console.log('J2ME forced landscape on a portrait viewport:', JSON.stringify(forced))
-    requireCheck(forced.orientation === 'landscape' && forced.display !== 'none' && forced.width > 0, 'toolbar toggle unreachable in forced landscape')
+    requireCheck(forced.orientation === 'landscape' && forced.collapsed && forced.display !== 'none' && forced.width > 0, 'toolbar toggle unreachable in forced landscape')
     await evaluate(`document.querySelector('.runtimeToolbarToggle').click(); true`)
     await sleep(150)
-    requireCheck(await evaluate("!!document.querySelector('.runtimeToolbarBack')"), 'toolbar did not expand in forced landscape')
+    const forcedButtons = await evaluate(`(() => { const bar = document.querySelector('.runtimeToolbar').getBoundingClientRect(); return [...document.querySelectorAll('.runtimeToolbar .adm-button')].map((button) => { const r = button.getBoundingClientRect(); return { label: button.getAttribute('aria-label'), inside: r.left >= Math.max(0, bar.left) - 1 && r.right <= Math.min(innerWidth, bar.right) + 1 } }) })()`)
+    console.log('J2ME forced landscape toolbar:', JSON.stringify(forcedButtons))
+    requireCheck(forcedButtons.some((button) => button.label === '返回大厅') && forcedButtons.every((button) => button.inside), 'forced-landscape toolbar buttons spill off the toolbar or the screen')
     await evaluate(`window.ScreenSetup.setOrientation('auto'); true`)
+    await sleep(300)
+    // Every in-game sheet spans an upright phone's width (the old sheets collapsed to a sliver).
+    for (const label of ['游戏设置', '键盘设置', '按键映射']) {
+      await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); if (toggle?.getAttribute('aria-expanded') === 'false') toggle.click(); return true })()`)
+      await sleep(100)
+      await evaluate(`document.querySelector('[aria-label="${label}"]').click(); true`)
+      await sleep(700)
+      const sheet = await evaluate(`(() => { const sheet = [...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0); const r = sheet.getBoundingClientRect(); return { title: sheet.querySelector('.runtimeSheetHeader strong')?.textContent, width: r.width, height: r.height, viewport: innerWidth, settings: !!sheet.querySelector('.panel-box') } })()`)
+      console.log('Sheet', JSON.stringify(sheet))
+      requireCheck(sheet.title === label && Math.abs(sheet.width - sheet.viewport) <= 1 && sheet.height > 120, `${label} sheet collapsed or wrong`)
+      if (label === '游戏设置') requireCheck(sheet.settings, 'game settings content missing from its sheet')
+      await evaluate(`[...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0).querySelector('.runtimeSheetHeader button').click(); true`)
+      await sleep(500)
+    }
     // A sheet taller than a landscape screen scrolls with a finger inside the runtime frame.
     await send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: true })
     await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
@@ -759,6 +799,7 @@ try {
     await sleep(700)
     const sheetBox = await evaluate(`(() => { const sheet = [...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0); const r = sheet.getBoundingClientRect(); return { x: r.left + r.width / 2, top: r.top, bottom: r.bottom, overflow: sheet.scrollHeight - sheet.clientHeight, touchAction: getComputedStyle(sheet).touchAction } })()`)
     const frameBox = inRuntimeFrame ? await (async () => { inRuntimeFrame = false; const box = await evaluate(`(() => { const r = document.querySelector('.runtimeFrame').getBoundingClientRect(); return { x: r.left, y: r.top } })()`); inRuntimeFrame = true; return box })() : { x: 0, y: 0 }
+    const scrolledBefore = await evaluate(`[...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0).scrollTop`)
     const startY = frameBox.y + sheetBox.bottom - 30
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: frameBox.x + sheetBox.x, y: startY }] })
     for (let step = 1; step <= 8; step++) {
@@ -768,8 +809,8 @@ try {
     await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
     await sleep(400)
     const scrolled = await evaluate(`[...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0).scrollTop`)
-    console.log('Landscape keypad sheet:', JSON.stringify({ ...sheetBox, scrolled }))
-    requireCheck(sheetBox.overflow > 0 && sheetBox.touchAction === 'pan-y' && scrolled > 0, 'landscape keypad sheet does not scroll by touch')
+    console.log('Landscape keypad sheet:', JSON.stringify({ ...sheetBox, scrolledBefore, scrolled }))
+    requireCheck(sheetBox.overflow > 0 && sheetBox.touchAction === 'pan-y' && scrolled > scrolledBefore, 'landscape keypad sheet does not scroll by touch')
     await evaluate(`[...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0).querySelector('.runtimeSheetHeader button').click(); true`)
     await sleep(400)
     await send('Emulation.setTouchEmulationEnabled', { enabled: false })
