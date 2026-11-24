@@ -8,7 +8,9 @@ import 'virtual:uno.css'
 import './mobile-ui.css'
 import { isRuntimeFrame } from './App.jsx'
 import { createApplicationRouter } from './router.jsx'
+import { installSelectionGuard } from './selection-guard.js'
 
+installSelectionGuard()
 const runtimeFrame = isRuntimeFrame()
 const router = createApplicationRouter(runtimeFrame)
 
