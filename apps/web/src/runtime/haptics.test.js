@@ -11,27 +11,23 @@ test('pulse length follows the vibrate setting: 24ms when unset, clamped, off at
 })
 
 test('a press pulses once per touch; mouse and pen do not, and one move pressing two keys pulses once', () => {
-  let clock = 1000
   const sent = []
-  const haptic = createKeyHaptic({ now: () => clock, send: (ms) => { sent.push(ms); return true } })
+  const haptic = createKeyHaptic({ send: (ms) => { sent.push(ms); return true } })
   assert.equal(haptic({ pointerType: 'mouse' }), false)
   assert.equal(haptic({ pointerType: 'pen' }), false)
-  assert.equal(haptic({ pointerType: 'touch' }), true)
-  assert.equal(haptic({ pointerType: 'touch' }), false, 'second direction of the same diagonal move')
-  clock += 40
+  const diagonal = { pointerType: 'touch' }
+  assert.equal(haptic(diagonal), true)
+  assert.equal(haptic(diagonal), false, 'second direction of the same diagonal move')
   assert.equal(haptic({ pointerType: 'touch' }, '30'), true)
   assert.equal(haptic({ pointerType: 'touch' }, 0), false, 'vibration off')
   assert.deepEqual(sent, [24, 30])
 })
 
-test('the press clock, not event.timeStamp, decides: a frame event far ahead of the app clock still pulses', () => {
-  let clock = 50
+test('presses that queued up behind a busy game each pulse, however close together their handlers run', () => {
   const sent = []
-  const haptic = createKeyHaptic({ now: () => clock, send: (ms) => sent.push(ms) })
-  haptic({ pointerType: 'touch', timeStamp: 900000 })
-  clock += 200
-  haptic({ pointerType: 'touch', timeStamp: 10 })
-  assert.equal(sent.length, 2)
+  const haptic = createKeyHaptic({ send: (ms) => sent.push(ms) })
+  for (let i = 0; i < 4; i += 1) haptic({ pointerType: 'touch' })
+  assert.equal(sent.length, 4)
 })
 
 test('the native bridge is looked up at press time, through the runtime frame to the app window', () => {

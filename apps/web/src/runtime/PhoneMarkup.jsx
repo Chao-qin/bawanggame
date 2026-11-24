@@ -26,8 +26,8 @@ const classicPulse = (duration) => keyHaptic({ pointerType: 'touch' }, duration)
 export function PhoneMarkup({ mrp = false }) {
   const [keypadPrefs] = useKeypadPrefs()
   useKeypadStage(keypadPrefs, { mrp })
-  // The classic keypad (touchpad.js) pulses through the same channel and merge window as the T9 keypad; it has
-  // already filtered out mouse and pen and worked out the duration.
+  // The classic keypad (touchpad.js) pulses through the same channel as the T9 keypad, once per press; it has
+  // already filtered out mouse and pen, merged a diagonal into one pulse and worked out the duration.
   useEffect(() => {
     window.__XIAOCHAO_HAPTIC_PULSE__ = classicPulse
     return () => { if (window.__XIAOCHAO_HAPTIC_PULSE__ === classicPulse) delete window.__XIAOCHAO_HAPTIC_PULSE__ }

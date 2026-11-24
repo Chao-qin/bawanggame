@@ -4,8 +4,6 @@
 const DEFAULT_MS = 24
 const MIN_MS = 8
 const MAX_MS = 40
-// A diagonal on the wheel presses two directions in one move, and two fingers can land in the same frame: one pulse.
-const MERGE_MS = 30
 
 /** Pulse length for a vibrate setting; 0 when vibration is off. */
 export function hapticDuration(setting) {
@@ -62,17 +60,17 @@ export function pulse(duration, { win = globalThis.window, nav } = {}) {
   try { return vibration?.vibrate?.(duration) === true } catch { return false }
 }
 
-/** Creates the haptic for key presses. Timing uses the clock at the press, not event.timeStamp, whose origin differs
- *  between the app document and a runtime frame and between browsers. */
-export function createKeyHaptic({ now = () => globalThis.performance?.now?.() ?? Date.now(), send = pulse } = {}) {
-  let last = -Infinity
+/** Creates the haptic for key presses: one pulse per press event. A diagonal on the wheel presses two directions with
+ *  one event, so it pulses once. Presses are not merged by time: a busy game delays the handlers, and presses that
+ *  queued up behind it run back to back, so a time window dropped real presses. */
+export function createKeyHaptic({ send = pulse } = {}) {
+  let lastEvent = null
   return function keyHaptic(event, setting) {
     if (event?.pointerType && event.pointerType !== 'touch') return false
     const duration = hapticDuration(setting)
     if (!duration) return false
-    const at = now()
-    if (at - last < MERGE_MS && at >= last) return false
-    last = at
+    if (event && event === lastEvent) return false
+    lastEvent = event ?? null
     return send(duration)
   }
 }

@@ -39,8 +39,9 @@
     pace();
   }
 
+  var NORMAL_WINDOW = J2ME.windowTime;
   function pace() {
-    J2ME.windowTime = Object.keys(links).some(function (id) { return !links[id].closed; }) ? 2 : 80;
+    J2ME.windowTime = Object.keys(links).some(function (id) { return !links[id].closed; }) ? 2 : NORMAL_WINDOW;
   }
 
   Link.prototype.wake = function () {

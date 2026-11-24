@@ -3,7 +3,7 @@ var Settings = (function () {
   var GAME = "j2me.game.";
   var phone = window.matchMedia && matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 800;
   var DEFAULTS = {
-    screen: "auto", scale: "2", keypad: "3", orientation: "auto", theme: "classic", fps: "0", jit: "1", platform: "se",
+    screen: "auto", scale: phone ? "99" : "2", keypad: "3", orientation: "auto", theme: "classic", fps: "0", jit: "1", platform: "se",
     keyHold: "60", tapFrames: "1", dpadOk: "press", keyRepeat: "1", repeatDelay: "450", repeatInterval: "100", vibrate: phone ? "24" : "0",
     wakeLock: "0", pixelated: "0", showFps: "0"
   };

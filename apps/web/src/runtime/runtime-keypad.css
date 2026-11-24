@@ -35,6 +35,17 @@ body.runtime-active :is(.t9Keypad, #keypad > #keypad-canvas, #keypad > #nav, #ke
   opacity: var(--runtime-keypad-opacity, 1);
 }
 
+/* ---- Stage room: no frame around the screen box or the T9 keypad. The runtime stylesheet pads the screen box
+   (12px) and the classic keypad (about 12-14px); with the T9 canvas's own padding on top, the screen stopped 12px
+   short of the box even at 「宽度铺满」 / 「高度铺满」 and the keys sat about 24px in from each side. ---- */
+body.runtime-active.fixed-screen #display-container {
+  padding: 0;
+}
+body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]) #keypad {
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
 /* ---- Docked: the keypad takes its own space, the game screen fits the rest. ---- */
 body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]) .t9KeypadFull {
   width: 100%;
@@ -43,7 +54,7 @@ body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]) 
      the digit keys keep their size. */
   aspect-ratio: 7.4 / 7.95;
   max-height: min(54vh, 490px);
-  padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+  padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px));
 }
 
 body.runtime-active[data-keypad-style="t9"][data-orientation="landscape"] :is(.t9KeypadNav, .t9KeypadNumpad) {
