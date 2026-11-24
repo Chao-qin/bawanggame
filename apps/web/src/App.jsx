@@ -11,7 +11,7 @@ import { RuntimeLoading } from './runtime/RuntimeStatus.jsx'
 import { InputMappingPopup } from './runtime/InputMappingPopup.jsx'
 import { KeypadSettingsPopup } from './runtime/KeypadSettingsPopup.jsx'
 import { GameSettingsSheet } from './runtime/GameSettingsSheet.jsx'
-import { useKeypadPrefs, useViewportOrientation } from './runtime/RuntimeKeypad.jsx'
+import { useKeypadPrefs, useRuntimeOrientation, useViewportOrientation } from './runtime/RuntimeKeypad.jsx'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
 import { fetchArtwork, validArtwork } from './artwork.js'
 import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
@@ -931,6 +931,7 @@ function Store({ onRefreshLibrary }) {
 function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
   const [confirming, setConfirming] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(fullscreenElement()))
+  const runtimeOrientation = useRuntimeOrientation()
   const [runtimeReadyFor, setRuntimeReadyFor] = useState('')
   // The toolbar's room follows the screen itself (mobile-ui.css): a landscape screen starts with it collapsed.
   const toolbarLandscape = useViewportOrientation() === 'landscape'
@@ -1070,7 +1071,11 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
     onBack()
   }
   return (
-    <div ref={playerRef} className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}>
+    <div
+      ref={playerRef}
+      className={`player${toolbarCollapsed ? ' runtimePlayerToolbarCollapsed' : ''}`}
+      data-runtime-orientation={runtimeOrientation}
+    >
       <div className={toolbarCollapsed ? 'runtimeToolbar runtimeToolbarCollapsed' : 'runtimeToolbar'} role="toolbar" aria-label="游戏控制" onClick={(event) => event.stopPropagation()}>
         <Button className="runtimeToolbarToggle" onClick={() => setToolbarChoice({ landscape: toolbarLandscape, collapsed: !toolbarCollapsed })} aria-expanded={!toolbarCollapsed} aria-label={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'} title={toolbarCollapsed ? '展开游戏控制' : '收起游戏控制'}><MoreOutline aria-hidden="true" /></Button>
           {!toolbarCollapsed && <div className="runtimeToolbarContent">

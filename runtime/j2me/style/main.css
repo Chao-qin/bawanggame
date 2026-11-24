@@ -1797,12 +1797,12 @@ body.runtime-active.keyboard-open .runtimeToolbar {
 /* A landscape layout on an upright screen (a game's forced orientation, or 「布局方向：横排」): narrower side columns,
    or the screen between them would have no room left. */
 body.runtime-active[data-orientation="landscape"]:not(.viewport-landscape) .runtime-stage {
-  --landscape-side: clamp(96px, 27vw, 170px) !important;
+  --landscape-side: clamp(96px, min(27vw, 28vh), 170px) !important;
 }
 
 body.runtime-active[data-orientation="landscape"] .runtime-stage {
   /* Shared by the screen box and both keypad halves (their safe-area padding used to read an undefined gap). */
-  --landscape-side: clamp(170px, 26vw, 330px);
+  --landscape-side: clamp(112px, min(26vw, 42vh), 330px);
   --landscape-gap: clamp(8px, 1.4vw, 22px);
   position: relative;
   display: block !important;
@@ -1838,7 +1838,7 @@ body.runtime-active[data-orientation="landscape"] #keypad {
   inset: 0;
   z-index: 2;
   display: grid !important;
-  grid-template-columns: var(--landscape-side) minmax(0, 1fr) var(--landscape-side);
+  grid-template-columns: minmax(0, var(--landscape-side)) minmax(0, 1fr) minmax(0, var(--landscape-side));
   grid-template-rows: minmax(0, 1fr);
   align-items: center;
   width: 100%;
