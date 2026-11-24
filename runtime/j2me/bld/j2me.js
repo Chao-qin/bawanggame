@@ -10202,12 +10202,15 @@ var J2ME;
     /**
      * Maximum time in ms that all of the threads have to run before the event
      * loop is run.
-     * NOTE: this number is somewhat arbitrarily chosen, but the thought is
-     * we'd like the system to respond in under 100ms, so by using 80ms we then
-     * have 20ms to get an event, start processing it, and render an update.
-     * @const
+     * The runtime frame shares the page's main thread, so a game that never
+     * sleeps held it for the whole window: at 80ms the screen and the keypad drew
+     * at ~13fps and a touch (and its vibration) waited up to 80ms. One 60Hz frame
+     * keeps such a game at 60fps for ~6% less VM time; shorter windows also cut
+     * into games whose frame work runs longer than the window before they sleep
+     * (measured in Chrome with a busy thread, and a tile RPG at 6x CPU slowdown).
+     * bt.js shortens it further while a Bluetooth link is open.
      */
-    J2ME.windowTime = 80;
+    J2ME.windowTime = 16;
     /**
      * Number of ms between preemption checks, chosen arbitrarily.
      * @const

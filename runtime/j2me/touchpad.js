@@ -119,13 +119,17 @@
     }
 
     // ---------- 边沿去重：同一键被多指按住时，只给 sink 一次 press/release ----------
-    function press(code, holder, sourceAt, pointerType) {
+    // quiet: a move that presses two directions (a diagonal) pulses once. Returns whether this press pulsed, so a
+    // key another finger already holds does not take the pulse from the new one.
+    function press(code, holder, sourceAt, pointerType, quiet) {
       var h = codeHolders[code] || (codeHolders[code] = {});
-      if (h[holder]) return;
+      if (h[holder]) return false;
       var firstHolder = Object.keys(h).length === 0;
       h[holder] = 1;
-      if (firstHolder) haptic(pointerType);
+      var pulsed = firstHolder && !quiet;
+      if (pulsed) haptic(pointerType);
       sink.press(code, { pointer: true, sourceAt: sourceAt == null ? null : sourceAt });
+      return pulsed;
     }
     function release(code, holder, sourceAt) {
       var h = codeHolders[code];
@@ -298,11 +302,12 @@
         setDown(id, keyId, false);
         release(buttons[keyId], id, sourceAt);
       });
+      var pulsed = false;
       want.forEach(function (keyId) {
         if (prevIds.indexOf(keyId) >= 0) return;
         setDown(id, keyId, true);
         tap(keyEl(keyId));
-        press(buttons[keyId], id, sourceAt, pointerType);
+        if (press(buttons[keyId], id, sourceAt, pointerType, pulsed)) pulsed = true;
         if (!reps[id]) reps[id] = {};
         startRepeat(id, keyId);
       });
