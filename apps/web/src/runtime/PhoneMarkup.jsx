@@ -25,7 +25,7 @@ const classicPulse = (duration) => keyHaptic({ pointerType: 'touch' }, duration)
 
 export function PhoneMarkup({ mrp = false }) {
   const [keypadPrefs] = useKeypadPrefs()
-  useKeypadStage(keypadPrefs)
+  useKeypadStage(keypadPrefs, { mrp })
   // The classic keypad (touchpad.js) pulses through the same channel and merge window as the T9 keypad; it has
   // already filtered out mouse and pen and worked out the duration.
   useEffect(() => {

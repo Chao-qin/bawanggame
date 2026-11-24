@@ -278,7 +278,8 @@ try {
   await send('Page.addScriptToEvaluateOnNewDocument', { source: runtimeStateObserver })
   await evaluate(`(() => { ${runtimeStateObserver} })()`)
   await send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false })
-  await sleep(1500)
+  // Wait for the app itself, not a fixed delay: a slow first load used to read an empty page.
+  await waitFor("document.querySelectorAll('.tab').length === 5", 'library tabs', 150)
 
   const library = await evaluate(`(() => ({
     title: document.title,
@@ -491,7 +492,7 @@ try {
   requireCheck(await evaluate(`JSON.stringify(window.__flashKeyEvents) === JSON.stringify([['keydown','ArrowRight'],['keyup','ArrowRight']])`), 'physical keyboard events did not reach Ruffle exactly once')
   // The Flash gamepad (FlashKeypad.jsx) follows the Flash keypad choice; a mouse device defaults to no on-screen keys,
   // so pick the gamepad as a touch player would.
-  await evaluate(`localStorage.setItem('xiaochao.flashKeypad.v1', JSON.stringify({ style: 'gamepad', placement: 'docked' })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); true`)
+  await evaluate(`localStorage.setItem('xiaochao.flashKeypad.v1', JSON.stringify({ style: 'gamepad', visible: true, placement: 'docked' })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); true`)
   for (const [width, height] of [[390, 844], [844, 390]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
     await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
@@ -543,13 +544,16 @@ try {
       }
     }
   }
-  // 「隐藏」: no on-screen keys and the screen takes the whole stage.
-  await evaluate(`localStorage.setItem('xiaochao.flashKeypad.v1', JSON.stringify({ style: 'hidden', placement: 'docked' })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); true`)
+  // The toolbar's keyboard button hides the keys and the screen takes the whole stage.
+  await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); if (toggle?.getAttribute('aria-expanded') === 'false') toggle.click(); return true })()`)
+  await sleep(150)
+  await evaluate(`document.querySelector('[aria-label="隐藏键盘"]').click(); true`)
   await sleep(250)
-  const hidden = await evaluate(`(() => { const stage = document.querySelector('.playerStage').getBoundingClientRect(); const screen = document.querySelector('ruffle-player').getBoundingClientRect(); return { keys: document.querySelectorAll('.flashKeypad').length, widthGap: stage.width - screen.width, heightGap: stage.height - screen.height } })()`)
+  // The screen box takes the whole stage; the picture (sized to the movie, 「完整显示」) fills one axis, centred.
+  const hidden = await evaluate(`(() => { const stage = document.querySelector('.playerStage').getBoundingClientRect(); const host = document.querySelector('.flashRuffleHost').getBoundingClientRect(); const screen = document.querySelector('ruffle-player').getBoundingClientRect(); return { keys: document.querySelectorAll('.flashKeypad').length, hostGap: [stage.width - host.width, stage.height - host.height], fills: Math.abs(screen.width - host.width) <= 1 || Math.abs(screen.height - host.height) <= 1, centred: Math.abs((screen.left - host.left) - (host.right - screen.right)) <= 1 && Math.abs((screen.top - host.top) - (host.bottom - screen.bottom)) <= 1 } })()`)
   console.log('Flash hidden keypad:', JSON.stringify(hidden))
-  requireCheck(hidden.keys === 0 && Math.abs(hidden.widthGap) <= 1 && Math.abs(hidden.heightGap) <= 1, 'hidden Flash keypad did not give the screen the whole stage')
-  await evaluate(`localStorage.setItem('xiaochao.flashKeypad.v1', JSON.stringify({ style: 'gamepad', placement: 'docked' })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); true`)
+  requireCheck(hidden.keys === 0 && Math.abs(hidden.hostGap[0]) <= 1 && Math.abs(hidden.hostGap[1]) <= 1 && hidden.fills && hidden.centred, 'hidden Flash keypad did not give the screen the whole stage')
+  await evaluate(`localStorage.setItem('xiaochao.flashKeypad.v1', JSON.stringify({ style: 'gamepad', visible: true, placement: 'docked' })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); true`)
   await sleep(250)
   await evaluate(`document.querySelector('.runtimeToolbarToggle[aria-expanded="false"]')?.click(); true`)
   const fullscreenButton = await evaluate(`(() => { const r=document.querySelector('.runtimeToolbarIconButton[aria-label="进入全屏"]').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2} })()`)
@@ -761,23 +765,20 @@ try {
       // Short screens cap the keypad height (runtime-keypad.css), which can leave narrow side gutters.
       else requireCheck(t9.full && t9.full.top >= t9.display.bottom - 1 && t9.full.width >= width * 0.9 && Math.abs(t9.full.left + t9.full.right - width) <= 2, `T9 portrait keypad is not centred under the screen at ${width}x${height}`)
     }
-    // A game forced to landscape on an upright phone is laid out as landscape and starts with the toolbar collapsed:
-    // its toggle must still be there.
+    // A game forced to landscape on an upright phone is laid out as landscape; the toolbar keeps its row above the
+    // stage (the screen is upright), with every button on screen.
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
     await evaluate(`window.ScreenSetup.setOrientation('landscape'); true`)
     await sleep(300)
-    const forced = await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); const r = toggle.getBoundingClientRect(); return { orientation: document.body.dataset.orientation, collapsed: toggle.getAttribute('aria-expanded') === 'false', width: r.width, display: getComputedStyle(toggle).display } })()`)
-    console.log('J2ME forced landscape on a portrait viewport:', JSON.stringify(forced))
-    requireCheck(forced.orientation === 'landscape' && forced.collapsed && forced.display !== 'none' && forced.width > 0, 'toolbar toggle unreachable in forced landscape')
-    await evaluate(`document.querySelector('.runtimeToolbarToggle').click(); true`)
+    await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); if (toggle.getAttribute('aria-expanded') === 'false') toggle.click(); return true })()`)
     await sleep(150)
-    const forcedButtons = await evaluate(`(() => { const bar = document.querySelector('.runtimeToolbar').getBoundingClientRect(); return [...document.querySelectorAll('.runtimeToolbar .adm-button')].map((button) => { const r = button.getBoundingClientRect(); return { label: button.getAttribute('aria-label'), inside: r.left >= Math.max(0, bar.left) - 1 && r.right <= Math.min(innerWidth, bar.right) + 1 } }) })()`)
-    console.log('J2ME forced landscape toolbar:', JSON.stringify(forcedButtons))
-    requireCheck(forcedButtons.some((button) => button.label === '返回大厅') && forcedButtons.every((button) => button.inside), 'forced-landscape toolbar buttons spill off the toolbar or the screen')
+    const forced = await evaluate(`(() => { const bar = document.querySelector('.runtimeToolbar').getBoundingClientRect(); const stage = document.querySelector('.playerStage').getBoundingClientRect(); return { orientation: document.body.dataset.orientation, toolbarAboveStage: bar.bottom <= stage.top, buttons: [...document.querySelectorAll('.runtimeToolbar .adm-button')].map((button) => { const r = button.getBoundingClientRect(); return { label: button.getAttribute('aria-label'), inside: r.left >= Math.max(0, bar.left) - 1 && r.right <= Math.min(innerWidth, bar.right) + 1 } }) } })()`)
+    console.log('J2ME forced landscape on a portrait viewport:', JSON.stringify(forced))
+    requireCheck(forced.orientation === 'landscape' && forced.toolbarAboveStage && forced.buttons.some((button) => button.label === '返回大厅') && forced.buttons.every((button) => button.inside), 'toolbar unreachable or spilling in forced landscape')
     await evaluate(`window.ScreenSetup.setOrientation('auto'); true`)
     await sleep(300)
     // Every in-game sheet spans an upright phone's width (the old sheets collapsed to a sliver).
-    for (const label of ['游戏设置', '键盘设置', '按键映射']) {
+    for (const label of ['游戏设置', '游戏表现', '按键映射']) {
       await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); if (toggle?.getAttribute('aria-expanded') === 'false') toggle.click(); return true })()`)
       await sleep(100)
       await evaluate(`document.querySelector('[aria-label="${label}"]').click(); true`)
@@ -795,7 +796,7 @@ try {
     await sleep(300)
     await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); if (toggle?.getAttribute('aria-expanded') === 'false') toggle.click(); return true })()`)
     await sleep(150)
-    await evaluate(`document.querySelector('[aria-label="键盘设置"]').click(); true`)
+    await evaluate(`document.querySelector('[aria-label="游戏表现"]').click(); true`)
     await sleep(700)
     const sheetBox = await evaluate(`(() => { const sheet = [...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0); const r = sheet.getBoundingClientRect(); return { x: r.left + r.width / 2, top: r.top, bottom: r.bottom, overflow: sheet.scrollHeight - sheet.clientHeight, touchAction: getComputedStyle(sheet).touchAction } })()`)
     const frameBox = inRuntimeFrame ? await (async () => { inRuntimeFrame = false; const box = await evaluate(`(() => { const r = document.querySelector('.runtimeFrame').getBoundingClientRect(); return { x: r.left, y: r.top } })()`); inRuntimeFrame = true; return box })() : { x: 0, y: 0 }
@@ -812,6 +813,48 @@ try {
     console.log('Landscape keypad sheet:', JSON.stringify({ ...sheetBox, scrolledBefore, scrolled }))
     requireCheck(sheetBox.overflow > 0 && sheetBox.touchAction === 'pan-y' && scrolled > scrolledBefore, 'landscape keypad sheet does not scroll by touch')
     await evaluate(`[...document.querySelectorAll('.runtimeSheet')].find((node) => node.getBoundingClientRect().height > 0).querySelector('.runtimeSheetHeader button').click(); true`)
+    await sleep(400)
+    // 「游戏表现」 choices, set the way the sheet saves them.
+    const choose = (patch) => evaluate(`(() => { const now = JSON.parse(localStorage.getItem('xiaochao.runtimeKeypad.v1') || '{}'); localStorage.setItem('xiaochao.runtimeKeypad.v1', JSON.stringify({ ...now, ...${JSON.stringify(patch)} })); window.dispatchEvent(new CustomEvent('xiaochao:keypadprefs')); return true })()`)
+    const screenNow = () => evaluate(`(() => { const r = (q) => { const node = document.querySelector(q); if (!node) return null; const b = node.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)] }; const container = document.querySelector('#display-container'); const style = getComputedStyle(container); return { orientation: document.body.dataset.orientation, canvas: r('#canvas'), box: r('#display-container'), boxContentWidth: Math.round(container.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)), full: r('.t9KeypadFull'), nav: r('.t9KeypadNav'), numpad: r('.t9KeypadNumpad'), opacity: document.querySelector('.t9Keypad') ? getComputedStyle(document.querySelector('.t9Keypad')).opacity : null } })()`)
+    await choose({ style: 't9', visible: true, layout: 'auto', fit: 'contain', opacity: 'auto', placement: 'docked' })
+    for (const [width, height] of [[390, 844], [844, 390]]) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true })
+      await sleep(600)
+      // Collapsing or expanding the toolbar never moves or resizes the game screen.
+      const before = await screenNow()
+      await evaluate(`document.querySelector('.runtimeToolbarToggle').click(); true`)
+      await sleep(400)
+      const after = await screenNow()
+      console.log(`J2ME toolbar toggle ${width}x${height}:`, JSON.stringify({ before: before.canvas, after: after.canvas }))
+      requireCheck(JSON.stringify(before.canvas) === JSON.stringify(after.canvas), `toggling the toolbar resized the game screen at ${width}x${height}`)
+    }
+    // The other layout direction, chosen by hand, on each orientation.
+    await choose({ layout: 'portrait' })
+    await sleep(700)
+    const portraitOnLandscape = await screenNow()
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+    await choose({ layout: 'landscape' })
+    await sleep(700)
+    const landscapeOnPortrait = await screenNow()
+    console.log('J2ME chosen layouts:', JSON.stringify({ portraitOnLandscape, landscapeOnPortrait }))
+    requireCheck(portraitOnLandscape.orientation === 'portrait' && portraitOnLandscape.full && portraitOnLandscape.full[1] >= portraitOnLandscape.box[1] + portraitOnLandscape.box[3] - 1, 'chosen portrait layout not applied on a landscape screen')
+    requireCheck(landscapeOnPortrait.orientation === 'landscape' && landscapeOnPortrait.nav && landscapeOnPortrait.numpad && landscapeOnPortrait.box[2] >= 120, 'chosen landscape layout not applied, or no room for the screen, on an upright screen')
+    // Fill the width; a translucent keypad.
+    await choose({ layout: 'auto', fit: 'width', opacity: '0.4' })
+    await sleep(700)
+    const filled = await screenNow()
+    console.log('J2ME fill width + 40% keypad:', JSON.stringify(filled))
+    requireCheck(Math.abs(filled.canvas[2] - filled.boxContentWidth) <= 2 && filled.canvas[3] > filled.box[3] && Number(filled.opacity) === 0.4, 'fill width or keypad opacity not applied')
+    // The toolbar's keyboard button hides the keypad and the screen gets the stage.
+    await evaluate(`(() => { const toggle = document.querySelector('.runtimeToolbarToggle'); if (toggle.getAttribute('aria-expanded') === 'false') toggle.click(); return true })()`)
+    await sleep(150)
+    await evaluate(`document.querySelector('[aria-label="隐藏键盘"]').click(); true`)
+    await sleep(600)
+    const hiddenKeypad = await evaluate(`({ visible: document.body.dataset.keypadVisible, keypad: getComputedStyle(document.querySelector('#keypad')).display })`)
+    requireCheck(hiddenKeypad.visible === 'false' && hiddenKeypad.keypad === 'none', 'toolbar keyboard button did not hide the keypad')
+    await evaluate(`document.querySelector('[aria-label="显示键盘"]').click(); true`)
+    await choose({ fit: 'contain', opacity: 'auto' })
     await sleep(400)
     await send('Emulation.setTouchEmulationEnabled', { enabled: false })
     await send('Emulation.clearDeviceMetricsOverride')

@@ -293,6 +293,10 @@ var ScreenSetup = (function () {
   function resolvedOrientation() {
     var requested = ["auto", "portrait", "landscape"].indexOf(config.orientation) >= 0 ? config.orientation : "auto";
     if (requested !== "auto") return requested;
+    // The app's 「布局方向」 choice for every phone game (apps/web/src/runtime/keypad-prefs.js); a game's own
+    // orientation above wins over it.
+    var preferred = window.__XIAOCHAO_LAYOUT_PREFERENCE__;
+    if (preferred === "portrait" || preferred === "landscape") return preferred;
     return innerWidth >= innerHeight ? "landscape" : "portrait";
   }
 

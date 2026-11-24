@@ -613,7 +613,7 @@ body.runtime-active #numpad {
 }
 
 /* Keep portrait action keys clear of the d-pad and each other. */
-body.runtime-active:not(.viewport-landscape):not([data-orientation="landscape"]) .runtime-stage:not(.mrp-stage) :is(#choice, #back, #ret, #clear) {
+body.runtime-active:not([data-orientation="landscape"]) .runtime-stage:not(.mrp-stage) :is(#choice, #back, #ret, #clear) {
   height: calc(50% - var(--u) * 0.09);
 }
 
@@ -1705,9 +1705,9 @@ body[data-dpad-layout="rotate-ccw"] #left { grid-area: 3 / 2; }
 
 /* Which side each half takes is the touch layout's choice (touch-layout.js sets data-side-layout): "standard" keeps
    the navigation on the right (the landscape rules near the end of this file), "swapped" — the default — puts it on
-   the left. Landscape is either rule the stage uses: J2ME's data-orientation or the viewport (all MRP has). */
-body.runtime-active:is([data-orientation="landscape"], .viewport-landscape)[data-side-layout="swapped"] #numpad { grid-column: 3 !important; }
-body.runtime-active:is([data-orientation="landscape"], .viewport-landscape)[data-side-layout="swapped"] #nav { grid-column: 1 !important; }
+   the left. Landscape is body[data-orientation], the one layout attribute every runtime frame sets. */
+body.runtime-active[data-orientation="landscape"][data-side-layout="swapped"] #numpad { grid-column: 3 !important; }
+body.runtime-active[data-orientation="landscape"][data-side-layout="swapped"] #nav { grid-column: 1 !important; }
 
 .layout-note {
   margin: 0;
@@ -1773,11 +1773,11 @@ body.runtime-active .runtime-stage {
 body.runtime-active.viewport-short-height #keypad { --key-size-limit: 34px; }
 body.runtime-active.viewport-compact #keypad { --key-size-limit: 28px; gap: calc(var(--u) * 0.18); }
 
-body.runtime-active.viewport-landscape #display-container {
+body.runtime-active[data-orientation="landscape"] #display-container {
   min-width: 0;
 }
 
-body.runtime-active.viewport-landscape #keypad-canvas {
+body.runtime-active[data-orientation="landscape"] #keypad-canvas {
   max-width: 100%;
 }
 
@@ -1794,8 +1794,16 @@ body.runtime-active.keyboard-open .runtimeToolbar {
 /* Keep landscape controls in a real three-column containing block. The old
    display:contents composition made #keypad-canvas lose its containing block
    and allowed #numpad to collapse or escape the viewport in WebViews. */
-body.runtime-active[data-orientation="landscape"] .runtime-stage,
-body.runtime-active.viewport-landscape .runtime-stage {
+/* A landscape layout on an upright screen (a game's forced orientation, or 「布局方向：横排」): narrower side columns,
+   or the screen between them would have no room left. */
+body.runtime-active[data-orientation="landscape"]:not(.viewport-landscape) .runtime-stage {
+  --landscape-side: clamp(96px, 27vw, 170px) !important;
+}
+
+body.runtime-active[data-orientation="landscape"] .runtime-stage {
+  /* Shared by the screen box and both keypad halves (their safe-area padding used to read an undefined gap). */
+  --landscape-side: clamp(170px, 26vw, 330px);
+  --landscape-gap: clamp(8px, 1.4vw, 22px);
   position: relative;
   display: block !important;
   width: 100%;
@@ -1805,19 +1813,15 @@ body.runtime-active.viewport-landscape .runtime-stage {
   overflow: hidden;
 }
 
-body.runtime-active[data-orientation="landscape"] #phone,
-body.runtime-active.viewport-landscape #phone {
+body.runtime-active[data-orientation="landscape"] #phone {
   position: relative;
   display: block !important;
   width: 100%;
   height: 100%;
 }
 
-body.runtime-active[data-orientation="landscape"] #display-container,
-body.runtime-active.viewport-landscape #display-container {
+body.runtime-active[data-orientation="landscape"] #display-container {
   position: absolute;
-  --landscape-side: clamp(170px, 26vw, 330px);
-  --landscape-gap: clamp(8px, 1.4vw, 22px);
   top: 0;
   bottom: 0;
   left: calc(var(--landscape-side) + var(--landscape-gap));
@@ -1829,14 +1833,11 @@ body.runtime-active.viewport-landscape #display-container {
   min-height: 0;
 }
 
-body.runtime-active[data-orientation="landscape"] #keypad,
-body.runtime-active.viewport-landscape #keypad {
+body.runtime-active[data-orientation="landscape"] #keypad {
   position: absolute;
   inset: 0;
   z-index: 2;
   display: grid !important;
-  --landscape-side: clamp(170px, 26vw, 330px);
-  --landscape-gap: clamp(8px, 1.4vw, 22px);
   grid-template-columns: var(--landscape-side) minmax(0, 1fr) var(--landscape-side);
   grid-template-rows: minmax(0, 1fr);
   align-items: center;
@@ -1849,16 +1850,13 @@ body.runtime-active.viewport-landscape #keypad {
   pointer-events: none;
 }
 
-body.runtime-active[data-orientation="landscape"] #keypad-canvas,
-body.runtime-active.viewport-landscape #keypad-canvas {
+body.runtime-active[data-orientation="landscape"] #keypad-canvas {
   z-index: 0;
   pointer-events: none !important;
 }
 
 body.runtime-active[data-orientation="landscape"] #numpad,
-body.runtime-active.viewport-landscape #numpad,
-body.runtime-active[data-orientation="landscape"] #nav,
-body.runtime-active.viewport-landscape #nav {
+body.runtime-active[data-orientation="landscape"] #nav {
   grid-row: 1;
   align-self: center;
   width: 100% !important;
@@ -1868,15 +1866,13 @@ body.runtime-active.viewport-landscape #nav {
   pointer-events: auto;
 }
 
-body.runtime-active[data-orientation="landscape"] #numpad,
-body.runtime-active.viewport-landscape #numpad {
+body.runtime-active[data-orientation="landscape"] #numpad {
   grid-column: 1;
   --u: var(--control-unit, clamp(24px, min(12vh, 5vw), 56px));
   padding: 0 var(--landscape-gap) 0 var(--safe-area-left, env(safe-area-inset-left, 0px));
 }
 
-body.runtime-active[data-orientation="landscape"] #nav,
-body.runtime-active.viewport-landscape #nav {
+body.runtime-active[data-orientation="landscape"] #nav {
   grid-column: 3;
   --u: var(--control-unit, clamp(24px, min(12vh, 5vw), 56px));
   height: calc(var(--u) * 4.6);
@@ -1885,8 +1881,7 @@ body.runtime-active.viewport-landscape #nav {
   isolation: isolate;
 }
 
-body.runtime-active[data-orientation="landscape"] #display,
-body.runtime-active.viewport-landscape #display {
+body.runtime-active[data-orientation="landscape"] #display {
   max-width: 100%;
   max-height: 100%;
 }

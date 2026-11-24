@@ -202,9 +202,9 @@ const t9Portrait = [
 ]
 
 // Landscape: the same four-corner arrangement in the left side column, digits on the right with a gap between the
-// halves for the game screen. The navigation half is shorter than before (2.6 vs 3.54 units), so the wheel dominates
-// its column and the four function keys take only the corners.
-const LANDSCAPE_WHEEL = { x: 0.4, y: 0.3, size: 2 }
+// halves for the game screen. The wheel takes 2.3 of the 2.8 × 2.6 navigation half, so it dominates its column and
+// the four function keys keep only the corners.
+const LANDSCAPE_WHEEL = { x: 0.25, y: 0.15, size: 2.3 }
 const landscapeArc = t9Arc(LANDSCAPE_WHEEL.x + LANDSCAPE_WHEEL.size / 2,
   LANDSCAPE_WHEEL.y + LANDSCAPE_WHEEL.size / 2, LANDSCAPE_WHEEL.size)
 const t9Landscape = [

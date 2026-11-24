@@ -392,50 +392,41 @@ a.ghostButton:hover { border-color: var(--ui-accent); }
   min-width: 36px;
 }
 
-/* Landscape game controls (every runtime) float over the central screen instead of adding a full-width layout row
-   above the side keypads. Landscape is the runtime orientation rule: the viewport, or a J2ME game's forced
-   orientation. Collapsed, the toolbar is only its small toggle in the top-left corner (uno.config.js), so it never
-   covers the top of the game screen. */
-body.viewport-landscape .player .runtimeToolbar:not(.runtimeToolbarCollapsed),
-body.runtime-active[data-orientation="landscape"] .player .runtimeToolbar:not(.runtimeToolbarCollapsed) {
+/* Runtime player layout, every runtime (J2ME, MRP, Flash). The toolbar's room follows the screen itself: a row
+   above the stage on an upright screen, a strip left of it on a landscape one. That room is fixed — expanding or
+   collapsing the toolbar only shows or hides its buttons, so the stage, and the game screen in it, never changes
+   size. Inside the stage the runtime lays itself out by body[data-orientation] (the 「布局方向」 choice). */
+:root {
+  --runtime-toolbar-row: calc(max(8px, var(--safe-area-top, 0px)) + 58px);
+  --runtime-toolbar-strip: calc(56px + var(--safe-area-left, 0px));
+}
+.player .runtimeToolbarToggle { display: grid; }
+body:not(.viewport-landscape) .player .playerStage {
+  inset: var(--runtime-toolbar-row) 0 0 0;
+}
+body.viewport-landscape .player .playerStage {
+  inset: 0 var(--safe-area-right, 0px) 0 var(--runtime-toolbar-strip);
+}
+/* Landscape screen: the expanded toolbar floats over the top of the stage, sized to its buttons. Keep it opaque:
+   backdrop-filter over the constantly repainting runtime canvas is a major source of jank when a sheet opens. */
+body.viewport-landscape .player .runtimeToolbar:not(.runtimeToolbarCollapsed) {
   position: absolute;
   z-index: 220;
   top: max(10px, var(--safe-area-top, 0px));
   left: 50%;
-  width: min(46vw, 520px);
+  width: max-content;
   max-width: calc(100% - 32px);
   transform: translateX(-50%);
-  /* Keep the floating toolbar opaque: backdrop-filter over the constantly
-     repainting runtime canvas is a major source of jank when a sheet opens. */
   background: var(--ui-surface);
   border-color: var(--ui-border);
 }
 
-/* Whatever useRuntimeOrientation calls landscape starts with the toolbar collapsed, so its toggle must stay reachable
-   and the collapsed stage leaves that corner free. The @media (orientation: landscape) rules in uno.config.js miss
-   two such cases: a J2ME game forced to landscape on an upright phone, and a square viewport (responsive.js counts
-   width >= height as landscape). */
-body.viewport-landscape .player .runtimeToolbarToggle,
-body.runtime-active[data-orientation="landscape"] .player .runtimeToolbarToggle { display: grid; }
-body.viewport-landscape .player.runtimePlayerToolbarCollapsed .playerStage,
-body.runtime-active[data-orientation="landscape"] .player.runtimePlayerToolbarCollapsed .playerStage {
-  left: calc(56px + var(--safe-area-left, 0px));
-  right: var(--safe-area-right, 0px);
-}
-/* On an upright phone a forced-landscape game has no room for a 46vw toolbar: give it the screen width. */
-body.runtime-active[data-orientation="landscape"]:not(.viewport-landscape) .player .runtimeToolbar:not(.runtimeToolbarCollapsed) {
-  width: calc(100% - 16px);
-  max-width: 720px;
-}
-
-body.viewport-landscape .player .runtimeToolbarContent,
-body.runtime-active[data-orientation="landscape"] .player .runtimeToolbarContent {
+body.viewport-landscape .player .runtimeToolbarContent {
   min-height: 42px;
   padding: 4px 6px;
 }
 
-body.viewport-landscape .player .runtimeToolbar .runtimeGame,
-body.runtime-active[data-orientation="landscape"] .player .runtimeToolbar .runtimeGame {
+body.viewport-landscape .player .runtimeToolbar .runtimeGame {
   font-size: 13px;
 }
 .player .runtimeToolbar .runtimeToolbarButton,
@@ -506,6 +497,11 @@ body.runtime-active .runtimeSheet * { touch-action: pan-y !important; }
   --checked-border: solid 1px rgba(127, 214, 255, 0.55);
 }
 .runtimeSheet .adm-selector-item-description { color: var(--ui-muted); }
+.runtimeSheetSection { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--ui-border); }
+.runtimeSheetSection > h3 { margin: 0; color: var(--ui-accent); font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
+.runtimeSheetField { display: grid; gap: 6px; }
+.runtimeSheetField .inputMappingStatus small, .runtimeSheetSwitch small { display: block; margin-top: 2px; color: var(--ui-muted); font-size: 12px; }
+.runtimeSheetSwitch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
 .keypadCurrent { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 8px; background: rgba(255, 255, 255, 0.04); }
 .keypadCurrent span, .keypadCurrent small { color: var(--ui-muted); font-size: 12px; }
 .keypadCurrent strong { font-size: 15px; }
@@ -600,31 +596,6 @@ body.runtime-active .runtimeSheet * { touch-action: pan-y !important; }
 .flashRuntimeView[data-placement="floating"][data-orientation="landscape"] :is(.flashKeypadNav, .flashKeypadActions) { top: 50%; transform: translateY(-50%); }
 .flashRuntimeView[data-placement="floating"][data-orientation="landscape"] .flashKeypadNav { left: 0; }
 .flashRuntimeView[data-placement="floating"][data-orientation="landscape"] .flashKeypadActions { right: 0; }
-/* Every runtime (J2ME, MRP, Flash): in portrait the toolbar takes its own row above the screen; collapsed, the
-   stage gets the whole player and the toggle floats in the corner. */
-@media (orientation: portrait) {
-  body:not(.viewport-landscape):not([data-orientation="landscape"]) .player .runtimeToolbarToggle { display: grid; }
-  body:not(.viewport-landscape):not([data-orientation="landscape"]) .player.runtimePlayerToolbarCollapsed .playerStage {
-    inset: 0;
-  }
-  body:not(.viewport-landscape):not([data-orientation="landscape"]) .player:not(.runtimePlayerToolbarCollapsed) {
-    display: flex;
-    flex-direction: column;
-  }
-  body:not(.viewport-landscape):not([data-orientation="landscape"]) .player:not(.runtimePlayerToolbarCollapsed) .runtimeToolbar {
-    position: relative;
-    top: auto;
-    flex: none;
-    margin-block: max(8px, var(--safe-area-top, 0px)) 8px;
-  }
-  body:not(.viewport-landscape):not([data-orientation="landscape"]) .player:not(.runtimePlayerToolbarCollapsed) .playerStage {
-    position: relative;
-    inset: auto;
-    flex: 1;
-    min-height: 0;
-  }
-}
-
 @media (max-width: 700px) {
   .appShell {
     --library-nav-height: calc(66px + max(6px, var(--safe-area-bottom, 0px)));

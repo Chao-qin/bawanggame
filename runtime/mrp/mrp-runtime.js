@@ -140,7 +140,10 @@
     var box = document.getElementById('display-container');
     var display = document.getElementById('display');
     if (!box) return;
-    var s = Math.min(box.clientWidth / 240, box.clientHeight / 320);
+    // 「画面缩放」 (the app's body[data-screen-fit]): the whole picture, or fill the width / the height of the box; the
+    // stylesheet crops the other axis around the centre.
+    var screenFit = document.body.dataset.screenFit;
+    var s = screenFit === 'width' ? box.clientWidth / 240 : screenFit === 'height' ? box.clientHeight / 320 : Math.min(box.clientWidth / 240, box.clientHeight / 320);
     if (!isFinite(s) || s <= 0) s = 1;
     var width = Math.floor(240 * s);
     var height = Math.floor(320 * s);

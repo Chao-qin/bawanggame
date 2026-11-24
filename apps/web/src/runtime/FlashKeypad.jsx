@@ -1,32 +1,60 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { KeyboardCanvas } from '../keyboard/KeyboardCanvas.jsx'
 import { FLASH_LANDSCAPE, FLASH_PORTRAIT, getLayout, layoutGroup } from '../keyboard/layouts.js'
 import { keyHaptic } from './haptics.js'
-import { useRuntimeOrientation } from './RuntimeKeypad.jsx'
-
-// Layout values are keyboard codes; the `key` a Flash game reads differs for the printable ones.
-const KEY_OF_CODE = { Space: ' ', KeyX: 'x' }
+import { directionCodes, FLASH_KEYS_EVENT, keyLegend, keyOfCode, readFlashKeys, writeFlashKeys } from './flash-keys.js'
 
 function sendKey(target, code, type) {
-  target.dispatchEvent(new KeyboardEvent(type, { key: KEY_OF_CODE[code] || code, code, bubbles: true, cancelable: true }))
+  target.dispatchEvent(new KeyboardEvent(type, { key: keyOfCode(code), code, bubbles: true, cancelable: true }))
+}
+
+/** One game's Flash keys, kept in sync with the sheet that edits them. */
+export function useFlashKeys(game) {
+  const [keys, setKeys] = useState(() => readFlashKeys(game))
+  useEffect(() => {
+    const sync = () => setKeys(readFlashKeys(game))
+    sync()
+    window.addEventListener(FLASH_KEYS_EVENT, sync)
+    window.addEventListener('storage', sync)
+    return () => {
+      window.removeEventListener(FLASH_KEYS_EVENT, sync)
+      window.removeEventListener('storage', sync)
+    }
+  }, [game])
+  return [keys, useCallback((patch) => setKeys(writeFlashKeys(game, patch)), [game])]
+}
+
+/** The preset with this game's keys: the wheel sends its directions and OK, the action keys their keys, and each
+ *  action key's small legend names the key it sends. */
+function withKeys(layout, keys) {
+  const directions = directionCodes(keys)
+  return {
+    ...layout,
+    keys: layout.keys.map((item) => {
+      if (item.shape === 'wheel') return { ...item, wheel: { ...directions, center: keys.ok } }
+      if (item.id === 'flash-a') return { ...item, value: keys.a, secondaryLegend: keyLegend(keys.a) }
+      if (item.id === 'flash-b') return { ...item, value: keys.b, secondaryLegend: keyLegend(keys.b) }
+      return item
+    }),
+  }
 }
 
 /**
- * The Flash gamepad, drawn by the same canvas keyboard as the T9 keypad: a direction wheel (OK = Enter) and A / B.
- * Portrait shows it under the screen, landscape splits it into the two side columns. Keys are delivered to the Ruffle
- * player as keyboard events; a key held by two fingers is released only when both lift.
+ * The Flash gamepad, drawn by the same canvas keyboard as the T9 keypad: a direction wheel (OK at its hub) and A / B.
+ * A portrait layout shows it under the screen, a landscape one splits it into the two side columns. Keys are
+ * delivered to the Ruffle player as keyboard events; a key held by two fingers is released only when both lift.
  */
-export function FlashKeypad({ target, prefs }) {
-  const orientation = useRuntimeOrientation()
+export function FlashKeypad({ target, visible, layout, opacity, keys }) {
   const counts = useRef(new Map())
+
+  const releaseAll = useCallback(() => {
+    if (!target) return
+    for (const code of counts.current.keys()) sendKey(target, code, 'keyup')
+    counts.current.clear()
+  }, [target])
 
   useEffect(() => {
     if (!target) return undefined
-    const held = counts.current
-    const releaseAll = () => {
-      for (const code of held.keys()) sendKey(target, code, 'keyup')
-      held.clear()
-    }
     const onVisibility = () => { if (document.hidden) releaseAll() }
     window.addEventListener('blur', releaseAll)
     document.addEventListener('visibilitychange', onVisibility)
@@ -39,16 +67,18 @@ export function FlashKeypad({ target, prefs }) {
       document.removeEventListener('webkitfullscreenchange', releaseAll)
       releaseAll()
     }
-  }, [target])
+  }, [target, releaseAll])
+  // A remapped key must not stay held under its old code.
+  useEffect(() => releaseAll, [keys, releaseAll])
 
   const layouts = useMemo(() => {
-    if (orientation !== 'landscape') return [['flashKeypadFull', getLayout(FLASH_PORTRAIT), 'Flash 手柄']]
-    const landscape = getLayout(FLASH_LANDSCAPE)
+    if (layout !== 'landscape') return [['flashKeypadFull', withKeys(getLayout(FLASH_PORTRAIT), keys), 'Flash 手柄']]
+    const landscape = withKeys(getLayout(FLASH_LANDSCAPE), keys)
     return [
       ['flashKeypadNav', layoutGroup(landscape, 'nav'), 'Flash 手柄：方向'],
       ['flashKeypadActions', layoutGroup(landscape, 'actions'), 'Flash 手柄：动作键'],
     ]
-  }, [orientation])
+  }, [layout, keys])
 
   const keyDown = useCallback((unit, _pointerId, event) => {
     if (!target) return
@@ -68,10 +98,10 @@ export function FlashKeypad({ target, prefs }) {
     }
   }, [target])
 
-  if (!target || prefs.style === 'hidden') return null
-  return layouts.map(([className, layout, label]) => (
-    <div key={layout.id} className={`flashKeypad ${className}`} data-runtime-control="flash-keypad">
-      <KeyboardCanvas layout={layout} accessibleLabel={label} onKeyDown={keyDown} onKeyUp={keyUp} />
+  if (!target || !visible) return null
+  return layouts.map(([className, keyLayout, label]) => (
+    <div key={keyLayout.id} className={`flashKeypad ${className}`} style={{ opacity }} data-runtime-control="flash-keypad">
+      <KeyboardCanvas layout={keyLayout} accessibleLabel={label} onKeyDown={keyDown} onKeyUp={keyUp} />
     </div>
   ))
 }

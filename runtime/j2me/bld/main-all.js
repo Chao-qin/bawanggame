@@ -6454,7 +6454,10 @@ if (typeof module !== "undefined" && module.exports) {
     }
     lcdWidth = w;
     lcdHeight = h;
-    var s = Math.min(config.scale || 1, physicalScreenWidth / w, physicalScreenHeight / h);
+    // 「画面缩放」 (the app's body[data-screen-fit]): the whole picture at the chosen scale, or fill the width / the
+    // height of the screen box; the stylesheet crops the other axis around the centre.
+    var screenFit = document.body.dataset.screenFit;
+    var s = screenFit === "width" ? physicalScreenWidth / w : screenFit === "height" ? physicalScreenHeight / h : Math.min(config.scale || 1, physicalScreenWidth / w, physicalScreenHeight / h);
     if (!(s > 0)) {
       s = 1;
     }
