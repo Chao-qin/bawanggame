@@ -10,11 +10,16 @@ function isEditable(element) {
 }
 
 export function allowsSelection(node, view = window) {
-  const element = elementOf(node)
+  let element = elementOf(node)
   if (!element) return false
   if (isEditable(element)) return true
-  const style = view.getComputedStyle(element)
-  return (style.userSelect || style.webkitUserSelect) !== 'none'
+  // 规范里 user-select 不继承，auto 取决于祖先：Chromium 直接算成 none，其他内核可能报 auto，所以向上找。
+  for (; element; element = element.parentElement) {
+    const style = view.getComputedStyle(element)
+    const value = style.userSelect || style.webkitUserSelect
+    if (value !== 'auto') return value !== 'none'
+  }
+  return true
 }
 
 export function installSelectionGuard(doc = document) {
@@ -22,10 +27,12 @@ export function installSelectionGuard(doc = document) {
   const blockUnlessAllowed = (event) => {
     if (!allowsSelection(event.target, view)) event.preventDefault()
   }
+  // 只拦触屏长按，桌面右键和键盘菜单键保留（Ruffle 等自带菜单靠它）。部分内核（Safari、UC 系）
+  // 派发的 contextmenu 不带 pointerType，这时看最近一次按下的指针类型。
+  let lastPointerType = ''
+  const rememberPointer = (event) => { lastPointerType = event.pointerType || 'touch' }
   const blockContextMenu = (event) => {
-    // 桌面鼠标右键保留（Ruffle 等自带菜单靠它）；触屏长按和未知来源一律拦截。
-    if (event.pointerType === 'mouse') return
-    blockUnlessAllowed(event)
+    if ((event.pointerType || lastPointerType) === 'touch') blockUnlessAllowed(event)
   }
   const clearStraySelection = () => {
     const selection = doc.getSelection()
@@ -33,6 +40,8 @@ export function installSelectionGuard(doc = document) {
     if (!allowsSelection(selection.anchorNode, view)) selection.removeAllRanges()
   }
 
+  doc.addEventListener('pointerdown', rememberPointer, true)
+  doc.addEventListener('touchstart', rememberPointer, { capture: true, passive: true })
   doc.addEventListener('selectstart', blockUnlessAllowed, true)
   doc.addEventListener('contextmenu', blockContextMenu, true)
   doc.addEventListener('selectionchange', clearStraySelection)

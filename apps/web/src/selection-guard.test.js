@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { allowsSelection, installSelectionGuard } from './selection-guard.js'
 
-function element(tag, userSelect = 'none') {
-  return { nodeType: 1, tag, userSelect, isContentEditable: false, matches: (selector) => selector.split(', ').includes(tag) }
+function element(tag, userSelect = 'none', parentElement = null) {
+  return { nodeType: 1, tag, userSelect, parentElement, isContentEditable: false, matches: (selector) => selector.split(', ').includes(tag) }
 }
 
 const view = { getComputedStyle: (el) => ({ userSelect: el.userSelect }), navigator: {} }
@@ -37,18 +37,35 @@ test('selection follows CSS: inputs and user-select:text areas allowed, user-sel
   assert.equal(allowsSelection(null, view), false)
 })
 
+test('user-select:auto (spec-compliant engines) resolves through ancestors', () => {
+  assert.equal(allowsSelection(element('span', 'auto', element('body', 'none')), view), false)
+  assert.equal(allowsSelection(element('span', 'auto', element('div', 'auto', element('div', 'text'))), view), true)
+  assert.equal(allowsSelection(element('span', 'auto'), view), true)
+})
+
 test('selectstart and touch long-press menus are blocked outside selectable areas', () => {
   const { handlers } = fakeDocument(null)
   assert.equal(fire(handlers.selectstart, element('span')), true)
   assert.equal(fire(handlers.selectstart, element('input')), false)
   assert.equal(fire(handlers.contextmenu, element('span'), { pointerType: 'touch' }), true)
-  assert.equal(fire(handlers.contextmenu, element('span')), true)
   assert.equal(fire(handlers.contextmenu, element('textarea'), { pointerType: 'touch' }), false)
 })
 
-test('desktop right-click keeps its menu', () => {
+test('long-press contextmenu without pointerType (Safari, UC kernels) is blocked after a touch', () => {
   const { handlers } = fakeDocument(null)
+  handlers.touchstart({})
+  assert.equal(fire(handlers.contextmenu, element('span')), true)
+  handlers.pointerdown({ pointerType: 'touch' })
+  assert.equal(fire(handlers.contextmenu, element('span')), true)
+})
+
+test('desktop right-click and the keyboard menu key keep their menu', () => {
+  const { handlers } = fakeDocument(null)
+  assert.equal(fire(handlers.contextmenu, element('span')), false)
   assert.equal(fire(handlers.contextmenu, element('span'), { pointerType: 'mouse' }), false)
+  handlers.pointerdown({ pointerType: 'mouse' })
+  assert.equal(fire(handlers.contextmenu, element('span')), false)
+  assert.equal(fire(handlers.contextmenu, element('span'), { pointerType: '' }), false)
 })
 
 test('stray selections are cleared unless they sit in a selectable area or an input has focus', () => {
