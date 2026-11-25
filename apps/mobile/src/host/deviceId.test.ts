@@ -42,6 +42,10 @@ describe('device id', () => {
 
   it('still gives an id for this launch when storage fails', async () => {
     expect(await loadDeviceId(memoryFiles({}, { failWrite: true }).files, '/data/device-id')).toMatch(UUID)
-    expect(await loadDeviceId(memoryFiles({ '/data/device-id': 'x' }, { failRead: true }).files, '/data/device-id')).toMatch(UUID)
+    const stored = '3f2b8c1e-0d4a-4b6e-9a7c-1e2d3f4a5b6c'
+    const unreadable = memoryFiles({ '/data/device-id': stored }, { failRead: true })
+    expect(await loadDeviceId(unreadable.files, '/data/device-id')).toMatch(UUID)
+    // A failed read does not replace the stored id, or the device would be counted twice from then on.
+    expect(unreadable.store['/data/device-id']).toBe(stored)
   })
 })

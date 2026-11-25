@@ -94,12 +94,16 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
         signal: controller?.signal,
       })
       if (response.ok) drop(batch)
+      else return
     } catch (_) {
       // Offline or refused: the batch stays queued for the next attempt.
+      return
     } finally {
       win.clearTimeout(timer)
       sending = false
     }
+    // A backlog (after a long offline spell) goes out batch after batch while the endpoint takes them.
+    flush()
   }
 
   // The page may be gone before a fetch settles; a beacon the browser accepted is taken as sent.

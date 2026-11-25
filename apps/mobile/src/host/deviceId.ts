@@ -19,12 +19,14 @@ export function randomUuid(random: () => number = Math.random): string {
 
 /** The stored id, or a new one saved for later launches; a storage failure still gives an id for this launch. */
 export async function loadDeviceId(files: DeviceIdFiles, path: string, random?: () => number): Promise<string> {
+  let stored = ''
   try {
-    if (await files.exists(path)) {
-      const stored = (await files.readFile(path, 'utf8')).trim()
-      if (UUID.test(stored)) return stored
-    }
-  } catch {}
+    if (await files.exists(path)) stored = (await files.readFile(path, 'utf8')).trim()
+  } catch {
+    // The stored id may still be fine: keep it for later launches and use one just for this launch.
+    return randomUuid(random)
+  }
+  if (UUID.test(stored)) return stored
   const id = randomUuid(random)
   await files.writeFile(path, id, 'utf8').catch(() => {})
   return id

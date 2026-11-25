@@ -202,6 +202,20 @@ test('events the endpoint did not take stay queued, survive a reload and are sen
   assert.equal(env.storage.has('xiaochao-analytics-queue'), false)
 })
 
+test('a backlog goes out batch after batch once the endpoint takes it', async () => {
+  const env = fakeWindow({ fetchOk: 'throw' })
+  const analytics = start(env)
+  for (let i = 0; i < 60; i++) analytics.startPlay(GAME)
+  await settle()
+  assert.equal(JSON.parse(env.storage.get('xiaochao-analytics-queue')).length, 120) // app_open + 60 starts + 59 ends
+  env.win.fetch = async (url, init) => { env.posts.push({ url, init, body: JSON.parse(init.body) }); return { ok: true } }
+  env.posts.length = 0
+  env.online()
+  for (let i = 0; i < 5; i++) await settle()
+  assert.deepEqual(env.posts.map((post) => post.body.events.length), [50, 50, 20])
+  assert.equal(env.storage.has('xiaochao-analytics-queue'), false)
+})
+
 test('reconnecting sends what was queued offline', async () => {
   const env = fakeWindow({ fetchOk: 'throw' })
   start(env)
