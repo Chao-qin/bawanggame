@@ -5,15 +5,18 @@ import { createAnalytics, HOST_ACTIVE_EVENT, installAnalytics, trackPlay } from 
 const ENDPOINT = 'https://stats.example.com/collect'
 const GAME = { kind: 'j2me', file: 'snake.jar', name: '贪吃蛇', local: false }
 
-function fakeWindow({ storage = new Map(), host, fetchOk = true, beaconOk = true } = {}) {
+function fakeWindow({ storage = new Map(), host, search = '', fetchOk = true, beaconOk = true } = {}) {
   const listeners = {}
   const docListeners = {}
   const posts = []
   const beacons = []
   let clock = 1_000_000
+  let monotonic = 0
   let interval = null
+  const timeouts = []
   const win = {
     __XIAOCHAO_RN_HOST__: host,
+    location: { search },
     localStorage: {
       getItem: (key) => (storage.has(key) ? storage.get(key) : null),
       setItem: (key, value) => storage.set(key, String(value)),
@@ -26,6 +29,9 @@ function fakeWindow({ storage = new Map(), host, fetchOk = true, beaconOk = true
     addEventListener: (type, fn) => { listeners[type] = fn },
     setInterval: (fn) => { interval = fn; return 1 },
     clearInterval: () => { interval = null },
+    setTimeout: (fn) => timeouts.push(fn),
+    clearTimeout: (id) => { timeouts[id - 1] = null },
+    AbortController,
     fetch: async (url, init) => {
       posts.push({ url, init, body: JSON.parse(init.body) })
       if (fetchOk === 'throw') throw new TypeError('Failed to fetch')
@@ -40,7 +46,10 @@ function fakeWindow({ storage = new Map(), host, fetchOk = true, beaconOk = true
     posts,
     beacons,
     now: () => clock,
-    advance: (ms) => { clock += ms },
+    elapsed: () => monotonic,
+    advance: (ms) => { clock += ms; monotonic += ms },
+    setDeviceClock: (ms) => { clock = ms },
+    runTimeouts: () => timeouts.splice(0).forEach((fn) => fn?.()),
     tick: () => interval?.(),
     hide: () => { win.document.visibilityState = 'hidden'; docListeners.visibilitychange() },
     show: () => { win.document.visibilityState = 'visible'; docListeners.visibilitychange() },
@@ -53,10 +62,9 @@ function fakeWindow({ storage = new Map(), host, fetchOk = true, beaconOk = true
 
 const settle = () => new Promise((resolve) => setImmediate(resolve))
 const events = (posts) => posts.flatMap((post) => post.body.events)
-const playTime = (posts) => events(posts).reduce((sum, event) => sum + (event.active_ms || 0), 0)
 
 function start(env) {
-  const analytics = createAnalytics({ endpoint: ENDPOINT, win: env.win, now: env.now, heartbeatMs: 30_000 })
+  const analytics = createAnalytics({ endpoint: ENDPOINT, win: env.win, now: env.now, elapsed: env.elapsed, heartbeatMs: 30_000 })
   analytics.start()
   return analytics
 }
@@ -90,6 +98,53 @@ test('in the APK the app host id and platform are used instead of browser storag
   assert.equal(env.posts[0].body.device_id, '3f2b8c1e-0d4a-4b6e-9a7c-1e2d3f4a5b6c')
   assert.equal(env.posts[0].body.platform, 'android')
   assert.equal(env.storage.has('xiaochao-device-id'), false)
+})
+
+test('in the APK nothing is sent or stored under a page id before the app host gives its id', async () => {
+  const env = fakeWindow({ search: '?host=rn', fetchOk: 'throw' })
+  start(env)
+  await settle()
+  env.pagehide()
+  assert.equal(env.posts.length, 0)
+  assert.equal(env.beacons.length, 0)
+  assert.equal(env.storage.has('xiaochao-device-id'), false)
+  assert.equal(JSON.parse(env.storage.get('xiaochao-analytics-queue')).length, 1)
+
+  env.win.__XIAOCHAO_RN_HOST__ = { deviceId: '3f2b8c1e-0d4a-4b6e-9a7c-1e2d3f4a5b6c', platform: 'android' }
+  env.online()
+  await settle()
+  assert.equal(env.posts[0].body.device_id, '3f2b8c1e-0d4a-4b6e-9a7c-1e2d3f4a5b6c')
+  assert.deepEqual(env.posts[0].body.events.map((event) => event.type), ['app_open'])
+})
+
+test('a device clock change does not change the play time', async () => {
+  const env = fakeWindow()
+  const analytics = start(env)
+  const end = analytics.startPlay(GAME)
+  await settle()
+  env.advance(10_000.4)
+  env.setDeviceClock(0) // the clock is set back by hours
+  env.advance(4_999.6)
+  end()
+  await settle()
+  const ends = events(env.posts).filter((event) => event.type === 'game_end')
+  assert.equal(ends[0].active_ms, 15_000)
+})
+
+test('a request that never settles is given up so later flushes still go out', async () => {
+  const env = fakeWindow()
+  env.win.fetch = (url, init) => new Promise((resolve, reject) => {
+    env.posts.push({ url, init, body: JSON.parse(init.body) })
+    init.signal.addEventListener('abort', () => reject(init.signal.reason))
+  })
+  const analytics = start(env)
+  await settle()
+  analytics.flush()
+  assert.equal(env.posts.length, 1) // the first one is still pending
+  env.runTimeouts()
+  await settle()
+  analytics.flush()
+  assert.equal(env.posts.length, 2)
 })
 
 test('play time counts only the time the game is in front', async () => {

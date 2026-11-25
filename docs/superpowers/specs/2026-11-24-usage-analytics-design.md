@@ -12,7 +12,7 @@
 ## 1. 用户怎么区分
 
 - 每台设备一个随机 ID（`device_id`），不含任何个人信息。
-  - APK：原生层生成 UUID v4，存在应用私有目录 `device-id` 文件（`apps/mobile/src/host/deviceId.ts`），启动时经注入桥 `window.__XIAOCHAO_RN_HOST__.deviceId` 交给页面。页面自己存不住：内置站点每次启动换一个回环端口，浏览器存储按端口隔离。
+  - APK：原生层生成 UUID v4，存在应用私有目录 `device-id` 文件（`apps/mobile/src/host/deviceId.ts`），启动时经注入桥 `window.__XIAOCHAO_RN_HOST__.deviceId` 交给页面。页面自己存不住：内置站点每次启动换一个回环端口，浏览器存储按端口隔离。所以 APK 页面（`?host=rn`）拿到宿主 ID 之前，事件只排队不发送，也不生成页面自己的 ID。
   - Web：首次打开生成，存 `localStorage` 的 `xiaochao-device-id`。
 - 统计的是「设备数」不是「人数」：同一个人用两台设备记 2 个；清除应用数据、卸载重装、换浏览器或无痕模式记为新设备。
 - `session_id`：每次打开应用（每次页面加载）一个，用来算打开次数和单次使用时长。
@@ -39,6 +39,7 @@ Content-Type: text/plain;charset=UTF-8     ← 正文是 JSON 字符串，按 JS
 
 - 用 `text/plain` 是为了让它属于 CORS 简单请求：浏览器不发 OPTIONS 预检。接口只需在响应里带 `Access-Control-Allow-Origin: *`。没有这个头时，浏览器读不到响应，客户端会当作失败，并在下次重发这一批。
 - 返回任意 2xx（推荐 204）表示收下，客户端随即从队列删除这一批；非 2xx 或网络失败会保留，之后重发。
+- 单次请求 15 秒未完成即放弃，留待下次重发。
 - 页面关闭或切到后台时改用 `navigator.sendBeacon` 发送，浏览器接受即视为已发出，客户端拿不到响应。
 - 同一事件可能因重发到达多次，按 `events[].id` 去重。
 - 不带 Cookie（`credentials: 'omit'`），也不带任何鉴权头。
@@ -71,7 +72,7 @@ Content-Type: text/plain;charset=UTF-8     ← 正文是 JSON 字符串，按 JS
 | `events[].session_id` | 本次打开应用的 ID |
 | `events[].play_id` | 这一局的 ID，`game_start` 到 `game_end` 相同 |
 | `events[].game` | `kind`（`j2me` / `maopao` / `flash` / `local-revival`）、`file`、`name`（最长 200 字）、`local`（是否为用户自己导入到浏览器的游戏） |
-| `events[].active_ms` | 距上一次上报之间、游戏在前台的毫秒数；页面隐藏或 APK 在后台的时间不计 |
+| `events[].active_ms` | 距上一次上报之间、游戏在前台的毫秒数；页面隐藏或 APK 在后台的时间不计。用单调时钟计算，用户改设备时间不影响 |
 
 一批最多 50 个事件；离线时最多在本地保留 500 个，超出丢最早的。
 
@@ -96,7 +97,7 @@ Content-Type: text/plain;charset=UTF-8     ← 正文是 JSON 字符串，按 JS
 
 ## 6. 验证
 
-- `node --test apps/web/src/analytics.test.js`：设备 ID 复用、APK 优先使用宿主 ID、前台时长、失败保留与重发、beacon、未配置时不采集。
+- `node --test apps/web/src/analytics.test.js`：设备 ID 复用、APK 优先使用宿主 ID 且未拿到前不发送、前台时长、改设备时间不影响时长、请求超时放弃、失败保留与重发、beacon、未配置时不采集。
 - `apps/mobile` jest：`deviceId.test.ts`（生成、复用、损坏替换、存储失败）与 `protocol.test.ts`（桥接字段）。
 - 浏览器冒烟：带测试接收端构建，从大厅进入游戏约 60 秒再退出，接收端按顺序收到 `app_open`、`game_start`、两次 `heartbeat`、`game_end`，`active_ms` 合计与实际时长一致；直达链接只记一次 `game_start`。
 
