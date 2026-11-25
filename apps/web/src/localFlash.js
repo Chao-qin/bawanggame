@@ -139,7 +139,7 @@ function normalizeText(value, fallback = '') {
   return String(value ?? '').trim().slice(0, 200) || fallback
 }
 
-function randomId() {
+export function randomId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 }

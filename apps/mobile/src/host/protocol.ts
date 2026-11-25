@@ -34,7 +34,10 @@ export function resolveRequestScript(id: string, result: unknown): string {
   return `window.__XIAOCHAO_RN_HOST__ && window.__XIAOCHAO_RN_HOST__.resolve(${JSON.stringify(id)}, ${JSON.stringify(result)}); true;`
 }
 
-export const injectedBridge = (capabilities: readonly HostCapability[]) => `
+/** Who the page runs on, for its usage statistics: the app's anonymous device id (deviceId.ts) and Platform.OS. */
+export type HostIdentity = { deviceId: string | null; platform: string | null }
+
+export const injectedBridge = (capabilities: readonly HostCapability[], identity: HostIdentity = { deviceId: null, platform: null }) => `
 (function () {
   var version = ${BRIDGE_VERSION};
   var pending = {};
@@ -118,6 +121,8 @@ export const injectedBridge = (capabilities: readonly HostCapability[]) => `
   window.__XIAOCHAO_RN_HOST__ = {
     version: version,
     capabilities: ${JSON.stringify(capabilities)},
+    deviceId: ${JSON.stringify(identity.deviceId)},
+    platform: ${JSON.stringify(identity.platform)},
     send: send,
     request: request,
     resolve: resolveRequest,

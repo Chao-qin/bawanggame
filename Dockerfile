@@ -18,6 +18,8 @@ RUN pnpm --filter @xiaochao/web --filter @xiaochao/server install --frozen-lockf
 COPY apps/web/ apps/web/
 COPY apps/server/ apps/server/
 COPY games/flash/ games/flash/
+# Usage statistics endpoint (docs/superpowers/specs/2026-11-24-usage-analytics-design.md); unset leaves them off.
+ARG VITE_ANALYTICS_URL=
 RUN pnpm build \
  && pnpm --filter @xiaochao/server build
 

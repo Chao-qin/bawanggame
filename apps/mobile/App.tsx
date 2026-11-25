@@ -3,8 +3,10 @@ import { AppState, BackHandler, Linking, NativeModules, Platform, Pressable, Sta
 import { WebView } from 'react-native-webview'
 import type { WebViewErrorEvent, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview/lib/WebViewTypes'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as RNFS from 'react-native-fs'
 import { blobToBase64, onlineFiles, startAssetServer, stopAssetServer, webRoot } from './src/host/assetServer'
 import { injectedBridge, parseHostMessage, resolveRequestScript, type HostCapability } from './src/host/protocol'
+import { loadDeviceId } from './src/host/deviceId'
 import { dispatchHapticMessage } from './src/host/haptics'
 import { handleOnlineRequest, type OnlineResult } from './src/host/onlineProxy'
 import { dispatchOrientationMessage } from './src/host/orientation'
@@ -18,7 +20,7 @@ const hostCapabilities: HostCapability[] = [
   ...(Platform.OS === 'android' ? ['online.fetch' as const] : []),
   ...(NativeModules.XiaochaoOrientation ? ['orientation.lock' as const] : []),
 ]
-const bridgeScript = injectedBridge(hostCapabilities)
+const deviceIdReady = loadDeviceId(RNFS, `${RNFS.DocumentDirectoryPath}/device-id`)
 
 function AppContent() {
   const webViewRef = useRef<any>(null)
@@ -26,12 +28,14 @@ function AppContent() {
   const [origin, setOrigin] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  const [bridgeScript, setBridgeScript] = useState(() => injectedBridge(hostCapabilities))
 
   const start = useCallback(async () => {
     setError('')
     setOrigin(null)
     try {
-      const nextOrigin = await startAssetServer()
+      const [nextOrigin, deviceId] = await Promise.all([startAssetServer(), deviceIdReady])
+      setBridgeScript(injectedBridge(hostCapabilities, { deviceId, platform: Platform.OS }))
       setOrigin(`${nextOrigin}/?host=rn`)
     } catch (startError) {
       setError(startError instanceof Error ? startError.message : String(startError))
@@ -46,6 +50,8 @@ function AppContent() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') webViewRef.current?.injectJavaScript("window.__XIAOCHAO_RN_HOST__?.send('network.state', {active:true}); true;")
+      // The page counts play time only while the app is in front (web analytics.js); a backgrounded WebView may keep the page visible.
+      if (state === 'active' || state === 'background') webViewRef.current?.injectJavaScript(`window.dispatchEvent(new CustomEvent('xiaochao:hostactive', { detail: ${state === 'active'} })); true;`)
     })
     return () => subscription.remove()
   }, [origin])
