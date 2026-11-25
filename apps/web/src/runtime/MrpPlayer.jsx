@@ -4,6 +4,7 @@ import { createRuntimeSession, loadClassicInOrder, loadStyle } from './loadScrip
 import { cleanupRuntimeArtifacts } from './cleanup.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
 import { claimRuntimeDocument, RUNTIME_ALREADY_BOOTED } from './runtime-boot.js'
+import { resolveMrpFileUrl } from '../maopao.js'
 
 export function MrpPlayer({ game, onReady }) {
   const [error, setError] = useState('')
@@ -18,13 +19,16 @@ export function MrpPlayer({ game, onReady }) {
     }
     document.body.classList.add('runtime-active')
     window.__XIAOCHAO_RUNTIME_MRP = game.file
-    window.__XIAOCHAO_RUNTIME_MRP_URL = `/maopao/public/mrps/${encodeURIComponent(game.file)}`
     const styles = ['/style/main.css', '/style/feedback.css']
     let alive = true
     const session = createRuntimeSession()
     window.__XIAOCHAO_RUNTIME_SESSION__ = session
     ;(async () => {
       try {
+        // A game outside the packed set loads from the public mirror (maopao.js).
+        const fileUrl = await resolveMrpFileUrl(game.file)
+        if (!alive || !session.active) return
+        window.__XIAOCHAO_RUNTIME_MRP_URL = fileUrl
         await Promise.all(styles.map((src) => loadStyle(src, session)))
         await loadClassicInOrder(['/config/i18n.js', '/config/settings.js', '/runtime/j2me/touch-layout.js', '/ui-feedback.js', '/keypad-canvas.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/maopao/vmrp_v1.0/vmrp.js'], session)
         if (!alive || !session.active) return

@@ -282,10 +282,9 @@ export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = '
   useEffect(() => {
     const host = hostRef.current
     if (!host) return undefined
-    const update = () => {
-      const rect = host.getBoundingClientRect()
-      setSize({ width: rect.width, height: rect.height })
-    }
+    // The laid-out size: a floating keypad may be scaled (CSS scale) or the page turned, which changes the
+    // on-screen box but not the canvas the keys are drawn on.
+    const update = () => setSize({ width: host.clientWidth, height: host.clientHeight })
     const observer = new ResizeObserver(update)
     observer.observe(host)
     update()
@@ -313,7 +312,10 @@ export function KeyboardCanvas({ layout, onKeyDown, onKeyUp, accessibleLabel = '
       const { scale: s, offsetX: ox, offsetY: oy } = geometry.current
       if (!(s > 0)) return null
       const rect = host.getBoundingClientRect()
-      return [(event.clientX - rect.left - ox) / s, (event.clientY - rect.top - oy) / s]
+      // On-screen pixels to laid-out pixels (1 unless the keypad is scaled).
+      const kx = rect.width ? host.clientWidth / rect.width : 1
+      const ky = rect.height ? host.clientHeight / rect.height : 1
+      return [((event.clientX - rect.left) * kx - ox) / s, ((event.clientY - rect.top) * ky - oy) / s]
     }
     const handleDown = (event) => {
       if (Object.hasOwn(pointerState.current.pointers, event.pointerId)) return

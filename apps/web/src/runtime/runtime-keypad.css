@@ -26,7 +26,7 @@
 }
 .t9Keypad canvas { display: block; }
 
-body.runtime-active[data-keypad-style="t9"] #keypad > :is(#keypad-canvas, #nav, #numpad) {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"]) #keypad > :is(#keypad-canvas, #nav, #numpad) {
   display: none !important;
 }
 
@@ -41,13 +41,13 @@ body.runtime-active :is(.t9Keypad, #keypad > #keypad-canvas, #keypad > #nav, #ke
 body.runtime-active.fixed-screen #display-container {
   padding: 0;
 }
-body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]) #keypad {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"]):not([data-orientation="landscape"]) #keypad {
   padding: 0 !important;
   gap: 0 !important;
 }
 
 /* ---- Docked: the keypad takes its own space, the game screen fits the rest. ---- */
-body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]) .t9KeypadFull {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"]):not([data-orientation="landscape"]) .t9KeypadFull {
   width: 100%;
   /* Match the T9 portrait design (7.4 x 7.95 units, layouts.js) so the canvas fills the box instead of scaling by
      height and leaving empty gutters at the sides. The larger wheel made the design taller; the cap grew with it so
@@ -57,7 +57,7 @@ body.runtime-active[data-keypad-style="t9"]:not([data-orientation="landscape"]) 
   padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px));
 }
 
-body.runtime-active[data-keypad-style="t9"][data-orientation="landscape"] :is(.t9KeypadNav, .t9KeypadNumpad) {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-orientation="landscape"] :is(.t9KeypadNav, .t9KeypadNumpad) {
   grid-row: 1;
   align-self: center;
   width: 100%;
@@ -65,49 +65,49 @@ body.runtime-active[data-keypad-style="t9"][data-orientation="landscape"] :is(.t
   padding: 6px;
   pointer-events: auto;
 }
-body.runtime-active[data-keypad-style="t9"][data-orientation="landscape"] .t9KeypadNav {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-orientation="landscape"] .t9KeypadNav {
   grid-column: 1;
   padding-left: max(6px, env(safe-area-inset-left, 0px));
 }
-body.runtime-active[data-keypad-style="t9"][data-orientation="landscape"] .t9KeypadNumpad {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-orientation="landscape"] .t9KeypadNumpad {
   grid-column: 3;
   padding-right: max(6px, env(safe-area-inset-right, 0px));
 }
 
 /* ---- Floating: the game screen gets the whole stage, the keypad floats over it. ---- */
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"] .t9Keypad {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-keypad-placement="floating"] .t9Keypad {
   z-index: 6;
 }
 
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]) #keypad {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-keypad-placement="floating"]:not([data-orientation="landscape"]) #keypad {
   position: absolute !important;
   inset: auto 0 0 0;
   z-index: 6;
   min-height: 0 !important;
   background: transparent !important;
 }
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]) .t9KeypadFull {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-keypad-placement="floating"]:not([data-orientation="landscape"]) .t9KeypadFull {
   max-height: min(50vh, 460px);
 }
 /* Screen at the top, so the keypad covers as little of it as it can. */
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"]:not([data-orientation="landscape"]) #display-container {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-keypad-placement="floating"]:not([data-orientation="landscape"]) #display-container {
   align-items: flex-start;
 }
 
 /* The screen spans the stage instead of the middle column; the halves float at its edges. */
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] #display-container {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-keypad-placement="floating"][data-orientation="landscape"] #display-container {
   left: 0;
   right: 0;
 }
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] :is(.t9KeypadNav, .t9KeypadNumpad) {
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-keypad-placement="floating"][data-orientation="landscape"] :is(.t9KeypadNav, .t9KeypadNumpad) {
   position: absolute;
   top: 50%;
   width: min(28vw, 280px);
   height: min(80vh, 280px);
   transform: translateY(-50%);
 }
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] .t9KeypadNav { left: 0; }
-body.runtime-active[data-keypad-style="t9"][data-keypad-placement="floating"][data-orientation="landscape"] .t9KeypadNumpad { right: 0; }
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-keypad-placement="floating"][data-orientation="landscape"] .t9KeypadNav { left: 0; }
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-keypad-placement="floating"][data-orientation="landscape"] .t9KeypadNumpad { right: 0; }
 
 /* ---- Hidden (「显示键盘」 off, or the toolbar's keyboard button): the screen gets the whole stage. The extra
    [data-keypad-style] outranks the runtime stylesheet's landscape `#keypad { display: grid !important }`, which loads
@@ -135,4 +135,53 @@ body.runtime-active:is([data-screen-fit="width"], [data-screen-fit="height"]) :i
    title and OK / Cancel bar are cut off. */
 body.runtime-active:is([data-screen-fit="width"], [data-screen-fit="height"]) .mrp-stage #display {
   position: static;
+}
+
+/* ---- The page turned by orientation.js: vw / vh still measure the physical screen, so the sizes they set for the
+   landscape keypad columns are recomputed from the turned viewport (responsive.js --viewport-width / -height). ---- */
+html[data-forced-rotation="cw"] {
+  --lvw: calc(var(--viewport-width) / 100);
+  --lvh: calc(var(--viewport-height) / 100);
+}
+html[data-forced-rotation="cw"] body.runtime-active[data-orientation="landscape"] .runtime-stage {
+  --landscape-side: clamp(112px, min(calc(26 * var(--lvw)), calc(42 * var(--lvh))), 330px);
+  --landscape-gap: clamp(8px, calc(1.4 * var(--lvw)), 22px);
+  --control-unit: clamp(30px, min(calc(12 * var(--lvh)), calc(6 * var(--lvw))), 46px);
+  grid-template-columns: minmax(132px, calc(25 * var(--lvw))) minmax(0, 1fr) minmax(132px, calc(25 * var(--lvw)));
+}
+html[data-forced-rotation="cw"] body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-orientation="landscape"] :is(.t9KeypadNav, .t9KeypadNumpad) {
+  height: min(100%, calc(86 * var(--lvh)), 320px);
+}
+html[data-forced-rotation="cw"] body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"])[data-keypad-placement="floating"][data-orientation="landscape"] :is(.t9KeypadNav, .t9KeypadNumpad) {
+  width: min(calc(28 * var(--lvw)), 280px);
+  height: min(calc(80 * var(--lvh)), 280px);
+}
+html[data-forced-rotation="cw"] .flashRuntimeView[data-orientation="landscape"] :is(.flashKeypadNav, .flashKeypadActions) {
+  width: min(calc(28 * var(--lvw)), 230px);
+}
+
+/* ---- A wide keyboard (numeric keypad, 60% … full-size: keyboard/system.js split = false) has no halves for the
+   landscape side columns: it floats across the bottom of the stage (ScreenKeypad), and the screen takes the whole
+   stage as with any floating keypad. ---- */
+body.runtime-active[data-keypad-wide="true"][data-orientation="landscape"] #display-container {
+  left: 0;
+  right: 0;
+}
+body.runtime-active[data-orientation="landscape"] .t9KeypadWide,
+.flashRuntimeView[data-orientation="landscape"] .flashKeypadWide {
+  position: absolute;
+  z-index: 6;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: min(100%, 960px);
+  height: min(46%, 300px);
+  margin-inline: auto;
+  padding: 4px max(6px, var(--safe-area-right, 0px)) calc(4px + var(--safe-area-bottom, 0px)) max(6px, var(--safe-area-left, 0px));
+  pointer-events: auto;
+}
+/* Upright, a wide keyboard keeps its own proportions under the screen instead of the T9 keypad's. */
+body.runtime-active[data-keypad-style]:not([data-keypad-style="classic"], [data-keypad-style="t9"]):not([data-orientation="landscape"]) .t9KeypadFull {
+  aspect-ratio: auto;
+  height: min(40vh, 320px);
 }

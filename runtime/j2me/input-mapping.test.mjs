@@ -171,3 +171,71 @@ test('polls gamepads only while one is connected', () => {
   assert.equal(timers.size, 0, 'polling stops with the last controller')
   input.destroy()
 })
+
+test('the flash family has its own actions and leaves unbound keys to the game', () => {
+  const { window, document } = createEnvironment()
+  const edges = []
+  const input = window.InputMapping.create({
+    family: 'flash',
+    gameId: 'flash:game.swf',
+    keyboard: true,
+    gamepad: true,
+    trustedOnly: true,
+    repeat: false,
+    sink: { press: (action) => edges.push(`P:${action}`), release: (action) => edges.push(`R:${action}`) },
+  })
+  assert.deepEqual([...input.actions], ['up', 'down', 'left', 'right', 'ok', 'a', 'b'])
+  const arrow = { ...keyEvent('ArrowUp'), isTrusted: true }
+  document.dispatch('keydown', arrow)
+  assert.equal(arrow.prevented, undefined, 'an unbound key reaches the Flash game untouched')
+
+  input.setKeyboardBinding('a', 'KeyJ')
+  document.dispatch('keydown', { ...keyEvent('KeyJ', 'j'), isTrusted: false })
+  assert.deepEqual(edges, [], 'the player\'s own synthetic key is not input')
+  document.dispatch('keydown', { ...keyEvent('KeyJ', 'j'), isTrusted: true })
+  document.dispatch('keyup', { ...keyEvent('KeyJ', 'j'), isTrusted: true })
+  assert.deepEqual(edges, ['P:a', 'R:a'])
+
+  window.navigator.getGamepads = () => [{ index: 0, buttons: [{ pressed: true }], axes: [] }]
+  input.pollGamepads()
+  assert.deepEqual(edges, ['P:a', 'R:a', 'P:a'])
+  input.press('touch:x', 'star')
+  assert.deepEqual(edges, ['P:a', 'R:a', 'P:a'], 'phone actions do not exist in the flash family')
+  input.destroy()
+})
+
+test('games without their own bindings follow the family\'s global choice, and a reset returns to it', () => {
+  const { window, document } = createEnvironment()
+  window.localStorage.setItem(window.InputMapping.globalKey('phone'), JSON.stringify({ keyboard: { KeyK: 'ok' }, gamepad: { 'button:7': 'ok' } }))
+  const edges = []
+  const input = window.InputMapping.create({
+    gameId: 'global', keyboard: true, gamepad: true, repeat: false,
+    sink: { press: (action) => edges.push(`P:${action}`) },
+  })
+  assert.deepEqual({ ...input.keyboardBindings() }, { KeyK: 'ok' }, 'a saved global map replaces the defaults')
+  document.dispatch('keydown', keyEvent('Enter'))
+  document.dispatch('keydown', keyEvent('KeyK', 'k'))
+  assert.deepEqual(edges, ['P:ok'])
+
+  input.setKeyboardBinding('up', 'KeyW')
+  input.resetKeyboardBindings()
+  assert.deepEqual({ ...input.keyboardBindings() }, { KeyK: 'ok' })
+  assert.deepEqual({ ...input.gamepadBindings() }, { 'button:7': 'ok' })
+  input.destroy()
+
+  // After the reset the game keeps no copy: a later global change reaches it.
+  window.localStorage.setItem(window.InputMapping.globalKey('phone'), JSON.stringify({ keyboard: { KeyL: 'ok' } }))
+  const again = window.InputMapping.create({ gameId: 'global', keyboard: true, repeat: false })
+  assert.deepEqual({ ...again.keyboardBindings() }, { KeyL: 'ok' })
+  again.destroy()
+})
+
+test('the shoulder buttons press the soft keys', () => {
+  const { window } = createEnvironment()
+  const edges = []
+  window.navigator.getGamepads = () => [{ index: 0, buttons: [{}, {}, {}, {}, { pressed: true }, { pressed: true }], axes: [] }]
+  const input = window.InputMapping.create({ gameId: 'soft', gamepad: true, repeat: false, sink: { press: (action) => edges.push(action) } })
+  input.pollGamepads()
+  assert.deepEqual(edges.sort(), ['back', 'choice'])
+  input.destroy()
+})

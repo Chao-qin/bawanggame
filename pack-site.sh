@@ -61,21 +61,27 @@ python3 - "$REPORT" "$VENDOR" "$DEST" <<'PYEOF'
 import json, os, shutil, sys
 report, vendor, dest = sys.argv[1], sys.argv[2], sys.argv[3]
 results = json.load(open(report))['results']
-alive = [g for g in results if g.get('alive')]
+# alive: True ran and answered keys, False froze, None the scan itself failed.
+status = {g['file']: {True: 'alive', False: 'frozen'}.get(g.get('alive'), 'unknown') for g in results}
 full = json.load(open(os.path.join(vendor, 'hall', 'manifest.json')))
-by_file = {g['file']: g for g in full}
-shipped, missing = [], []
-for g in alive:
-    src = os.path.join(vendor, 'public', 'mrps', g['file'])
-    dst = os.path.join(dest, 'maopao', 'public', 'mrps', g['file'])
-    if os.path.exists(src):
-        shutil.copy2(src, dst)
-        shipped.append(by_file.get(g['file'], g))
-    else:
-        missing.append(g['file'])
+# Only games the compatibility scan saw running are packed (the whole library is ~200 MB). Every other game stays in
+# the catalog with bundled=false and is loaded from the public vmrp mirror when it starts (apps/web/src/maopao.js).
+shipped, missing, catalog = [], [], []
+for g in full:
+    entry = dict(g, compat=status.get(g['file'], 'untested'), bundled=False)
+    if entry['compat'] == 'alive':
+        src = os.path.join(vendor, 'public', 'mrps', g['file'])
+        if os.path.exists(src):
+            shutil.copy2(src, os.path.join(dest, 'maopao', 'public', 'mrps', g['file']))
+            entry['bundled'] = True
+            shipped.append(g['file'])
+        else:
+            missing.append(g['file'])
+    catalog.append(entry)
+catalog.sort(key=lambda g: not g['bundled'])
 with open(os.path.join(dest, 'maopao', 'hall', 'manifest.json'), 'w') as f:
-    json.dump(shipped, f, ensure_ascii=False)
-print(f'shipped {len(shipped)} mrp, missing {len(missing)}: {missing}')
+    json.dump(catalog, f, ensure_ascii=False)
+print(f'catalog {len(catalog)} mrp, shipped {len(shipped)}, missing {len(missing)}: {missing}')
 PYEOF
 
 echo "---- staging done: $DEST ----"

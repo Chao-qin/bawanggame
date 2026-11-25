@@ -18,8 +18,13 @@ import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from '
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
 import { installResponsiveContract } from './responsive.js'
 import { addBundled, addFromFile, addFromUrl, fillArtwork, list as listLocalFlash, remove as removeLocalFlash } from './localFlash.js'
+import { isEmbeddedHost, onlineAvailable, onlineFetch, onlineMode, onlineSourceUrl } from './online.js'
+import { MRP_CATALOG_URL, normalizeMrpEntry } from './maopao.js'
+import { requestOrientation } from './orientation.js'
+import { RUNTIME_SHEET_EVENT } from './runtime/KeypadPiece.jsx'
 
 const KeyboardTestPage = lazy(() => import('./keyboard/KeyboardTestPage.jsx').then((module) => ({ default: module.KeyboardTestPage })))
+const KeyboardSystemPage = lazy(() => import('./keyboard/KeyboardSystemPage.jsx').then((module) => ({ default: module.KeyboardSystemPage })))
 
 const TABS = [
   { id: 'j2me', label: 'J2ME', Icon: AppstoreOutline },
@@ -43,16 +48,6 @@ const FLASH_GAMES = [
   { kind: 'flash', file: 'sample-game.swf', name: 'Star Catcher', vendor: '内置输入测试', desc: '点击星星得分', size: 1767, iconUrl: null, local: false, catalogId: 'sample-game' },
 ]
 
-function isEmbeddedHost() {
-  return new URLSearchParams(window.location.search).get('host') === 'rn'
-}
-
-const mobileApiBase = String(import.meta.env.VITE_52JAVA_API_BASE || '').replace(/\/+$/, '')
-
-function apiPath(path) {
-  return isEmbeddedHost() && mobileApiBase ? mobileApiBase + path : path
-}
-
 function routeForLibrary(tab) {
   return { type: 'library', tab: TAB_IDS.has(tab) ? tab : 'j2me' }
 }
@@ -63,6 +58,7 @@ function routeForGame(game, tab) {
 
 function routePath(route) {
   if (route.type === 'keyboard-test') return '/test/keyboard'
+  if (route.type === 'keyboard') return '/keyboard'
   if (route.type === 'play') {
     const params = new URLSearchParams()
     params.set('tab', route.tab)
@@ -72,6 +68,13 @@ function routePath(route) {
     return '/play/' + encodeURIComponent(route.game.kind) + '/' + encodeURIComponent(route.game.file) + (suffix ? '?' + suffix : '')
   }
   return '/library/' + route.tab
+}
+
+function KeyboardIcon() {
+  return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+    <rect x="2.5" y="6" width="19" height="12" rx="2" />
+    <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6" />
+  </svg>
 }
 
 function fullscreenElement() {
@@ -93,7 +96,7 @@ function useServerGames(kind) {
     if (kind !== 'maopao') return
     let alive = true
     setState({ loading: true, error: null, games: [] })
-    fetch('/maopao/hall/manifest.json')
+    fetch(MRP_CATALOG_URL)
       .then((r) => {
         if (!r.ok) throw new Error('HTTP ' + r.status)
         return r.json()
@@ -103,16 +106,7 @@ function useServerGames(kind) {
         setState({
           loading: false,
           error: null,
-          games: data.map((g) => ({
-            kind,
-            file: g.file,
-            name: g.name || g.file,
-            vendor: g.vendor || '',
-            desc: g.desc || '',
-            size: g.size || 0,
-            iconUrl: typeof g.iconUrl === 'string' ? g.iconUrl : null,
-            local: false,
-          })),
+          games: data.map(normalizeMrpEntry),
         })
       })
       .catch((e) => {
@@ -154,7 +148,7 @@ function useServerJars(enabled) {
             version: g.version,
             desc: '',
             size: 0,
-            iconUrl: g.icon ? '/__icon?jar=' + encodeURIComponent(g.file) : null,
+            iconUrl: typeof g.iconUrl === 'string' ? g.iconUrl : g.icon ? '/__icon?jar=' + encodeURIComponent(g.file) : null,
             local: false,
           })),
         })
@@ -173,8 +167,7 @@ function useServerJars(enabled) {
 }
 
 function useJavaStore(query, category, page) {
-  const embedded = isEmbeddedHost()
-  const online = !embedded || Boolean(mobileApiBase)
+  const online = onlineAvailable()
   const [state, setState] = useState({ loading: online, error: null, offline: !online, games: [], siteUrl: 'https://java.52emu.cn', pages: 1, total: 0 })
   const [tick, setTick] = useState(0)
   useEffect(() => {
@@ -188,7 +181,7 @@ function useJavaStore(query, category, page) {
     if (query) params.set('query', query)
     if (category) params.set('category', category)
     if (tick) params.set('refresh', '1')
-    fetch(apiPath('/__52java/catalog?' + params))
+    onlineFetch('/__52java/catalog?' + params)
       .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json() })
       .then((data) => { if (alive) setState({ loading: false, error: null, offline: false, games: data.games || [], siteUrl: data.siteUrl || 'https://java.52emu.cn', pages: data.pages || 1, total: data.total || 0 }) })
       .catch((e) => { if (alive) setState((current) => ({ ...current, loading: false, error: String(e.message || e) })) })
@@ -652,7 +645,7 @@ function FilePicker({ children, fill, ...inputProps }) {
 
 function FlashStore({ onRefreshLibrary }) {
   const local = useLocalFlash(true)
-  const archiveOnline = !isEmbeddedHost() || Boolean(mobileApiBase)
+  const archiveOnline = onlineAvailable()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [url, setUrl] = useState('')
@@ -674,7 +667,7 @@ function FlashStore({ onRefreshLibrary }) {
     setArchiveLoading(true)
     setArchiveError('')
     try {
-      const response = await fetch(apiPath(`/__flash/catalog?query=${encodeURIComponent(value.trim())}`))
+      const response = await onlineFetch(`/__flash/catalog?query=${encodeURIComponent(value.trim())}`)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
       if (requestId === archiveRequest.current) setArchiveGames(data.games || [])
@@ -699,7 +692,7 @@ function FlashStore({ onRefreshLibrary }) {
     setMessage('')
     try {
       const suffix = `/__flash/download/${encodeURIComponent(game.code)}`
-      const downloadUrl = new URL(apiPath(suffix), window.location.href).href
+      const downloadUrl = onlineSourceUrl(suffix)
       const installed = local.games.find((item) => item.dedupeKey === `url:${downloadUrl}`)
       if (installed) {
         if (!installed.iconUrl && game.coverUrl) {
@@ -710,14 +703,20 @@ function FlashStore({ onRefreshLibrary }) {
         setMessage(duplicateMessage(game.name))
         return
       }
-      const detailResponse = await fetch(apiPath(`/__flash/detail/${encodeURIComponent(game.code)}`))
+      const detailResponse = await onlineFetch(`/__flash/detail/${encodeURIComponent(game.code)}`)
       if (!detailResponse.ok) throw new Error(`详情获取失败（HTTP ${detailResponse.status}）`)
       const detail = (await detailResponse.json()).game || game
-      await addFromUrl(apiPath(`/__flash/download/${encodeURIComponent(game.code)}`), {
+      // The app host saves the SWF locally first; the record keeps the stable address as its source.
+      const fetchBlob = onlineMode() === 'host' ? async () => {
+        const response = await onlineFetch(suffix)
+        if (!response.ok) throw new Error(`SWF 下载失败（HTTP ${response.status}）`)
+        return response.blob()
+      } : undefined
+      await addFromUrl(downloadUrl, {
         name: detail.name,
         artwork: await fetchArtwork(detail.coverUrl || game.coverUrl),
         description: `Flash 保存计划 · SHA-256 ${detail.sha256 || '未提供'}`,
-      })
+      }, undefined, fetchBlob)
       setMessage(`已加入「${detail.name}」，现在可以在 Flash 库中启动。`)
       local.refresh()
       onRefreshLibrary()
@@ -794,7 +793,7 @@ function FlashStore({ onRefreshLibrary }) {
       {archiveOnline ? <form className="flashImportFields" onSubmit={(event) => { event.preventDefault(); searchArchive() }}>
         <label>搜索作品<Input className="field" type="search" placeholder="搜索 Flash 游戏" value={archiveQuery} onChange={setArchiveQuery} /></label>
         <Button className="downloadButton" color="primary" size="small" type="submit" disabled={archiveLoading}>{archiveLoading ? '搜索中…' : '搜索'}</Button>
-      </form> : <div className="status" role="status">当前安装包未配置在线商城服务。</div>}
+      </form> : <div className="status" role="status">当前环境无法访问在线商城，请更新到最新安装包后重试。</div>}
       {archiveError && <div className="status statusError" role="alert">{archiveError}</div>}
       {archiveLoading && <div className="status" role="status"><DotLoading /> 正在加载游戏目录…</div>}
       {archiveOnline && !archiveLoading && !archiveError && archiveGames.length === 0 && <div className="emptyPanel"><strong>{archiveQuery.trim() ? '没有找到匹配的游戏' : '目录暂无游戏'}</strong><span>尝试其他关键词，或稍后刷新目录。</span></div>}
@@ -874,7 +873,7 @@ function Store({ onRefreshLibrary }) {
         setMessage(duplicateMessage(game.name))
         return
       }
-      const response = await fetch(apiPath('/__52java/download?id=' + encodeURIComponent(id)))
+      const response = await onlineFetch('/__52java/download?id=' + encodeURIComponent(id))
       if (!response.ok) {
         let message = '下载失败'
         try { message = (await response.json()).error || message } catch (_) {}
@@ -899,8 +898,8 @@ function Store({ onRefreshLibrary }) {
   if (store.offline) {
     return <section className="storePage">
       <div className="emptyPanel">
-        <strong>在线商城服务未配置</strong>
-        <span>打包时设置 MOBILE_52JAVA_API_BASE 后重新构建，即可在安装包中使用 52java 商城。</span>
+        <strong>当前环境无法访问在线商城</strong>
+        <span>请更新到最新安装包后重试。</span>
       </div>
     </section>
   }
@@ -1001,6 +1000,9 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
       document.body.classList.toggle('fullscreen-active', active)
       if (active) window.ScreenSetup?.lockOrientation?.()
       else window.ScreenSetup?.unlockOrientation?.()
+      // A browser locks the screen orientation only in fullscreen: ask again for the current choice.
+      const orientation = window.__XIAOCHAO_ORIENTATION__
+      if (active && orientation) orientation.request(orientation.requested)
       requestRefit(true)
       setIsFullscreen(active)
       if (active && game.kind === 'flash') {
@@ -1022,6 +1024,19 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
       document.removeEventListener('webkitfullscreenchange', syncFullscreen)
       window.removeEventListener('xiaochao:viewportchange', onViewportResize)
     }
+  }, [])
+  // The 「布局方向」 choice turns the whole app (orientation.js); 'auto' follows the device. J2ME asks from its
+  // screen.js instead, where a game's own orientation wins over the choice. Leaving the game hands rotation back.
+  const requestedOrientation = keypadFamily && game.kind !== 'j2me' ? keypadPrefs.layout : null
+  useEffect(() => {
+    if (requestedOrientation) requestOrientation(requestedOrientation)
+  }, [requestedOrientation])
+  useEffect(() => () => requestOrientation('auto'), [])
+  // The floating keypad's menu opens the keypad and mapping sheets.
+  useEffect(() => {
+    const open = (event) => { if (event.detail?.name === 'keypad' || event.detail?.name === 'mapping') setOpenSheet(event.detail.name) }
+    window.addEventListener(RUNTIME_SHEET_EVENT, open)
+    return () => window.removeEventListener(RUNTIME_SHEET_EVENT, open)
   }, [])
   useEffect(() => {
     if (nativeBackSignal === lastNativeBackSignal.current) return
@@ -1085,7 +1100,7 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
           {game.kind === 'j2me' && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => toggleSheet('game')} aria-label="游戏设置" title="游戏设置" disabled={!settingsReady}><SetOutline aria-hidden="true" /></Button>}
           {keypadFamily && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => updateKeypadPrefs({ visible: !keypadPrefs.visible })} aria-label={keypadPrefs.visible ? '隐藏键盘' : '显示键盘'} aria-pressed={keypadPrefs.visible} title={keypadPrefs.visible ? '隐藏键盘' : '显示键盘'}>{keypadPrefs.visible ? <EyeOutline aria-hidden="true" /> : <EyeInvisibleOutline aria-hidden="true" />}</Button>}
           {keypadFamily && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => toggleSheet('keypad')} aria-label="游戏表现" title="游戏表现"><AppstoreOutline aria-hidden="true" /></Button>}
-          {phoneRuntime && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => toggleSheet('mapping')} aria-label="按键映射" title="按键映射" disabled={runtimeReadyFor !== game.file}><CalculatorOutline aria-hidden="true" /></Button>}
+          {keypadFamily && <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={() => toggleSheet('mapping')} aria-label="按键映射" title="按键映射" disabled={phoneRuntime && runtimeReadyFor !== game.file}><CalculatorOutline aria-hidden="true" /></Button>}
           <Button className="runtimeToolbarButton runtimeToolbarIconButton" onClick={toggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? <ShrinkOutline aria-hidden="true" /> : <ArrowsAltOutline aria-hidden="true" />}</Button>
         </div>}
       </div>
@@ -1095,7 +1110,7 @@ function Player({ game, onBack, onCancelBack, nativeBackSignal }) {
       <div className="runtime-overlay-root" />
       {game.kind === 'j2me' && <GameSettingsSheet visible={openSheet === 'game'} onClose={closeSheet} getContainer={popupContainer} />}
       {keypadFamily && <KeypadSettingsPopup family={keypadFamily} runtime={game.kind} game={game.file} visible={openSheet === 'keypad'} onClose={closeSheet} getContainer={popupContainer} />}
-      {phoneRuntime && <InputMappingPopup visible={openSheet === 'mapping'} onClose={closeSheet} getContainer={popupContainer} />}
+      {keypadFamily && <InputMappingPopup visible={openSheet === 'mapping'} onClose={closeSheet} getContainer={popupContainer} />}
       {confirming && (
         <div className="exitConfirm" role="dialog" aria-modal="true" aria-label="退出当前游戏？">
           <div className="exitBox">
@@ -1193,6 +1208,9 @@ function RuntimeFrame({ route, nativeBackSignal, onBack, onCancelBack }) {
     }
   }, [onBack, onCancelBack])
 
+  // Removing the frame does not unmount the player inside it, so the app host's orientation is handed back here.
+  useEffect(() => () => requestOrientation('auto'), [])
+
   useEffect(() => {
     if (lastBackSignal.current === nativeBackSignal) return
     lastBackSignal.current = nativeBackSignal
@@ -1215,6 +1233,8 @@ export default function App() {
   const query = new URLSearchParams(location.search)
   const routeType = location.pathname === '/test/keyboard'
     ? 'keyboard-test'
+    : location.pathname === '/keyboard'
+      ? 'keyboard'
     : location.pathname.startsWith('/play/')
       ? 'play'
       : 'library'
@@ -1232,11 +1252,14 @@ export default function App() {
     ? routeForGame(game, query.get('tab') || tab)
     : routeType === 'keyboard-test'
       ? { type: 'keyboard-test' }
-      : routeForLibrary(tab)
+      : routeType === 'keyboard'
+        ? { type: 'keyboard' }
+        : routeForLibrary(tab)
   const [nativeBackSignal, requestBack] = useNativeBackRequest()
   const libraryScroll = useRef(null)
   const playing = route.type === 'play'
   const keyboardTest = route.type === 'keyboard-test'
+  const keyboardSystem = route.type === 'keyboard'
   const directEntryStarted = useRef(false)
   const pendingDirectPlay = useRef(null)
   // Set while the app itself leaves a play route (exiting a game, or turning a direct link into lobby + game): only
@@ -1329,15 +1352,24 @@ export default function App() {
   }, [blocker])
 
   const [libraryTick, setLibraryTick] = useState(0)
+  const openKeyboard = () => navigate(routePath({ type: 'keyboard' }))
+  const closeKeyboard = useCallback(() => {
+    if (location.key !== 'default') navigate(-1)
+    else navigate(routePath(routeForLibrary(tab)), { replace: true })
+  }, [location.key, navigate, tab])
 
   return <>
     <div className="appShell" hidden={playing || keyboardTest}>
       <header className="header">
         <div className="brand"><AppstoreOutline aria-hidden="true" /><h1>小潮霸王</h1></div>
-        <PrimaryNavigation items={TABS} activeId={tab} onSelect={switchTab} />
+        <Button className="headerAction" fill="none" onClick={keyboardSystem ? closeKeyboard : openKeyboard} aria-pressed={keyboardSystem} aria-label="键盘：屏幕键盘、实体键盘与手柄设置">
+          <KeyboardIcon /><span>键盘</span>
+        </Button>
+        <PrimaryNavigation items={TABS} activeId={keyboardSystem ? null : tab} onSelect={switchTab} />
       </header>
       <main className="main">
-        {TABS.map((t) => (
+        {keyboardSystem && <Suspense fallback={<div className="status" role="status"><DotLoading /> 加载中</div>}><KeyboardSystemPage onBack={closeKeyboard} /></Suspense>}
+        {!keyboardSystem && TABS.map((t) => (
           <div key={t.id} className="pane">
             {tab === t.id && (t.id === 'store' ? <Store key={t.id} onRefreshLibrary={() => setLibraryTick((value) => value + 1)} /> : t.id === 'flash-store' ? <FlashStore key={t.id} onRefreshLibrary={() => setLibraryTick((value) => value + 1)} /> : <Library key={t.id + libraryTick} kind={t.id} onPlay={startGame} />)}
           </div>

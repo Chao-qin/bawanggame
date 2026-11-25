@@ -9,9 +9,12 @@ import './mobile-ui.css'
 import { isRuntimeFrame } from './App.jsx'
 import { createApplicationRouter } from './router.jsx'
 import { installSelectionGuard } from './selection-guard.js'
+import { installOrientationController } from './orientation.js'
 
 installSelectionGuard()
 const runtimeFrame = isRuntimeFrame()
+// The J2ME / MRP frame turns itself (its own #root) and reaches the app host through the parent's bridge.
+installOrientationController()
 const router = createApplicationRouter(runtimeFrame)
 
 function render() {

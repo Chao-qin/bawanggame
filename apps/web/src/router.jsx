@@ -25,6 +25,7 @@ export function createApplicationRouter(runtimeFrame) {
           { path: 'library/:tab?' },
           { path: 'play/:kind/*' },
           { path: 'test/keyboard' },
+          { path: 'keyboard' },
           { path: '*', element: <UnknownRoute /> },
         ],
       },

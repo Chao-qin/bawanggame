@@ -10,6 +10,8 @@ function viewportSize(win) {
   const visual = win.visualViewport
   const width = Math.max(0, Number(win.innerWidth) || Number(win.document.documentElement.clientWidth) || 0)
   const height = Math.max(0, Number(win.innerHeight) || Number(win.document.documentElement.clientHeight) || 0)
+  // While orientation.js turns the page by 90°, the app lays out in the turned viewport.
+  if (win.document.documentElement.dataset.forcedRotation === 'cw') return { width: height, height: width, visualHeight: width, visualOffsetTop: 0 }
   const visualHeight = Math.max(0, Number(visual?.height) || height)
   const visualOffsetTop = Math.max(0, Number(visual?.offsetTop) || 0)
   return { width, height, visualHeight, visualOffsetTop }

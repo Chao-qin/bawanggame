@@ -21,6 +21,20 @@ COPY games/flash/ games/flash/
 RUN pnpm build \
  && pnpm --filter @xiaochao/server build
 
+# The MRP runtime (vmrp_v1.0, ~3 MB) from the same pinned vmrp checkout the Android release uses. The ~200 MB game
+# library is not copied: the catalog marks every game bundled=false and the page loads it from the public mirror.
+FROM node:22-bookworm-slim AS mrp-runtime
+
+ARG VMRP_COMMIT=7f96c715244adaea927eb8f60d9319160a767e5a
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates git \
+ && rm -rf /var/lib/apt/lists/*
+RUN git clone --filter=blob:none --no-checkout https://github.com/vmrp/vmrp.github.io.git /vmrp \
+ && git -C /vmrp sparse-checkout set --no-cone /vmrp_v1.0/ \
+ && git -C /vmrp checkout "$VMRP_COMMIT"
+COPY maopao-revival/hall/manifest.json /catalog/manifest.json
+RUN node -e "const fs=require('fs');const games=JSON.parse(fs.readFileSync('/catalog/manifest.json','utf8')).map((game)=>({...game,bundled:false}));fs.writeFileSync('/catalog/manifest.json',JSON.stringify(games))"
+
 FROM node:22-bookworm-slim AS runtime
 
 RUN apt-get update \
@@ -39,9 +53,9 @@ COPY --from=build /app/apps/server/dist/src/ apps/server/src/
 COPY runtime/ runtime/
 COPY games/jar/.keep games/jar/
 COPY start.sh turnserver.conf ./
-RUN mkdir -p maopao-revival/vendor/vmrp.github.io/hall \
- && printf '[]\n' > maopao-revival/vendor/vmrp.github.io/hall/manifest.json \
- && install -d -o node -g node "$TURN_STATE_DIR"
+COPY --from=mrp-runtime /vmrp/vmrp_v1.0/ maopao-revival/vendor/vmrp.github.io/vmrp_v1.0/
+COPY --from=mrp-runtime /catalog/manifest.json maopao-revival/vendor/vmrp.github.io/hall/manifest.json
+RUN install -d -o node -g node "$TURN_STATE_DIR"
 
 USER node
 EXPOSE 8080 3478/tcp 3478/udp 49160-49200/udp

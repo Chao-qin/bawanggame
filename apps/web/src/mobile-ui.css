@@ -424,15 +424,18 @@ body:not(.viewport-landscape) .player .playerStage {
 body.viewport-landscape .player .playerStage {
   inset: 0 var(--safe-area-right, 0px) 0 var(--runtime-toolbar-strip);
 }
-/* Landscape screen: the expanded toolbar floats over the top of the stage, sized to its buttons. Keep it opaque:
+/* Landscape screen: the expanded toolbar floats over the top of the stage, sized to its buttons. It is centred on
+   the stage (between the toolbar strip and the right safe area), the same centre as the game screen inside it — not
+   on the whole viewport, which would put it (strip + left inset - right inset) / 2 off the screen. Keep it opaque:
    backdrop-filter over the constantly repainting runtime canvas is a major source of jank when a sheet opens. */
 body.viewport-landscape .player .runtimeToolbar:not(.runtimeToolbarCollapsed) {
+  --runtime-stage-width: calc(100% - var(--runtime-toolbar-strip) - var(--safe-area-right, 0px));
   position: absolute;
   z-index: 220;
   top: max(10px, var(--safe-area-top, 0px));
-  left: 50%;
+  left: calc(var(--runtime-toolbar-strip) + var(--runtime-stage-width) / 2);
   width: max-content;
-  max-width: calc(100% - 32px);
+  max-width: calc(var(--runtime-stage-width) - 32px);
   transform: translateX(-50%);
   background: var(--ui-surface);
   border-color: var(--ui-border);
@@ -713,4 +716,115 @@ body.runtime-active .runtimeSheet * { touch-action: pan-y !important; }
   .tabs .tab { min-width: 0; padding-inline: 2px; font-size: 10px; }
   .tabs .tab > span { white-space: normal; text-align: center; }
   .appShell { padding-bottom: calc(82px + var(--safe-area-bottom, 0px)); }
+}
+
+/* Header entry to the 「键盘」 page. */
+.header .headerAction {
+  margin-left: auto;
+  --text-color: var(--ui-text);
+  min-height: var(--ui-control-size);
+  padding: 0 var(--ui-space-3);
+  border-radius: var(--ui-radius-sm);
+}
+.header .headerAction > span { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.header .headerAction[aria-pressed='true'] { background: var(--ui-raised); color: var(--ui-accent); }
+
+/* 「键盘」 page (keyboard/KeyboardSystemPage.jsx). */
+.keyboardSystem { display: grid; gap: var(--ui-space-3); padding-block: var(--ui-space-4); }
+.keyboardSystem .adm-tabs-header { border-bottom: 1px solid var(--ui-border); }
+.keyboardSystemNote { margin: 4px 0 0; color: var(--ui-muted); font-size: 13px; line-height: 1.5; }
+.keyboardSystemSection {
+  display: grid;
+  gap: var(--ui-space-2);
+  margin-top: var(--ui-space-3);
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+}
+.keyboardSystemSection > h3 { margin: 0; font-size: 16px; }
+.keyboardSystemPreview {
+  width: min(100%, 360px);
+  margin-inline: auto;
+  aspect-ratio: 7.4 / 7.95;
+  touch-action: none;
+}
+.keyboardSystemPreview-flash { aspect-ratio: 7.4 / 3.6; }
+.keyboardSystemPreview .keyboardCanvas { width: 100%; height: 100%; }
+.keyboardSystemRows .inputMappingLabels,
+.keyboardSystemRows .inputMappingRow { grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr) auto; }
+.keyboardSystemRowActions { display: inline-flex; gap: 2px; overflow: visible !important; }
+.inputMappingRowActive { background: color-mix(in srgb, var(--ui-accent) 14%, transparent); }
+
+/* Floating keypad piece (runtime/KeypadPiece.jsx): its corner menu key drags it and opens the keypad menu. The key
+   keeps its size whatever the keypad's scale. */
+.keypadPieceFloating { position: relative; }
+.keypadPieceHandle {
+  position: absolute;
+  z-index: 2;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: 8px;
+  background: rgb(10 14 20 / 0.72);
+  color: #fff;
+  font-size: 16px;
+  touch-action: none;
+  cursor: grab;
+  transform-origin: top right;
+  scale: calc(1 / var(--keypad-piece-scale, 1));
+}
+.keypadPieceHandle:active { cursor: grabbing; }
+.keypadPieceHandle:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.keypadMenu {
+  position: fixed;
+  z-index: 260;
+  display: grid;
+  gap: 4px;
+  width: 220px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-size: 13px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+.keypadMenuHint { margin: 0 0 4px; color: var(--ui-muted); font-size: 12px; }
+.keypadMenuRow { display: grid; grid-template-columns: 1fr 34px 48px 34px; align-items: center; gap: 4px; }
+.keypadMenuRow output { text-align: center; font-variant-numeric: tabular-nums; }
+.keypadMenuRow button,
+.keypadMenuItem {
+  min-height: 34px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-raised);
+  color: var(--ui-text);
+  font: inherit;
+}
+.keypadMenuRow button:disabled { opacity: 0.4; }
+.keypadMenuItem { padding: 0 10px; text-align: left; }
+.keypadMenu button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 1px; }
+
+/* orientation.js: a game asked for the orientation the device is not held in and neither the app host nor the
+   browser could rotate the screen, so the app turns by 90°. #root takes the turned viewport (responsive.js reports
+   it swapped) and every fixed layer inside it follows, since a transformed element contains fixed descendants. */
+html[data-forced-rotation='cw'],
+html[data-forced-rotation='cw'] body {
+  overflow: hidden;
+}
+html[data-forced-rotation='cw'] #root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--viewport-width);
+  height: var(--viewport-height);
+  overflow: hidden;
+  transform-origin: 0 0;
+  transform: translateX(var(--viewport-height)) rotate(90deg);
 }

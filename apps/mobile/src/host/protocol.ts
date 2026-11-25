@@ -25,19 +25,66 @@ export function encodeHostMessage(type: string, payload?: unknown, id?: string):
   return JSON.stringify({ version: BRIDGE_VERSION, ...(id ? { id } : {}), type, ...(payload === undefined ? {} : { payload }) })
 }
 
-export const injectedBridge = `
+/** Host features the page may rely on; the page checks them before using a request type. The app announces only
+ *  those it can serve on this device (hostCapabilities in App.tsx). */
+export type HostCapability = 'online.fetch' | 'orientation.lock'
+
+/** Script that settles the page's pending `request(type, payload)` with `result`. */
+export function resolveRequestScript(id: string, result: unknown): string {
+  return `window.__XIAOCHAO_RN_HOST__ && window.__XIAOCHAO_RN_HOST__.resolve(${JSON.stringify(id)}, ${JSON.stringify(result)}); true;`
+}
+
+export const injectedBridge = (capabilities: readonly HostCapability[]) => `
 (function () {
   var version = ${BRIDGE_VERSION};
-  function send(type, payload) {
+  var pending = {};
+  var nextId = 0;
+  function post(message) {
     if (!window.ReactNativeWebView || typeof window.ReactNativeWebView.postMessage !== 'function') return false;
     try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ version: version, type: type, payload: payload }));
+      window.ReactNativeWebView.postMessage(JSON.stringify(message));
       return true;
     } catch (_) {
       return false;
     }
   }
+  function send(type, payload) {
+    return post({ version: version, type: type, payload: payload });
+  }
+  // A request the host answers later through resolve(id, result); unanswered after timeoutMs it fails and is dropped.
+  function request(type, payload, timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var id = 'q' + (++nextId);
+      var timer = 0;
+      pending[id] = function (result) {
+        if (timer) clearTimeout(timer);
+        resolve(result);
+      };
+      if (!post({ version: version, id: id, type: type, payload: payload })) {
+        delete pending[id];
+        reject(new Error('host_unavailable'));
+        return;
+      }
+      if (timeoutMs > 0) timer = setTimeout(function () {
+        if (!pending[id]) return;
+        delete pending[id];
+        reject(new Error('host_timeout'));
+      }, timeoutMs);
+    });
+  }
+  function resolveRequest(id, result) {
+    var done = pending[id];
+    if (!done) return false;
+    delete pending[id];
+    done(result);
+    return true;
+  }
   window.__XIAOCHAO_NATIVE_BACK__ = function () {
+    // A page of the app (e.g. 「键盘」) can take the back key and return to the lobby itself.
+    if (typeof window.__XIAOCHAO_NATIVE_BACK_OVERRIDE__ === 'function' && window.__XIAOCHAO_NATIVE_BACK_OVERRIDE__()) {
+      send('navigation.back', { handled: true });
+      return true;
+    }
     var isGame = /^#\\/play\\//.test(window.location.hash);
     send('navigation.back', { handled: isGame });
     if (isGame && typeof window.__XIAOCHAO_NATIVE_BACK_REQUEST__ === 'function') {
@@ -68,7 +115,15 @@ export const injectedBridge = `
     window.dispatchEvent(new CustomEvent('xiaochao:hostinsets', { detail: insets }));
     return true;
   }
-  window.__XIAOCHAO_RN_HOST__ = { version: version, send: send, setInsets: setInsets, haptic: haptic };
+  window.__XIAOCHAO_RN_HOST__ = {
+    version: version,
+    capabilities: ${JSON.stringify(capabilities)},
+    send: send,
+    request: request,
+    resolve: resolveRequest,
+    setInsets: setInsets,
+    haptic: haptic
+  };
   send('app.ready', { url: window.location.href });
 })();
 true;

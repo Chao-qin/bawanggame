@@ -1,24 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Tabs } from 'antd-mobile'
 import { RuntimeSheet } from './RuntimeSheet.jsx'
+import { controlsFor, KEYBOARD_FAMILIES } from '../keyboard/system.js'
 
-const ACTIONS = [
-  ['up', '上'], ['down', '下'], ['left', '左'], ['right', '右'], ['ok', '确认'],
-  ['choice', '左软键'], ['back', '右软键'], ['ret', '返回'], ['clear', '清除'],
-  ['star', '*'], ['pound', '#'],
-  ...Array.from({ length: 10 }, (_, digit) => [`num${digit}`, String(digit)]),
-]
-function controlName(control) {
-  if (control.startsWith('button:')) return `按钮 ${control.slice(7)}`
-  const axis = /^axis:(\d+):([+-])$/.exec(control)
-  if (axis) return `摇杆 ${Number(axis[1]) + 1} ${axis[2] === '-' ? '负向' : '正向'}`
-  return control
-}
-
-function controlsFor(bindings, action) {
-  return Object.keys(bindings || {}).filter((control) => bindings[control] === action).map(controlName).join('、') || '未绑定'
-}
-
+/** 按键映射 for the game being played: its keyboard and gamepad bindings (over the 「键盘」 page's global ones) and,
+ *  for the phone keypad, its touch layout. */
 export function InputMappingPopup({ visible, onClose, getContainer }) {
   const [controller, setController] = useState(null)
   const [bindings, setBindings] = useState({ keyboard: {}, gamepad: {} })
@@ -39,9 +25,15 @@ export function InputMappingPopup({ visible, onClose, getContainer }) {
       setCapturing('')
       return undefined
     }
-    const current = window.__XIAOCHAO_INPUT_CONTROLLER__
-    setController(current || null)
+    // A runtime still loading has no controller yet (Flash creates it once the movie is in): pick it up when it comes.
+    let current = window.__XIAOCHAO_INPUT_CONTROLLER__ || null
+    setController(current)
     const refresh = () => {
+      const latest = window.__XIAOCHAO_INPUT_CONTROLLER__ || null
+      if (latest !== current) {
+        current = latest
+        setController(latest)
+      }
       if (!current) return
       const nextKeyboard = current.keyboardBindings()
       const nextGamepad = current.gamepadBindings()
@@ -63,7 +55,7 @@ export function InputMappingPopup({ visible, onClose, getContainer }) {
     // Gamepad presence only needs a slow poll, and only while the device tab is
     // visible. A 500ms no-op poll re-rendered the whole sheet and fought the
     // runtime canvas for main-thread time on mobile.
-    const timer = current && activeTab === 'devices' ? window.setInterval(refresh, 1000) : 0
+    const timer = activeTab === 'devices' ? window.setInterval(refresh, 1000) : 0
     window.addEventListener('xiaochao:inputbinding', onBinding)
     window.addEventListener('xiaochao:gamepadbinding', onBinding)
     return () => {
@@ -84,6 +76,9 @@ export function InputMappingPopup({ visible, onClose, getContainer }) {
     if (controller) setBindings((state) => ({ ...state, gamepad: controller.gamepadBindings() }))
   }
 
+  const actions = KEYBOARD_FAMILIES[controller?.family || 'phone']?.actions || KEYBOARD_FAMILIES.phone.actions
+  const touchLayout = (controller?.family || 'phone') === 'phone'
+
   const resetKeyboard = () => {
     controller?.resetKeyboardBindings()
     if (controller) setBindings((state) => ({ ...state, keyboard: controller.keyboardBindings() }))
@@ -102,14 +97,14 @@ export function InputMappingPopup({ visible, onClose, getContainer }) {
   return <RuntimeSheet visible={visible} onClose={onClose} title="按键映射" getContainer={getContainer}>
     <Tabs activeKey={activeTab} onChange={setActiveTab}>
       <Tabs.Tab title="键盘与手柄" key="devices">
-        <div className="inputMappingStatus" role="status">{connected ? '检测到手柄' : '等待手柄输入'} · {capturing ? '请按下键盘按键或手柄控件' : '选择动作后可重新绑定'}</div>
+        <div className="inputMappingStatus" role="status">{!controller ? '游戏启动后可设置按键' : `${connected ? '检测到手柄' : '等待手柄输入'} · ${capturing ? '请按下键盘按键或手柄控件' : '只改当前游戏；所有游戏的默认映射在大厅的「键盘」页设置'}`}</div>
         <div className="inputMappingRows">
           <div className="inputMappingLabels"><strong>动作</strong><strong>键盘</strong><strong>手柄</strong><span /></div>
-          {ACTIONS.map(([action, label]) => <div className="inputMappingRow" key={action}>
+          {actions.map(([action, label]) => <div className="inputMappingRow" key={action}>
             <strong>{label}</strong>
             <span title={controlsFor(bindings.keyboard, action)}>{controlsFor(bindings.keyboard, action)}</span>
             <span title={controlsFor(bindings.gamepad, action)}>{controlsFor(bindings.gamepad, action)}</span>
-            <Button size="small" fill="outline" onClick={() => capture(action)} aria-label={`设置${label}的按键或手柄映射`}>
+            <Button size="small" fill="outline" disabled={!controller} onClick={() => capture(action)} aria-label={`设置${label}的按键或手柄映射`}>
               {capturing === action ? '等待输入' : '设置'}
             </Button>
           </div>)}
@@ -119,7 +114,7 @@ export function InputMappingPopup({ visible, onClose, getContainer }) {
           <Button size="small" fill="outline" onClick={resetGamepad}>恢复手柄默认</Button>
         </footer>
       </Tabs.Tab>
-      <Tabs.Tab title="触屏键位" key="touch"><div ref={layoutHost} className="touchLayoutEditor" /></Tabs.Tab>
+      {touchLayout && <Tabs.Tab title="触屏键位" key="touch"><div ref={layoutHost} className="touchLayoutEditor" /></Tabs.Tab>}
     </Tabs>
   </RuntimeSheet>
 }

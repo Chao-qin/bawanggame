@@ -6,6 +6,29 @@ import { FlashKeypad, useFlashKeys } from './FlashKeypad.jsx'
 import { useKeypadPrefs, useViewportOrientation } from './RuntimeKeypad.jsx'
 import { effectiveLayout, effectiveOpacity, effectivePlacement } from './keypad-prefs.js'
 import { flashPlayerBox } from './flash-player-box.js'
+import { directionCodes, keyOfCode } from './flash-keys.js'
+import { INPUT_ENGINE_URL } from '../keyboard/system.js'
+
+// Ruffle tears a movie down when its element leaves the document. An exit while the movie is still loading removes
+// the element before Ruffle has created the movie, which then starts — and plays its sound — in the detached element.
+// Silence it, then attach and detach the element once more so Ruffle destroys it.
+function destroyDetachedPlayer(element) {
+  try {
+    const api = element.ruffle?.()
+    api?.suspend?.()
+    if (api) api.volume = 0
+  } catch {}
+  if (element.isConnected) return
+  element.style.display = 'none'
+  document.body.appendChild(element)
+  element.remove()
+}
+
+// The key a Flash gamepad action sends in this game (its 「本游戏按键」 choice).
+function codeForAction(keys, action) {
+  if (action === 'ok' || action === 'a' || action === 'b') return keys[action]
+  return directionCodes(keys)[action] || null
+}
 
 export function FlashPlayer({ game, onCleanupReady, onExit }) {
   const hostRef = useRef(null)
@@ -14,9 +37,11 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
   const [loading, setLoading] = useState(true)
   const [canReturn, setCanReturn] = useState(false)
   const [movie, setMovie] = useState(null)
-  const [keypadPrefs] = useKeypadPrefs('flash')
+  const [keypadPrefs, updateKeypadPrefs] = useKeypadPrefs('flash')
   const [flashKeys] = useFlashKeys(game.file)
   const layout = effectiveLayout(keypadPrefs, useViewportOrientation())
+  const keysRef = useRef(flashKeys)
+  keysRef.current = flashKeys
 
   // The app body carries the layout while Flash plays, so the toolbar and stage follow the same rule as the phone
   // runtimes (mobile-ui.css); the lobby gets its body back on exit.
@@ -51,18 +76,26 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
     let player = null
     let objectUrl = ''
     let cleaned = false
+    let input = null
     const session = createRuntimeSession()
     const cleanup = () => {
       if (cleaned) return
       cleaned = true
       alive = false
       session.invalidate()
+      resetInput()
       player?.remove()
       player = null
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl)
         objectUrl = ''
       }
+    }
+    function resetInput() {
+      if (input && window.__XIAOCHAO_INPUT_CONTROLLER__ === input) delete window.__XIAOCHAO_INPUT_CONTROLLER__
+      input?.destroy()
+      input = null
+      if (window.__XIAOCHAO_INPUT_RESET__ === resetInput) delete window.__XIAOCHAO_INPUT_RESET__
     }
     onCleanupReady?.(cleanup)
     const ensureActive = () => {
@@ -111,8 +144,33 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
           objectUrl = URL.createObjectURL(record.data)
           source = objectUrl
         }
-        await player.ruffle().load(source)
         ensureActive()
+        const loading = player
+        await loading.ruffle().load(source)
+        if (!alive || !session.active) destroyDetachedPlayer(loading)
+        ensureActive()
+        // Gamepads and remapped keyboard keys (the 「键盘」 page / 按键映射) go through the shared input engine and
+        // reach the game as the keys this game's gamepad sends; unbound keyboard keys reach Ruffle untouched.
+        await loadClassic(INPUT_ENGINE_URL, session)
+        ensureActive()
+        const target = player
+        const send = (action, type) => {
+          const code = codeForAction(keysRef.current, action)
+          if (code) target.dispatchEvent(new KeyboardEvent(type, { key: keyOfCode(code), code, bubbles: true, cancelable: true }))
+        }
+        input = window.InputMapping?.create({
+          family: 'flash',
+          gameId: 'flash:' + game.file,
+          keyboard: true,
+          gamepad: true,
+          trustedOnly: true,
+          repeat: false,
+          sink: { press: (action) => send(action, 'keydown'), release: (action) => send(action, 'keyup') },
+        }) || null
+        if (input) {
+          window.__XIAOCHAO_INPUT_CONTROLLER__ = input
+          window.__XIAOCHAO_INPUT_RESET__ = resetInput
+        }
         player.focus({ preventScroll: true })
         setLoading(false)
       } catch (cause) {
@@ -136,6 +194,6 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
     {error ? <RuntimeFailure message={error} onAction={canReturn ? onExit : undefined} actionLabel={canReturn ? '返回 Flash 库' : undefined} /> : null}
     <div ref={hostRef} className="flashRuffleHost" />
     <FlashKeypad target={playerElement} visible={keypadPrefs.visible} layout={layout}
-      opacity={effectiveOpacity(keypadPrefs, 'flash')} keys={flashKeys} />
+      opacity={effectiveOpacity(keypadPrefs, 'flash')} keys={flashKeys} prefs={keypadPrefs} update={updateKeypadPrefs} />
   </div>
 }

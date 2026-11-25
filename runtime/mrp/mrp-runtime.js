@@ -322,6 +322,8 @@
 
   /* ---------- 加载态 ---------- */
   var loading = document.getElementById('mrp-loading');
+  // Once the game file failed to load, its message stays (later progress updates must not replace it).
+  var gameFileFailed = false;
   var loadingText = document.getElementById('mrp-loading-text');
   var progress = document.getElementById('mrp-progress');
 
@@ -340,7 +342,7 @@
     printErr: mrpDebug ? function (t) { console.error(t); } : function () {},
     canvas: canvas,
     setStatus: function (text) {
-      if (!text) return;
+      if (!text || gameFileFailed) return;
       var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
       if (m) {
         progress.value = parseFloat(m[2]) * 100;
@@ -353,6 +355,7 @@
     totalDependencies: 0,
     monitorRunDependencies: function (left) {
       this.totalDependencies = Math.max(this.totalDependencies, left);
+      if (gameFileFailed) return;
       loadingText.textContent = left ? '准备文件…(' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : '下载完成';
     }
   };
@@ -380,7 +383,12 @@
         var parent = v.substring(0, v.lastIndexOf('/'));
         var name = v.substring(v.lastIndexOf('/') + 1);
         if (name === 'dsm_gm.mrp') {
-          FS.createPreloadedFile(parent, name, f, true, true);   // 游戏本体
+          // 游戏本体。未随包的游戏从公共镜像下载（apps/web/src/maopao.js），断网时给出明确提示，而不是笼统的启动失败。
+          FS.createPreloadedFile(parent, name, f, true, true, null, function () {
+            gameFileFailed = true;
+            loading.classList.remove('hide');
+            loadingText.textContent = /^https?:/i.test(f) ? '该游戏需联网下载，请检查网络后重试' : '游戏文件加载失败';
+          });
         } else {
           FS.createPreloadedFile(parent, name, FS_ROOT + v, true, true);
         }
