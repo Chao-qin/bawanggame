@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { KeyboardCanvas } from '../keyboard/KeyboardCanvas.jsx'
-import { FLASH_LANDSCAPE, FLASH_PORTRAIT, getLayout, layoutGroup } from '../keyboard/layouts.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { flashCodeOf } from '../keyboard/system.js'
 import { keyHaptic } from './haptics.js'
 import { directionCodes, FLASH_KEYS_EVENT, keyLegend, keyOfCode, readFlashKeys, writeFlashKeys } from './flash-keys.js'
+import { ScreenKeypad } from './ScreenKeypad.jsx'
+
+const FLASH_KEYPAD_CLASSES = { base: 'flashKeypad', full: 'flashKeypadFull', left: 'flashKeypadNav', right: 'flashKeypadActions', wide: 'flashKeypadWide' }
 
 function sendKey(target, code, type) {
   target.dispatchEvent(new KeyboardEvent(type, { key: keyOfCode(code), code, bubbles: true, cancelable: true }))
@@ -40,17 +42,20 @@ function withKeys(layout, keys) {
 }
 
 /**
- * The Flash gamepad, drawn by the same canvas keyboard as the T9 keypad: a direction wheel (OK at its hub) and A / B.
- * A portrait layout shows it under the screen, a landscape one splits it into the two side columns. Keys are
- * delivered to the Ruffle player as keyboard events; a key held by two fingers is released only when both lift.
+ * The Flash on-screen keyboard: any keyboard of the catalog (keyboard/system.js), the gamepad (direction wheel with OK,
+ * A / B) by default. Keys are delivered to the Ruffle player as keyboard events — the gamepad's with this game's keys,
+ * a T9 key as the key a phone keyboard would send; a key held by two fingers is released only when both lift.
  */
-export function FlashKeypad({ target, visible, layout, opacity, keys }) {
+export function FlashKeypad({ target, visible, layout, opacity, keys, prefs, update }) {
   const counts = useRef(new Map())
+  // The code each finger's key sent, so it releases the same one even if the game's keys change meanwhile.
+  const held = useRef(new Map())
 
   const releaseAll = useCallback(() => {
     if (!target) return
     for (const code of counts.current.keys()) sendKey(target, code, 'keyup')
     counts.current.clear()
+    held.current.clear()
   }, [target])
 
   useEffect(() => {
@@ -71,37 +76,33 @@ export function FlashKeypad({ target, visible, layout, opacity, keys }) {
   // A remapped key must not stay held under its old code.
   useEffect(() => releaseAll, [keys, releaseAll])
 
-  const layouts = useMemo(() => {
-    if (layout !== 'landscape') return [['flashKeypadFull', withKeys(getLayout(FLASH_PORTRAIT), keys), 'Flash 手柄']]
-    const landscape = withKeys(getLayout(FLASH_LANDSCAPE), keys)
-    return [
-      ['flashKeypadNav', layoutGroup(landscape, 'nav'), 'Flash 手柄：方向'],
-      ['flashKeypadActions', layoutGroup(landscape, 'actions'), 'Flash 手柄：动作键'],
-    ]
-  }, [layout, keys])
-
-  const keyDown = useCallback((unit, _pointerId, event) => {
+  // The gamepad shows this game's keys on its buttons; other keyboards are drawn as they are.
+  const gamepadKeys = useCallback((piece) => (piece.id.startsWith('flash-') ? withKeys(piece, keys) : piece), [keys])
+  const keyDown = useCallback((unit, pointerId, event) => {
     if (!target) return
+    const code = flashCodeOf(unit, keys)
+    if (!code) return
     keyHaptic(event)
     target.focus({ preventScroll: true })
-    const count = counts.current.get(unit.value) || 0
-    counts.current.set(unit.value, count + 1)
-    if (count === 0) sendKey(target, unit.value, 'keydown')
-  }, [target])
-  const keyUp = useCallback((unit) => {
-    if (!target || !counts.current.has(unit.value)) return
-    const count = counts.current.get(unit.value) - 1
-    if (count > 0) counts.current.set(unit.value, count)
+    held.current.set(`${pointerId}:${unit.id}`, code)
+    const count = counts.current.get(code) || 0
+    counts.current.set(code, count + 1)
+    if (count === 0) sendKey(target, code, 'keydown')
+  }, [target, keys])
+  const keyUp = useCallback((unit, pointerId) => {
+    const id = `${pointerId}:${unit.id}`
+    const code = held.current.get(id)
+    held.current.delete(id)
+    if (!target || !code || !counts.current.has(code)) return
+    const count = counts.current.get(code) - 1
+    if (count > 0) counts.current.set(code, count)
     else {
-      counts.current.delete(unit.value)
-      sendKey(target, unit.value, 'keyup')
+      counts.current.delete(code)
+      sendKey(target, code, 'keyup')
     }
   }, [target])
 
   if (!target || !visible) return null
-  return layouts.map(([className, keyLayout, label]) => (
-    <div key={keyLayout.id} className={`flashKeypad ${className}`} style={{ opacity }} data-runtime-control="flash-keypad">
-      <KeyboardCanvas layout={keyLayout} accessibleLabel={label} onKeyDown={keyDown} onKeyUp={keyUp} />
-    </div>
-  ))
+  return <ScreenKeypad style={prefs.style} orientation={layout} family="flash" prefs={prefs} update={update}
+    classes={FLASH_KEYPAD_CLASSES} opacity={opacity} transformLayout={gamepadKeys} onPress={keyDown} onRelease={keyUp} control="flash-keypad" />
 }

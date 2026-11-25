@@ -310,11 +310,12 @@ export async function addFromFile(file, metadata = {}) {
   })
 }
 
-export async function addFromUrl(url, metadata = {}, signal) {
+/** Adds a SWF identified by `url`; `fetchBlob` fetches it some other way when the URL itself is not fetchable. */
+export async function addFromUrl(url, metadata = {}, signal, fetchBlob) {
   const sourceUrl = normalizedUrl(url)
   const dedupeKey = `url:${sourceUrl}`
   if (await has(dedupeKey)) throw alreadyExists()
-  const blob = await fetchSwf(sourceUrl, signal)
+  const blob = fetchBlob ? await validateSwf(await fetchBlob()) : await fetchSwf(sourceUrl, signal)
   return add({
     ...metadata,
     source: 'remote',

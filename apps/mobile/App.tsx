@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AppState, BackHandler, Pressable, StatusBar, Text, View, Vibration } from 'react-native'
+import { AppState, BackHandler, Linking, NativeModules, Platform, Pressable, StatusBar, Text, View, Vibration } from 'react-native'
 import { WebView } from 'react-native-webview'
 import type { WebViewErrorEvent, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview/lib/WebViewTypes'
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { startAssetServer, stopAssetServer } from './src/host/assetServer'
-import { injectedBridge, parseHostMessage } from './src/host/protocol'
+import { blobToBase64, onlineFiles, startAssetServer, stopAssetServer, webRoot } from './src/host/assetServer'
+import { injectedBridge, parseHostMessage, resolveRequestScript, type HostCapability } from './src/host/protocol'
 import { dispatchHapticMessage } from './src/host/haptics'
+import { handleOnlineRequest, type OnlineResult } from './src/host/onlineProxy'
+import { dispatchOrientationMessage } from './src/host/orientation'
 import { styles } from './src/host/styles'
 
 const MAX_START_ATTEMPTS = 2
 const BrowserView = WebView as any
+// Downloads are written into the served web root, which only Android copies to writable storage (assetServer.ts);
+// rotation needs the native module.
+const hostCapabilities: HostCapability[] = [
+  ...(Platform.OS === 'android' ? ['online.fetch' as const] : []),
+  ...(NativeModules.XiaochaoOrientation ? ['orientation.lock' as const] : []),
+]
+const bridgeScript = injectedBridge(hostCapabilities)
 
 function AppContent() {
   const webViewRef = useRef<any>(null)
@@ -75,6 +84,20 @@ function AppContent() {
       dispatchHapticMessage(message, Vibration)
       return
     }
+    if (dispatchOrientationMessage(message, NativeModules.XiaochaoOrientation)) return
+    if (message.type === 'online.fetch' && message.id) {
+      const id = message.id
+      const reply = (result: OnlineResult) => webViewRef.current?.injectJavaScript(resolveRequestScript(id, result))
+      const path = (message.payload as { path?: unknown } | undefined)?.path
+      const root = webRoot()
+      if (typeof path !== 'string' || !root) {
+        reply({ status: 503, body: { error: 'host_not_ready' } })
+        return
+      }
+      handleOnlineRequest(path, { fetch, files: onlineFiles, webRoot: root, blobToBase64 })
+        .then(reply, (cause: unknown) => reply({ status: 502, body: { error: String(cause) } }))
+      return
+    }
     if (message.type === 'navigation.back' && typeof message.payload === 'object' && message.payload !== null && 'handled' in message.payload && message.payload.handled === false) {
       BackHandler.exitApp()
     }
@@ -91,6 +114,13 @@ function AppContent() {
 
   const handleNavigation = (_state: WebViewNavigation) => {
     // The bundled page is the only allowed origin; game links stay in the WebView.
+  }
+
+  // An external page (e.g. the 52java 「打开原站」 link) opens in the system browser instead of replacing the app.
+  const handleShouldStartLoad = (request: { url: string }) => {
+    if (!/^https?:\/\//i.test(request.url) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(request.url)) return true
+    Linking.openURL(request.url).catch(() => {})
+    return false
   }
 
   return (
@@ -110,10 +140,11 @@ function AppContent() {
               allowsFullscreenVideo
               mixedContentMode="always"
               setSupportMultipleWindows={false}
-              injectedJavaScriptBeforeContentLoaded={injectedBridge}
+              injectedJavaScriptBeforeContentLoaded={bridgeScript}
               onMessage={handleMessage}
               onError={handleWebError}
               onNavigationStateChange={handleNavigation}
+              onShouldStartLoadWithRequest={handleShouldStartLoad}
               onLoadEnd={() => { syncInsets(); setAttempt(0) }}
             />
           ) : error ? (

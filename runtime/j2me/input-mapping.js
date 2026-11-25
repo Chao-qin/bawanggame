@@ -1,3 +1,8 @@
+// The one input engine of every runtime keyboard family (apps/web/src/keyboard/system.js describes them for the UI):
+//   phone  J2ME and MRP: the T9 keypad's 21 actions;
+//   flash  the Flash gamepad: directions, OK, A and B, which the player turns into the game's keyboard keys.
+// Bindings resolve per game (xiaochao.input.v1.<gameId>), else the family's global choice from the 「键盘」 page
+// (xiaochao.input.v1.global.<family>), else the defaults below.
 (function (root) {
   var ACTIONS = ["up", "down", "left", "right", "ok", "choice", "back", "ret", "clear", "star", "pound"];
   for (var digit = 0; digit <= 9; digit++) ACTIONS.push("num" + digit);
@@ -14,11 +19,26 @@
   };
   for (var keyDigit = 0; keyDigit <= 9; keyDigit++) KEY_DEFAULTS[String(keyDigit)] = "num" + keyDigit;
 
+  // Shoulder buttons are the soft keys (they used to name "soft1"/"soft2", which are not actions, so did nothing).
   var GAMEPAD_DEFAULTS = {
     "button:0": "ok", "button:1": "back", "button:2": "choice", "button:3": "clear",
-    "button:4": "soft1", "button:5": "soft2", "button:8": "ret",
+    "button:4": "choice", "button:5": "back", "button:8": "ret",
     "button:12": "up", "button:13": "down", "button:14": "left", "button:15": "right",
     "axis:0:-": "left", "axis:0:+": "right", "axis:1:-": "up", "axis:1:+": "down"
+  };
+
+  var FAMILIES = {
+    phone: { actions: ACTIONS, keyboard: KEY_DEFAULTS, gamepad: GAMEPAD_DEFAULTS },
+    // A Flash game reads the real keyboard itself, so no keyboard key is taken over unless the player binds one.
+    flash: {
+      actions: ["up", "down", "left", "right", "ok", "a", "b"],
+      keyboard: {},
+      gamepad: {
+        "button:0": "a", "button:1": "b", "button:2": "a", "button:3": "b", "button:9": "ok",
+        "button:12": "up", "button:13": "down", "button:14": "left", "button:15": "right",
+        "axis:0:-": "left", "axis:0:+": "right", "axis:1:-": "up", "axis:1:+": "down"
+      }
+    }
   };
 
   var LEGACY_NAMES = {
@@ -26,23 +46,42 @@
     soft1: "choice", soft2: "back", clear: "clear", back: "ret"
   };
 
-  function validAction(action) { return ACTIONS.indexOf(action) >= 0; }
   function safeRead(key) {
     try { return JSON.parse(root.localStorage.getItem(key)) || {}; } catch (_) { return {}; }
   }
   function storageKey(id) { return "xiaochao.input.v1." + encodeURIComponent(String(id || "default")); }
+  function globalKey(family) { return "xiaochao.input.v1.global." + family; }
+  function familyOf(name) { return Object.prototype.hasOwnProperty.call(FAMILIES, name) ? name : "phone"; }
+  function bindingMap(value) { return value && typeof value === "object" && !Array.isArray(value) ? value : null; }
+
+  /** The family's global bindings (the 「键盘」 page), else its defaults; a saved map is complete, not a patch. */
+  function baseBindings(family) {
+    var defaults = FAMILIES[family];
+    var saved = safeRead(globalKey(family));
+    return {
+      keyboard: Object.assign({}, bindingMap(saved.keyboard) || defaults.keyboard),
+      gamepad: Object.assign({}, bindingMap(saved.gamepad) || defaults.gamepad)
+    };
+  }
 
   function create(options) {
     options = options || {};
     var sink = options.sink || {};
+    var family = familyOf(options.family);
+    var ACTIONS = FAMILIES[family].actions;
+    function validAction(action) { return ACTIONS.indexOf(action) >= 0; }
     var id = storageKey(options.gameId);
     var saved = safeRead(id);
-    var gamepadBindings = Object.assign({}, GAMEPAD_DEFAULTS, saved.gamepad || {});
-    var keyboardBindings = Object.assign({}, KEY_DEFAULTS);
+    var base = baseBindings(family);
+    // Whether this game has bindings of its own; otherwise it keeps following the global choice and saves none.
+    var ownKeyboard = Boolean(bindingMap(saved.keyboard));
+    var ownGamepad = Boolean(bindingMap(saved.gamepad));
+    var gamepadBindings = Object.assign({}, base.gamepad, saved.gamepad || {});
+    var keyboardBindings = Object.assign({}, base.keyboard);
     var legacy = options.legacyKeyboardMap || {};
     Object.keys(LEGACY_NAMES).forEach(function (name) {
       var key = legacy[name];
-      if (key) keyboardBindings[key] = LEGACY_NAMES[name];
+      if (key && validAction(LEGACY_NAMES[name])) keyboardBindings[key] = LEGACY_NAMES[name];
     });
     Object.assign(keyboardBindings, saved.keyboard || {});
 
@@ -104,6 +143,8 @@
 
     function onKeyDown(event) {
       if (destroyed || !options.keyboard) return;
+      // The Flash player answers bound keys with keyboard events of its own; only real key presses are input.
+      if (options.trustedOnly && !event.isTrusted) return;
       var target = event.target;
       if (captureAction) {
         event.preventDefault();
@@ -112,6 +153,7 @@
         captureDown["keyboard:" + capturedKey] = true;
         Object.keys(keyboardBindings).forEach(function (key) { if (keyboardBindings[key] === captureAction) delete keyboardBindings[key]; });
         keyboardBindings[capturedKey] = captureAction;
+        ownKeyboard = true;
         var action = captureAction;
         captureAction = null;
         persist();
@@ -130,6 +172,7 @@
     }
 
     function onKeyUp(event) {
+      if (options.trustedOnly && !event.isTrusted) return;
       var source = "keyboard:" + (event.code || event.key);
       if (captureDown[source]) {
         delete captureDown[source];
@@ -147,7 +190,7 @@
 
     function persist() {
       try {
-        root.localStorage.setItem(id, JSON.stringify({ keyboard: keyboardBindings, gamepad: gamepadBindings }));
+        root.localStorage.setItem(id, JSON.stringify({ keyboard: ownKeyboard ? keyboardBindings : undefined, gamepad: ownGamepad ? gamepadBindings : undefined }));
       } catch (_) {}
     }
 
@@ -183,6 +226,7 @@
             if (gamepadBindings[control] === captureAction) delete gamepadBindings[control];
           });
           gamepadBindings[captured] = captureAction;
+          ownGamepad = true;
           var action = captureAction;
           captureAction = null;
           persist();
@@ -304,6 +348,7 @@
       setKeyboardBinding: function (action, control) {
         if (!validAction(action) || typeof control !== "string") return false;
         keyboardBindings[control] = action;
+        ownKeyboard = true;
         persist();
         return true;
       },
@@ -311,13 +356,18 @@
         if (!validAction(action) || typeof control !== "string") return false;
         Object.keys(gamepadBindings).forEach(function (key) { if (gamepadBindings[key] === action) delete gamepadBindings[key]; });
         gamepadBindings[control] = action;
+        ownGamepad = true;
         persist();
         return true;
       },
-      resetGamepadBindings: function () { gamepadBindings = Object.assign({}, GAMEPAD_DEFAULTS); persist(); },
-      resetKeyboardBindings: function () { keyboardBindings = Object.assign({}, KEY_DEFAULTS); persist(); },
+      family: family,
+      // 「恢复默认」 in a game returns to the family's global choice.
+      // and drops the game's own bindings, so later global changes reach it again.
+      resetGamepadBindings: function () { gamepadBindings = baseBindings(family).gamepad; ownGamepad = false; persist(); },
+      resetKeyboardBindings: function () { keyboardBindings = baseBindings(family).keyboard; ownKeyboard = false; persist(); },
       clearGamepadBinding: function (action) {
         Object.keys(gamepadBindings).forEach(function (key) { if (gamepadBindings[key] === action) delete gamepadBindings[key]; });
+        ownGamepad = true;
         persist();
       },
       captureGamepad: function (action) { if (validAction(action)) captureAction = action; },
@@ -342,5 +392,17 @@
     };
   }
 
-  root.InputMapping = { actions: ACTIONS.slice(), defaults: { gamepad: Object.assign({}, GAMEPAD_DEFAULTS), keyboard: Object.assign({}, KEY_DEFAULTS) }, create: create };
+  function familyInfo(name) {
+    var definition = FAMILIES[familyOf(name)];
+    return { actions: definition.actions.slice(), defaults: { keyboard: Object.assign({}, definition.keyboard), gamepad: Object.assign({}, definition.gamepad) } };
+  }
+
+  root.InputMapping = {
+    actions: ACTIONS.slice(),
+    defaults: { gamepad: Object.assign({}, GAMEPAD_DEFAULTS), keyboard: Object.assign({}, KEY_DEFAULTS) },
+    families: Object.keys(FAMILIES),
+    family: familyInfo,
+    globalKey: globalKey,
+    create: create
+  };
 })(window);

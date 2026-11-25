@@ -27,3 +27,16 @@ test('keys are saved per game and announced', () => {
 test('the key a game reads for each code', () => {
   assert.deepEqual(['Space', 'KeyX', 'ShiftLeft', 'ControlLeft', 'Enter', 'ArrowUp'].map(keyOfCode), [' ', 'x', 'Shift', 'Control', 'Enter', 'ArrowUp'])
 })
+
+test('a game without its own keys uses the 「键盘」 page default, and its own choice starts from it', async () => {
+  const { readFlashKeys, writeFlashKeys, FLASH_KEYS_DEFAULT_GAME } = await import('./flash-keys.js')
+  const values = new Map()
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) }
+  const target = { dispatchEvent: () => {} }
+  writeFlashKeys(FLASH_KEYS_DEFAULT_GAME, { a: 'KeyZ' }, { storage, target })
+  assert.equal(readFlashKeys('new.swf', storage).a, 'KeyZ')
+  const own = writeFlashKeys('mine.swf', { b: 'KeyC' }, { storage, target })
+  assert.deepEqual([own.a, own.b], ['KeyZ', 'KeyC'])
+  writeFlashKeys(FLASH_KEYS_DEFAULT_GAME, { a: 'Space' }, { storage, target })
+  assert.equal(readFlashKeys('mine.swf', storage).a, 'KeyZ', 'a game\'s own choice stays')
+})

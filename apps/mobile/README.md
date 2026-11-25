@@ -40,16 +40,18 @@ pnpm mobile:verify-web
 
 可用 `base64 <release.keystore`（macOS 可用 `base64 -i release.keystore`）生成 base64 内容。签名密钥只保存在 GitHub Actions secrets 中，不要提交到仓库。工作流从 tag 设置 Android `versionName`，并用 GitHub Actions run number 设置递增的 `versionCode`。
 
-需要让 APK 使用 52java 商城时，构建前设置 Node 服务的可访问地址：
+52java 商城与 Flash 商城（Flash 保存计划）在安装包中开箱即用：页面的商城请求由 RN 宿主直接访问 52emu / flash.homes（原生请求不受 CORS 限制，见 `src/host/onlineProxy.ts`），下载的 JAR / SWF 先写入本地静态目录 `__downloads/`，再由页面读入本机库；该目录在每次启动时清空。页面与桌面 Node 代理共用同一套页面解析（`apps/server/src/javaCatalog.ts`、`flashCatalog.ts`）。
+
+如需改用自建的 Node 服务，可在构建时设置（可选）：
 
 ```bash
-MOBILE_52JAVA_API_BASE=http://192.168.0.100:8080 pnpm mobile:build-android
+MOBILE_52JAVA_API_BASE=https://your-server.example pnpm mobile:build-android
 ```
 
-手机和 Node 服务必须在同一局域网；正式环境应使用 HTTPS 公网地址。未设置该变量时，APK 仍可离线运行内置游戏，商城会显示未配置提示。
+发布包的 J2ME 游戏清单由构建时生成的 `web/jar-manifest.json` 提供，内置 JAR 的图标同时导出到 `web/jar-icons/`，不需要桌面 Node 服务。
+冒泡社区列出全部 664 款游戏：兼容扫描确认能运行的 32 款打进安装包、可离线游玩；其余标记「需联网」，启动时从 vmrp.github.io 公共镜像加载。“大宋豪侠 · 本地复活”仍需要单独运行 `dasong-server`。
 
-发布包的 J2ME 游戏清单由构建时生成的 `web/jar-manifest.json` 提供，内置 JAR 不需要桌面 Node 服务。
-52java 商城是在线目录，安装包中会明确显示离线提示；“大宋豪侠 · 本地复活”仍需要单独运行 `dasong-server`。
+「屏幕方向」选择横屏或竖屏时，宿主通过原生模块 `XiaochaoOrientation`（`android/.../XiaochaoOrientationModule.kt`）旋转整个 Activity；选择「跟随手机」时交还给重力感应。
 
 Flash 商城不把用户游戏上传到服务器。通过商城 URL 或本地文件加入的 SWF 保存在当前浏览器/WebView 的 IndexedDB 中，Flash 库可在离线时继续启动；远程 URL 需要目标站点允许浏览器 CORS 读取。
 

@@ -10,11 +10,12 @@ import { createGzip } from 'node:zlib'
 import { WebSocketServer, WebSocket } from 'ws'
 import yauzl from 'yauzl'
 import { parseFlashArchiveDetail, parseFlashArchiveGames, type FlashArchiveGame } from './flashCatalog.js'
+import { allowedStoreUrl, isZipHeader, JAVA_DEFAULT_BASE, parseStoreCatalog, parseStoreDetail, storeCatalogQuery, storeCatalogUrl, storeDetailUrl, storeHosts, storeJarName, validStoreId, type StoreCatalog, type StoreCatalogQuery, type StoreGame } from './javaCatalog.js'
 
 const PROJECT = resolve(import.meta.dirname, '../../..')
 const PORT = Number(process.env.PORT ?? 8080)
-const JAVA_BASE = (process.env['52JAVA_BASE_URL'] ?? 'https://java.52emu.cn').replace(/\/$/, '')
-const JAVA_HOSTS = new Set([new URL(JAVA_BASE).hostname, ...(new URL(JAVA_BASE).hostname === 'java.52emu.cn' ? ['d2.52emu.cn'] : [])])
+const JAVA_BASE = (process.env['52JAVA_BASE_URL'] ?? JAVA_DEFAULT_BASE).replace(/\/$/, '')
+const JAVA_HOSTS = storeHosts(JAVA_BASE)
 const JAVA_MAX_BYTES = Number(process.env['52JAVA_MAX_BYTES'] ?? 64 * 1024 * 1024)
 const FLASH_HOMES_BASE = (process.env.FLASH_HOMES_BASE_URL ?? 'https://flash.homes').replace(/\/$/, '')
 const FLASH_MAX_BYTES = Number(process.env.FLASH_MAX_BYTES ?? 128 * 1024 * 1024)
@@ -30,8 +31,6 @@ const MIME: Record<string, string> = {
   '.jar': 'application/java-archive', '.mrp': 'application/octet-stream',
 }
 
-type StoreGame = { id: string; name: string; plays: number }
-type StoreCatalog = { games: StoreGame[]; page: number; pages: number; total: number }
 const storeCache = new Map<string, { expires: number; value: StoreCatalog }>()
 const flashArchiveCache = new Map<string, { expires: number; value: FlashArchiveGame[] }>()
 
@@ -44,10 +43,6 @@ function json(res: ServerResponse, status: number, value: unknown) {
     'Cache-Control': 'no-cache',
   })
   res.end(JSON.stringify(value))
-}
-
-function htmlText(value: string) {
-  return value.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).trim()
 }
 
 async function flashHomesPage(path: string) {
@@ -66,74 +61,31 @@ async function flashArchiveCatalog(query: string) {
   return games
 }
 
-function parseStoreCatalog(html: string, page: number): StoreCatalog {
-  const start = html.search(/<div\s+id=["']results["'][^>]*>/i)
-  const tail = start < 0 ? '' : html.slice(start)
-  const end = tail.indexOf('</div>\n<script')
-  const results = end < 0 ? '' : tail.slice(0, end)
-  const games: StoreGame[] = []
-  for (const match of results.matchAll(/<a\s+[^>]*href=["']game\.php\?id=(\d+)["'][^>]*>([\s\S]*?)<\/a>\s*\((\d+)\)/gi)) {
-    games.push({ id: match[1], name: htmlText(match[2]), plays: Number(match[3]) })
-  }
-  const pages = Number(results.match(/共\s*(\d+)\s*页/)?.[1] ?? 1)
-  const total = Number(results.match(/共\s*\d+\s*页\s*(\d+)\s*条/)?.[1] ?? games.length)
-  return { games, page, pages: Math.max(1, pages), total }
-}
-
-async function storeCatalog(options: { page: number; query: string; category: string; force: boolean }): Promise<StoreCatalog> {
+async function storeCatalog(options: StoreCatalogQuery): Promise<StoreCatalog> {
   const key = `${options.page}:${options.query}:${options.category}`
   const cached = storeCache.get(key)
   if (!options.force && cached && cached.expires > Date.now()) return cached.value
-  try {
-    const url = new URL('/index.php', JAVA_BASE)
-    if (options.query) {
-      url.searchParams.set('nkey', options.query)
-      url.searchParams.set('qiqi', '搜索游戏')
-    } else if (!options.category) {
-      // 52emu ignores nsort when q=all is present.
-      url.searchParams.set('q', 'all')
-    }
-    if (options.category) url.searchParams.set('nsort', options.category)
-    url.searchParams.set('p', String(options.page))
-    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
-    if (!response.ok) throw new Error(`catalog HTTP ${response.status}`)
-    const html = await response.text()
-    const value = parseStoreCatalog(html, options.page)
-    if (!html.includes('id="results"') && !html.includes("id='results'")) throw new Error('52emu catalog markup was not recognized')
-    storeCache.set(key, { expires: Date.now() + 60_000, value })
-    return value
-  } catch (error) { throw error }
-}
-
-function allowedStoreUrl(raw: string) {
-  const url = new URL(raw)
-  if (!['https:', 'http:'].includes(url.protocol) || !JAVA_HOSTS.has(url.hostname) || url.username || url.password || url.port) throw new Error('source is outside 52emu allowlist')
-  return url
+  const response = await fetch(storeCatalogUrl(JAVA_BASE, options), { signal: AbortSignal.timeout(10_000) })
+  if (!response.ok) throw new Error(`catalog HTTP ${response.status}`)
+  const value = parseStoreCatalog(await response.text(), options.page)
+  storeCache.set(key, { expires: Date.now() + 60_000, value })
+  return value
 }
 
 async function storeDownload(res: ServerResponse, id: string) {
-  if (!/^\d{1,8}$/.test(id)) return json(res, 400, { error: 'invalid_game_id' })
+  if (!validStoreId(id)) return json(res, 400, { error: 'invalid_game_id' })
   try {
-    const detailUrl = new URL('/game.php', JAVA_BASE)
-    detailUrl.searchParams.set('id', id)
-    const detailResponse = await fetch(detailUrl, { signal: AbortSignal.timeout(10_000) })
+    const detailResponse = await fetch(storeDetailUrl(JAVA_BASE, id), { signal: AbortSignal.timeout(10_000) })
     if (!detailResponse.ok) return json(res, 502, { error: `game detail HTTP ${detailResponse.status}` })
-    const detail = await detailResponse.text()
-    const titleMarkup = detail.match(/<div\s+class=["']results["'][^>]*>\s*<h2>([\s\S]*?)<\/h2>/i)?.[1] ?? ''
-    const title = htmlText(titleMarkup.split(/\s*\[<a\b/i)[0])
-    if (!title) return json(res, 404, { error: 'game_not_found' })
-    const download = detail.match(/href=["']download\.php\?id=(\d+)&amp;xid=(\d+)["']/i)
-    if (!download || download[1] !== id) return json(res, 404, { error: 'download_not_found' })
-    const game: StoreGame = { id, name: title, plays: 0 }
-    const downloadUrl = new URL('/download.php', JAVA_BASE)
-    downloadUrl.searchParams.set('id', id)
-    downloadUrl.searchParams.set('xid', download[2])
-    const source = allowedStoreUrl(downloadUrl.toString())
+    const detail = parseStoreDetail(await detailResponse.text(), id, JAVA_BASE)
+    if ('error' in detail) return json(res, 404, { error: detail.error })
+    const { game, downloadUrl } = detail
+    const source = allowedStoreUrl(downloadUrl.toString(), JAVA_HOSTS)
     const response = await fetch(source, { signal: AbortSignal.timeout(30_000), redirect: 'manual' })
     if (response.status >= 300 && response.status < 400) {
       const redirect = response.headers.get('location')
       if (!redirect) return json(res, 502, { error: 'invalid_download_redirect' })
-      const target = allowedStoreUrl(new URL(redirect, source).toString())
+      const target = allowedStoreUrl(new URL(redirect, source).toString(), JAVA_HOSTS)
       const redirected = await fetch(target, { signal: AbortSignal.timeout(30_000), redirect: 'manual' })
       if (redirected.status >= 300 && redirected.status < 400) return json(res, 502, { error: 'too_many_download_redirects' })
       return await streamStoreResponse(res, game, redirected)
@@ -156,11 +108,8 @@ async function streamStoreResponse(res: ServerResponse, game: StoreGame, respons
       prefix.push(part.value)
       prefixLength += part.value.byteLength
     }
-    const firstBytes = Buffer.concat(prefix.map(part => Buffer.from(part)))
-    if (firstBytes.readUInt32BE(0) !== 0x504b0304) return json(res, 415, { error: `not_a_jar (${contentType})` })
-    const baseName = (game.name || game.id).replace(/[^\w\u4e00-\u9fff.-]+/g, '_').slice(0, 80) || game.id
-    const name = baseName.toLowerCase().endsWith('.jar') ? baseName : `${baseName}.jar`
-    const encodedName = encodeURIComponent(name)
+    if (!isZipHeader(Buffer.concat(prefix.map(part => Buffer.from(part))))) return json(res, 415, { error: `not_a_jar (${contentType})` })
+    const encodedName = encodeURIComponent(storeJarName(game))
     res.writeHead(200, {
       'Access-Control-Allow-Origin': '*',
       'Content-Type': 'application/java-archive',
@@ -352,8 +301,7 @@ const server = createServer(async (req, res) => {
   }
   if (url.pathname === '/__52java/catalog') {
     try {
-      const page = Math.min(371, Math.max(1, Number(url.searchParams.get('page')) || 1))
-      const catalog = await storeCatalog({ page, query: (url.searchParams.get('query') || '').trim().slice(0, 80), category: (url.searchParams.get('category') || '').replace(/\D/g, '').slice(0, 2), force: url.searchParams.get('refresh') === '1' })
+      const catalog = await storeCatalog(storeCatalogQuery(url.searchParams))
       return json(res, 200, { source: JAVA_BASE, siteUrl: JAVA_BASE, ...catalog })
     } catch (error) {
       console.error('52emu catalog error:', error)

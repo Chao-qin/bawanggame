@@ -1,5 +1,6 @@
 import { Button, Card } from 'antd-mobile'
 import { useState } from 'react'
+import { mrpBadges } from '../maopao.js'
 
 function initialFor(value) {
   return (value || '?').trim().charAt(0).toUpperCase()
@@ -26,7 +27,7 @@ export function LibraryGameEntry({ game, onOpen, selected, selecting, disabled }
     <GameArtwork src={game.iconUrl} name={game.name} className="cardIcon" />
     <span className="gameEntryInfo">
       <span className="cardName">{game.name}</span>
-      <span className="cardMeta">{[game.vendor, formatSize(game.size), game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机' : ''].filter(Boolean).join(' · ') || '\u00a0'}</span>
+      <span className="cardMeta">{[game.vendor, formatSize(game.size), game.kind === 'j2me' ? (game.local ? '本机已安装' : '服务器提供') : game.local ? '本机' : '', ...(game.kind === 'maopao' ? mrpBadges(game) : [])].filter(Boolean).join(' · ') || '\u00a0'}</span>
     </span>
   </button>
 }

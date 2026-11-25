@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
-import { KeyboardCanvas } from '../keyboard/KeyboardCanvas.jsx'
-import { getLayout, layoutGroup, T9_LANDSCAPE, T9_PORTRAIT } from '../keyboard/layouts.js'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { phoneActionOf, screenKeypad } from '../keyboard/system.js'
 import { effectiveLayout, effectiveOpacity, effectivePlacement, KEYPAD_PREFS_EVENT, readKeypadPrefs, writeKeypadPrefs } from './keypad-prefs.js'
 import { keyHaptic } from './haptics.js'
+import { ScreenKeypad } from './ScreenKeypad.jsx'
 import './runtime-keypad.css'
 
 /** The keypad choice of a runtime family ('phone' for J2ME and MRP, 'flash'), kept in sync across every component
@@ -78,6 +78,8 @@ export function useKeypadStage(prefs, { mrp = false } = {}) {
   useLayoutEffect(() => {
     const body = document.body
     body.dataset.keypadStyle = prefs.style
+    // A wide keyboard (keyboard/system.js split = false) floats in landscape, so the screen takes the whole stage.
+    body.dataset.keypadWide = String(screenKeypad(prefs.style)?.split === false)
     body.dataset.keypadPlacement = placement
     body.dataset.keypadVisible = String(prefs.visible)
     body.dataset.screenFit = prefs.fit
@@ -102,25 +104,36 @@ export function useKeypadStage(prefs, { mrp = false } = {}) {
   }, [prefs.style, prefs.visible, placement, opacity, prefs.layout, prefs.fit, mrp])
 }
 
+const PHONE_KEYPAD_CLASSES = { base: 't9Keypad', full: 't9KeypadFull', left: 't9KeypadNav', right: 't9KeypadNumpad', wide: 't9KeypadWide' }
+
+// The gamepad's A / B legends name the keys a Flash game gets; on a phone they are OK and the right soft key.
+const PHONE_GAMEPAD_LEGENDS = { 'flash-a': '确认', 'flash-b': '返回' }
+const phoneLayout = (layout) => (layout.id.startsWith('flash-')
+  ? { ...layout, keys: layout.keys.map((item) => (PHONE_GAMEPAD_LEGENDS[item.id] ? { ...item, secondaryLegend: PHONE_GAMEPAD_LEGENDS[item.id] } : item)) }
+  : layout)
+
+/** The phone runtimes' on-screen keyboard: any keyboard of the catalog except the classic DOM keypad. A key presses
+ *  its phone action (keyboard/system.js phoneActionOf) through the runtime's input controller. */
 export function RuntimeKeypad({ prefs }) {
   const orientation = useRuntimeOrientation()
-  const layouts = useMemo(() => {
-    if (orientation !== 'landscape') return [['t9KeypadFull', getLayout(T9_PORTRAIT), 'T9 手机键盘']]
-    const landscape = getLayout(T9_LANDSCAPE)
-    return [
-      ['t9KeypadNav', layoutGroup(landscape, 'nav'), 'T9 手机键盘：方向与软键'],
-      ['t9KeypadNumpad', layoutGroup(landscape, 'numpad'), 'T9 手机键盘：数字键'],
-    ]
-  }, [orientation])
-  const keyDown = useCallback((key, pointerId, event) => {
+  const [, update] = useKeypadPrefs('phone')
+  // The action each finger pressed, so it releases the same one even if the bindings change meanwhile.
+  const held = useRef(new Map())
+  const keyDown = useCallback((unit, pointerId, event) => {
+    const action = phoneActionOf(unit, window.__XIAOCHAO_INPUT_CONTROLLER__?.keyboardBindings?.())
+    if (!action) return
     keyHaptic(event, window.config?.vibrate)
-    sendAction(key.value, true, pointerId)
+    held.current.set(`${pointerId}:${unit.id}`, action)
+    sendAction(action, true, pointerId)
   }, [])
-  const keyUp = useCallback((key, pointerId) => sendAction(key.value, false, pointerId), [])
-  if (prefs.style !== 't9' || !prefs.visible) return null
-  return layouts.map(([className, layout, label]) => (
-    <div key={layout.id} className={`t9Keypad ${className}`} data-runtime-control="t9-keypad">
-      <KeyboardCanvas layout={layout} accessibleLabel={label} onKeyDown={keyDown} onKeyUp={keyUp} />
-    </div>
-  ))
+  const keyUp = useCallback((unit, pointerId) => {
+    const key = `${pointerId}:${unit.id}`
+    const action = held.current.get(key)
+    if (!action) return
+    held.current.delete(key)
+    sendAction(action, false, pointerId)
+  }, [])
+  if (prefs.style === 'classic' || !prefs.visible) return null
+  return <ScreenKeypad style={prefs.style} orientation={orientation} family="phone" prefs={prefs} update={update}
+    classes={PHONE_KEYPAD_CLASSES} transformLayout={phoneLayout} onPress={keyDown} onRelease={keyUp} control="t9-keypad" />
 }

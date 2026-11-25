@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DEFAULT_KEYPAD_PREFS, effectiveLayout, effectiveOpacity, effectivePlacement, KEYPAD_PREFS_EVENT, KEYPAD_PREFS_KEY, normalizeKeypadPrefs, readKeypadPrefs, writeKeypadPrefs } from './keypad-prefs.js'
+import { clampScale, DEFAULT_KEYPAD_PREFS, effectiveLayout, effectiveOpacity, effectivePlacement, KEYPAD_PREFS_EVENT, KEYPAD_PREFS_KEY, normalizeKeypadPrefs, readKeypadPrefs, writeKeypadPrefs } from './keypad-prefs.js'
 
 const memoryStorage = (initial = {}) => {
   const values = new Map(Object.entries(initial))
   return { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) }
 }
-const PHONE_DEFAULTS = { style: 't9', visible: true, placement: 'docked', opacity: 'auto', layout: 'auto', fit: 'contain' }
+const PHONE_DEFAULTS = { style: 't9', visible: true, placement: 'docked', opacity: 'auto', layout: 'auto', fit: 'contain', scale: 1, offsets: {} }
 
 test('T9 docked, shown, auto opacity and layout, whole picture is the default; unknown values fall back to it', () => {
   assert.deepEqual(DEFAULT_KEYPAD_PREFS, PHONE_DEFAULTS)
@@ -26,7 +26,7 @@ test('a change is merged, saved and announced to the document', () => {
   const target = { dispatchEvent: (event) => events.push(event) }
   writeKeypadPrefs({ placement: 'floating' }, { storage, target })
   const saved = writeKeypadPrefs({ style: 'classic', visible: false, opacity: '0.8', layout: 'landscape', fit: 'height' }, { storage, target })
-  assert.deepEqual(saved, { style: 'classic', visible: false, placement: 'floating', opacity: '0.8', layout: 'landscape', fit: 'height' }, 'the earlier choice is kept')
+  assert.deepEqual(saved, { style: 'classic', visible: false, placement: 'floating', opacity: '0.8', layout: 'landscape', fit: 'height', scale: 1, offsets: {} }, 'the earlier choice is kept')
   assert.deepEqual(readKeypadPrefs(storage), saved)
   assert.deepEqual(events.map((event) => [event.type, event.detail]), [
     [KEYPAD_PREFS_EVENT, { ...PHONE_DEFAULTS, placement: 'floating' }],
@@ -42,7 +42,9 @@ test('Flash keeps its own choice, apart from the J2ME / MRP one, and its first-r
   writeKeypadPrefs({ visible: false }, { storage, target, family: 'flash' })
   assert.equal(readKeypadPrefs(storage, 'flash').visible, false)
   assert.equal(readKeypadPrefs(storage).visible, true, 'Flash choice does not leak into phones')
-  assert.equal(normalizeKeypadPrefs({ style: 't9' }, 'flash').style, 'gamepad', 'a phone style is not a Flash style')
+  assert.equal(normalizeKeypadPrefs({ style: 'classic' }, 'flash').style, 'gamepad', 'the classic DOM keypad is a phone keypad only')
+  assert.equal(normalizeKeypadPrefs({ style: 't9' }, 'flash').style, 't9', 'every drawn keyboard serves Flash too')
+  assert.equal(normalizeKeypadPrefs({ style: 'full-size' }).style, 'full-size', 'and the phone runtimes')
   assert.deepEqual(normalizeKeypadPrefs({ style: 'hidden', placement: 'docked' }, 'flash'), { ...PHONE_DEFAULTS, style: 'gamepad', visible: false })
 })
 
@@ -50,6 +52,7 @@ test('only a keypad that can float is placed floating', () => {
   assert.equal(effectivePlacement({ style: 't9', placement: 'floating' }), 'floating')
   assert.equal(effectivePlacement({ style: 'classic', placement: 'floating' }), 'docked')
   assert.equal(effectivePlacement({ style: 'gamepad', placement: 'floating' }, 'flash'), 'floating')
+  assert.equal(effectivePlacement({ style: 'tkl', placement: 'floating' }), 'floating')
 })
 
 test('auto opacity is opaque docked and translucent floating; a chosen opacity applies either way', () => {
@@ -63,4 +66,14 @@ test('the layout follows the screen unless one is chosen', () => {
   assert.equal(effectiveLayout({ layout: 'auto' }, 'landscape'), 'landscape')
   assert.equal(effectiveLayout({ layout: 'portrait' }, 'landscape'), 'portrait')
   assert.equal(effectiveLayout({ layout: 'landscape' }, 'portrait'), 'landscape')
+})
+
+test('the floating keypad keeps its size in range and only well-formed dragged positions', () => {
+  assert.equal(clampScale(2), 1.6)
+  assert.equal(clampScale(0.1), 0.6)
+  assert.equal(clampScale(1.23), 1.2)
+  assert.equal(clampScale('x'), 1)
+  const prefs = normalizeKeypadPrefs({ scale: 0.8, offsets: { 'portrait:full': [0.1, -0.2], 'landscape:nav': [3, -3], bad: [0, 0], 'portrait:x': [1] } })
+  assert.equal(prefs.scale, 0.8)
+  assert.deepEqual(prefs.offsets, { 'portrait:full': [0.1, -0.2], 'landscape:nav': [1, -1] })
 })

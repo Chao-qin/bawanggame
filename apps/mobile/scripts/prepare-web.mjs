@@ -37,14 +37,23 @@ const jarEntries = fs.readdirSync(jarRoot, { withFileTypes: true })
   .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.jar'))
   .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
 const jarManifest = []
+// The desktop server extracts JAR icons on request (/__icon); the package has no server, so they are written out here.
+const iconRoot = path.join(target, 'jar-icons')
 for (const entry of jarEntries) {
   const bytes = await fs.promises.readFile(path.join(jarRoot, entry.name))
   let metadata = { name: entry.name.replace(/\.jar$/i, ''), vendor: '' }
+  let iconUrl = null
   try {
-    const { name, suiteName, vendor, version } = await jarReader.LocalJars.describe(entry.name, new Uint8Array(bytes).buffer)
+    const { name, suiteName, vendor, version, icon } = await jarReader.LocalJars.describe(entry.name, new Uint8Array(bytes).buffer)
     metadata = { name, suiteName, vendor, version }
+    if (icon && icon.size) {
+      const iconFile = `${entry.name.replace(/\.jar$/i, '')}.png`
+      fs.mkdirSync(iconRoot, { recursive: true })
+      fs.writeFileSync(path.join(iconRoot, iconFile), Buffer.from(await icon.arrayBuffer()))
+      iconUrl = `/jar-icons/${encodeURIComponent(iconFile)}`
+    }
   } catch (_) {}
-  jarManifest.push({ ...metadata, kind: 'j2me', file: entry.name, size: bytes.length, icon: false })
+  jarManifest.push({ ...metadata, kind: 'j2me', file: entry.name, size: bytes.length, icon: false, iconUrl })
 }
 fs.writeFileSync(path.join(target, 'jar-manifest.json'), `${JSON.stringify(jarManifest)}\n`, 'utf8')
 fs.rmSync(androidAssetsTarget, { recursive: true, force: true })

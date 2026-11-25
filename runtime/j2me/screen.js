@@ -300,19 +300,34 @@ var ScreenSetup = (function () {
     return innerWidth >= innerHeight ? "landscape" : "portrait";
   }
 
+  // The orientation the app is asked to turn to: the game's own, else the 「布局方向」 choice, else the device's.
+  function requestedOrientation() {
+    if (config.orientation === "portrait" || config.orientation === "landscape") return config.orientation;
+    var preferred = window.__XIAOCHAO_LAYOUT_PREFERENCE__;
+    return preferred === "portrait" || preferred === "landscape" ? preferred : "auto";
+  }
+
   function syncOrientation() {
     var value = resolvedOrientation();
     document.body.dataset.orientation = value;
+    // The app turns itself (apps/web/src/orientation.js: native host, screen lock or a rotated page).
+    if (window.__XIAOCHAO_ORIENTATION__) window.__XIAOCHAO_ORIENTATION__.request(requestedOrientation());
     return value;
   }
 
   function lockOrientation() {
     var value = resolvedOrientation();
+    if (window.__XIAOCHAO_ORIENTATION__) {
+      window.__XIAOCHAO_ORIENTATION__.request(requestedOrientation());
+      return Promise.resolve(requestedOrientation() !== "auto");
+    }
     if (config.orientation === "auto" || !screen.orientation || typeof screen.orientation.lock !== "function") return Promise.resolve(false);
     return screen.orientation.lock(value).then(function () { return true; }, function () { return false; });
   }
 
   function unlockOrientation() {
+    // The app's controller keeps the player's choice while the game runs; Player hands rotation back on exit.
+    if (window.__XIAOCHAO_ORIENTATION__) return;
     if (screen.orientation && typeof screen.orientation.unlock === "function") screen.orientation.unlock();
   }
 
