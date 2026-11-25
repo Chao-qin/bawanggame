@@ -2,10 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import UnoCSS from 'unocss/vite'
 
-const apiTarget = `http://127.0.0.1:${process.env.PORT || 8080}`
+const defaultApiPort = process.env.NODE_ENV === 'production' ? 8080 : 8000
+const apiTarget = `http://127.0.0.1:${process.env.PORT || defaultApiPort}`
 
 // 构建产物部署到小潮霸王项目根目录，由 Node 服务直接提供 React PWA 首页。
-// 模拟器内核资源在站点根路径，开发时代理到 8080。
+// 模拟器内核资源在站点根路径，开发时代理到 Node 服务端口。
 const proxyTargets = [
   '/__icon',
   '/__jars',

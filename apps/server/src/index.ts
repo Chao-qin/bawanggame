@@ -13,7 +13,8 @@ import { parseFlashArchiveDetail, parseFlashArchiveGames, type FlashArchiveGame 
 import { allowedStoreUrl, isZipHeader, JAVA_DEFAULT_BASE, parseStoreCatalog, parseStoreDetail, storeCatalogQuery, storeCatalogUrl, storeDetailUrl, storeHosts, storeJarName, validStoreId, type StoreCatalog, type StoreCatalogQuery, type StoreGame } from './javaCatalog.js'
 
 const PROJECT = resolve(import.meta.dirname, '../../..')
-const PORT = Number(process.env.PORT ?? 8080)
+const defaultPort = process.env.NODE_ENV === 'production' ? 8080 : 8000
+const PORT = Number(process.env.PORT ?? defaultPort)
 const JAVA_BASE = (process.env['52JAVA_BASE_URL'] ?? JAVA_DEFAULT_BASE).replace(/\/$/, '')
 const JAVA_HOSTS = storeHosts(JAVA_BASE)
 const JAVA_MAX_BYTES = Number(process.env['52JAVA_MAX_BYTES'] ?? 64 * 1024 * 1024)

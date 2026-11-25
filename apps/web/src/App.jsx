@@ -598,7 +598,7 @@ function Library({ kind, onPlay }) {
       {notice && <div className={notice.failed ? 'status statusError' : 'status statusSuccess'} role={notice.failed ? 'alert' : 'status'}>{notice.text}</div>}
       {!selectMode && kind !== 'flash' && <GameRow title="🔥 大家都在玩" items={historyGames(popular)} onOpen={openGame} />}
       {!selectMode && kind !== 'flash' && <GameRow title="🕘 最近在玩" items={historyGames(recent)} onOpen={openGame} />}
-      {server.error && <div className="status statusError" role="alert">在线列表加载失败：{server.error}（请确认本地服务已在 8080 端口运行）</div>}
+      {server.error && <div className="status statusError" role="alert">在线列表加载失败：{server.error}（请确认本地服务已运行）</div>}
       {(kind === 'j2me' ? local.error : localFlash.error) && (
         <div className="status statusError" role="alert">{kind === 'j2me' ? local.error : localFlash.error}</div>
       )}
