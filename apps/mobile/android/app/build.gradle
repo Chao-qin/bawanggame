@@ -87,8 +87,8 @@ android {
         applicationId "com.xiaochao.bawang"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
-        versionName System.getenv("ANDROID_VERSION_NAME") ?: "1.0"
+        versionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+        versionName = System.getenv("ANDROID_VERSION_NAME") ?: "1.0"
     }
     signingConfigs {
         debug {
