@@ -22,6 +22,7 @@ import { isEmbeddedHost, onlineAvailable, onlineFetch, onlineMode, onlineSourceU
 import { MRP_CATALOG_URL, normalizeMrpEntry } from './maopao.js'
 import { requestOrientation } from './orientation.js'
 import { RUNTIME_SHEET_EVENT } from './runtime/KeypadPiece.jsx'
+import { trackPlay } from './analytics.js'
 
 const KeyboardTestPage = lazy(() => import('./keyboard/KeyboardTestPage.jsx').then((module) => ({ default: module.KeyboardTestPage })))
 const KeyboardSystemPage = lazy(() => import('./keyboard/KeyboardSystemPage.jsx').then((module) => ({ default: module.KeyboardSystemPage })))
@@ -1273,6 +1274,11 @@ export default function App() {
   useEffect(() => {
     if (!playing) exitingRef.current = false
   }, [playing])
+
+  // One play per game entry, whichever document runs it (frame or app page); leaving the route ends it. A direct
+  // link is not one yet: it is first turned into lobby + game entry (below), which then starts the play.
+  const playedGame = location.state?.xiaochaoGameEntry ? game : null
+  useEffect(() => (playedGame ? trackPlay(playedGame) : undefined), [playedGame])
 
   useLayoutEffect(() => {
     if (!playing && libraryScroll.current !== null) {

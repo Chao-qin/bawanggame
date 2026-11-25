@@ -10,9 +10,12 @@ import { isRuntimeFrame } from './App.jsx'
 import { createApplicationRouter } from './router.jsx'
 import { installSelectionGuard } from './selection-guard.js'
 import { installOrientationController } from './orientation.js'
+import { installAnalytics } from './analytics.js'
 
 installSelectionGuard()
 const runtimeFrame = isRuntimeFrame()
+// The app page reports for the game frames too; off unless the build sets VITE_ANALYTICS_URL.
+if (!runtimeFrame) installAnalytics(import.meta.env.VITE_ANALYTICS_URL)
 // The J2ME / MRP frame turns itself (its own #root) and reaches the app host through the parent's bridge.
 installOrientationController()
 const router = createApplicationRouter(runtimeFrame)

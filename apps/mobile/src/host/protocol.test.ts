@@ -47,3 +47,19 @@ describe('injected bridge requests', () => {
     await expect(loadBridge().request('online.fetch', {})).rejects.toThrow('host_unavailable')
   })
 })
+
+describe('injected bridge identity', () => {
+  it('gives the page the app device id and platform', () => {
+    const window: Record<string, unknown> = { location: { href: 'http://127.0.0.1/', hash: '' }, dispatchEvent: () => true }
+    const id = '3f2b8c1e-0d4a-4b6e-9a7c-1e2d3f4a5b6c'
+    // eslint-disable-next-line no-new-func
+    new Function('window', 'CustomEvent', injectedBridge([], { deviceId: id, platform: 'android' }))(window, class {})
+    expect(window.__XIAOCHAO_RN_HOST__).toMatchObject({ deviceId: id, platform: 'android' })
+  })
+
+  it('has no device id until the app passes one', () => {
+    const host = loadBridge() as unknown as Record<string, unknown>
+    expect(host.deviceId).toBeNull()
+    expect(host.platform).toBeNull()
+  })
+})
