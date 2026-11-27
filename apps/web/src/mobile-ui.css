@@ -706,6 +706,12 @@ body.runtime-active .runtimeSheet * { touch-action: pan-y !important; }
 }
 
 @media (max-width: 420px) {
+  .installShortcut {
+    width: var(--ui-control-size);
+    min-width: var(--ui-control-size);
+    padding-inline: 0;
+  }
+  .installShortcut > span { display: none; }
   .storeGrid { grid-template-columns: minmax(0, 1fr); }
   .storeCard .storeCardBody { gap: 10px; }
   .storeCard .downloadButton { min-width: 72px; }
