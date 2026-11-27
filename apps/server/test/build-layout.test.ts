@@ -21,7 +21,7 @@ describe('server build output layout', () => {
     const result = program.emit(undefined, file => emitted.push(relative(serverRoot, file)))
     expect(result.emitSkipped).toBe(false)
     expect(emitted).toContain('dist/src/main.js')
-    expect(emitted).toContain('dist/src/index.js')
+    expect(emitted).toContain('dist/src/app.module.js')
     expect(emitted).not.toContain('dist/main.js')
   }, 30_000)
 })

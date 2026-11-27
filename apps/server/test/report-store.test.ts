@@ -2,8 +2,8 @@ import { mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ReportQueueFullError, ReportStore, type ReportSink } from '../src/report-store.js'
-import type { ReportRecord } from '../src/report-record.js'
+import { ReportQueueFullError, ReportStore, type ReportSink } from '../src/reporting/report-store.js'
+import type { ReportRecord } from '../src/reporting/report-record.js'
 
 const record = (id: string, category: ReportRecord['category'] = 'usage'): ReportRecord => ({ id, category, device_id: 'device', received_at: '2026-11-26T00:00:00.000Z', environment: 'test', level: 'info', type: 'app_open', ts: 1 })
 const directories: string[] = []

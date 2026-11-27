@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core'
 import { Logger } from '@nestjs/common'
 import { networkInterfaces } from 'node:os'
 import { AppModule } from './app.module.js'
-import { AppLogger } from './reporting.module.js'
+import { AppLogger } from './reporting/reporting.module.js'
 
 const PORT = Number(process.env.PORT ?? 8080)
 const logger = new Logger('Bootstrap')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowedStoreUrl, isZipHeader, parseStoreCatalog, parseStoreDetail, storeCatalogQuery, storeCatalogUrl, storeHosts, storeJarName } from '../src/javaCatalog.js'
+import { allowedStoreUrl, isZipHeader, parseStoreCatalog, parseStoreDetail, storeCatalogQuery, storeCatalogUrl, storeHosts, storeJarName } from '../src/java/javaCatalog.js'
 
 const BASE = 'https://java.52emu.cn'
 

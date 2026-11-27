@@ -28,19 +28,15 @@ Web 默认向所在环境的 `/collect` 上报；设置 `VITE_ANALYTICS_URL=''` 
 
 工作簿 token 为链接 `/sheets/` 后的一段。两个环境不可混用 token 和 sheet ID。开发表保留 6 条带 `integration-check` 标识的接入验证记录，生产表仅初始化表头。
 
-示例（不写入 `.env` 文件）：
+配置模板为项目根目录的 `.env.example`，已预填生产表的 ID，只有 `FEISHU_APP_SECRET` 需要自行填写：
 
 ```sh
-export LOG_ENV=production
-export FEISHU_APP_ID=cli_ab82e4f599b85cf3
-read -rs FEISHU_APP_SECRET
-export FEISHU_APP_SECRET
-export FEISHU_SPREADSHEET_TOKEN=AcNrsmuLBhaZ0ytUq4McDpixnpe
-export FEISHU_USAGE_SHEET_ID=2d1e23
-export FEISHU_ERROR_SHEET_ID=UywsXp
-export FEISHU_SERVER_SHEET_ID=iOypFx
-pnpm start
+cp .env.example .env   # 填入 FEISHU_APP_SECRET；开发环境改为上表 development 一行的值，并设 LOG_ENV=development
+docker compose up -d --build                        # Compose 自动读取根目录 .env
+node --env-file=.env apps/server/dist/src/main.js   # 直接运行 Node 时需显式加载
 ```
+
+`.env` 已被 Git 忽略，不要提交；部署平台有密钥管理时，优先在平台注入 `FEISHU_APP_SECRET`。
 
 ## 权限与交付语义
 

@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppModule } from '../src/app.module.js'
-import { FeishuSink } from '../src/feishu-sink.js'
-import { parseReports, redact, serverRecord } from '../src/report-record.js'
-import { ReportStore } from '../src/report-store.js'
-import { AppLogger } from '../src/reporting.module.js'
+import { FeishuSink } from '../src/reporting/feishu-sink.js'
+import { parseReports, redact, serverRecord } from '../src/reporting/report-record.js'
+import { ReportStore } from '../src/reporting/report-store.js'
+import { AppLogger } from '../src/reporting/reporting.module.js'
 
 const event = { id: 'event-1', type: 'app_open', ts: 1000, session_id: 'session-1' }
 const envelope = { v: 1, device_id: 'device-1', platform: 'web', events: [event] }
