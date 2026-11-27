@@ -13,6 +13,7 @@ import { KeypadSettingsPopup } from './runtime/KeypadSettingsPopup.jsx'
 import { GameSettingsSheet } from './runtime/GameSettingsSheet.jsx'
 import { useKeypadPrefs, useRuntimeOrientation, useViewportOrientation } from './runtime/RuntimeKeypad.jsx'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
+import { InstallShortcutButton } from './components/InstallShortcutButton.jsx'
 import { UpdateNotices } from './components/UpdateNotices.jsx'
 import { fetchArtwork, validArtwork } from './artwork.js'
 import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
@@ -1372,6 +1373,7 @@ export default function App() {
         <Button className="headerAction" fill="none" onClick={keyboardSystem ? closeKeyboard : openKeyboard} aria-pressed={keyboardSystem} aria-label="键盘：屏幕键盘、实体键盘与手柄设置">
           <KeyboardIcon /><span>键盘</span>
         </Button>
+        <InstallShortcutButton />
         <PrimaryNavigation items={TABS} activeId={keyboardSystem ? null : tab} onSelect={switchTab} />
       </header>
       <UpdateNotices />
