@@ -48,7 +48,7 @@ export function InstallShortcutButton() {
   return (
     <>
       <Button className="headerAction installShortcut" fill="none" onClick={install} aria-label="添加到桌面">
-        <AddCircleOutline /><span>添加到桌面</span>
+        <AddCircleOutline /><span>桌面</span>
       </Button>
       <Popup visible={messageVisible} onMaskClick={() => setMessageVisible(false)} onClose={() => setMessageVisible(false)} position="bottom">
         <div className="installShortcutMessage">
