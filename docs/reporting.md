@@ -19,6 +19,15 @@ Web 默认向所在环境的 `/collect` 上报；设置 `VITE_ANALYTICS_URL=''` 
 
 已有 Compose 文件会透传以上配置并挂载持久卷；其他宿主应给日志目录写权限并持久化。一个目录仅供一个服务实例使用。直接重建容器而不保留该目录会丢失未同步日志。无需数据库。
 
+## 已创建的环境表格
+
+| 环境 | 工作簿 | 使用统计 ID | 前端报错 ID | 后端日志 ID |
+|---|---|---|---|---|
+| production | [生产日志](https://my.feishu.cn/sheets/AcNrsmuLBhaZ0ytUq4McDpixnpe) | `2d1e23` | `UywsXp` | `iOypFx` |
+| development | [开发日志](https://my.feishu.cn/sheets/Qtc0s3PYEhkSSVtdqTrcUrN2npg) | `fdb3a6` | `yRKh5N` | `QvW0LO` |
+
+工作簿 token 为链接 `/sheets/` 后的一段。两个环境不可混用 token 和 sheet ID。开发表保留 6 条带 `integration-check` 标识的接入验证记录，生产表仅初始化表头。
+
 示例（不写入 `.env` 文件）：
 
 ```sh
@@ -26,10 +35,10 @@ export LOG_ENV=production
 export FEISHU_APP_ID=cli_ab82e4f599b85cf3
 read -rs FEISHU_APP_SECRET
 export FEISHU_APP_SECRET
-export FEISHU_SPREADSHEET_TOKEN='<当前环境工作簿 token>'
-export FEISHU_USAGE_SHEET_ID='<使用统计 sheet ID>'
-export FEISHU_ERROR_SHEET_ID='<前端报错 sheet ID>'
-export FEISHU_SERVER_SHEET_ID='<后端日志 sheet ID>'
+export FEISHU_SPREADSHEET_TOKEN=AcNrsmuLBhaZ0ytUq4McDpixnpe
+export FEISHU_USAGE_SHEET_ID=2d1e23
+export FEISHU_ERROR_SHEET_ID=UywsXp
+export FEISHU_SERVER_SHEET_ID=iOypFx
 pnpm start
 ```
 
