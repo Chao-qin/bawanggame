@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module.js'
 import { FeishuSink } from '../src/reporting/feishu-sink.js'
 import { parseReports, redact, serverRecord } from '../src/reporting/report-record.js'
 import { ReportStore } from '../src/reporting/report-store.js'
+import { SessionTracker } from '../src/reporting/sessions.js'
 import { AppLogger } from '../src/reporting/reporting.module.js'
 
 const event = { id: 'event-1', type: 'app_open', ts: 1000, session_id: 'session-1' }
@@ -54,9 +55,52 @@ describe('report protocol and Feishu sink', () => {
     expect(requests).toHaveLength(3)
     expect(requests[0].headers.Authorization).toBeUndefined()
     expect(requests[1].headers.Authorization).toBe('Bearer fake-token')
-    expect(requests[1].body.valueRange).toMatchObject({ range: 'server!A1:S1' })
+    // INSERT_ROWS only takes effect as a query parameter; whole columns keep the range at least as large as the rows.
+    expect(requests[1].url).toMatch(/\/values_append\?insertDataOption=INSERT_ROWS$/)
+    expect(requests[1].body).not.toHaveProperty('insertDataOption')
+    expect(requests[1].body.valueRange).toMatchObject({ range: 'server!A:S' })
     expect(((requests[1].body.valueRange as { values: unknown[][] }).values[0][15] as string).startsWith("'=")).toBe(true)
-    expect(requests[2].body.valueRange).toMatchObject({ range: 'usage!A1:S1' })
+    expect(requests[2].body.valueRange).toMatchObject({ range: 'usage!A:S' })
+  })
+
+  it('appends session rows once, overwrites them in place and sends one request at a time', async () => {
+    const requests: { url: string; body: Record<string, unknown> }[] = []
+    let active = 0
+    let overlapped = false
+    const fetcher = vi.fn(async (url, options) => {
+      overlapped ||= ++active > 1
+      await new Promise(resolve => setTimeout(resolve, 5))
+      active--
+      requests.push({ url: String(url), body: JSON.parse(String(options?.body)) })
+      if (String(url).includes('/auth/')) return new Response(JSON.stringify({ code: 0, tenant_access_token: 'token', expire: 7200 }))
+      return new Response(JSON.stringify({ code: 0, data: String(url).includes('values_append') ? { updates: { updatedRange: 'plays!A7:O8' } } : {} }))
+    }) as unknown as typeof fetch
+    const sink = new FeishuSink({ appId: 'app', appSecret: 'secret', spreadsheet: 'book', sheets: { usage: 'u', client_error: 'e', server: 's' }, sessionSheet: 'plays' }, fetcher)
+    expect(sink.sessionsEnabled).toBe(true)
+    const [first] = await Promise.all([sink.appendSessions([['p1', '=HYPERLINK("x")'], ['p2', 'b']]), sink.append([serverRecord('info', 'together')])])
+    expect(first).toBe(7)
+    await sink.updateSessions([{ row: 7, values: ['p1', 'c'] }])
+    expect(overlapped).toBe(false)
+    const append = requests.find(request => request.url.includes('values_append') && (request.body.valueRange as { range: string }).range.startsWith('plays'))!
+    expect(append.url).toContain('?insertDataOption=INSERT_ROWS')
+    expect(append.body.valueRange).toMatchObject({ range: 'plays!A:B', values: [['p1', `'=HYPERLINK("x")`], ['p2', 'b']] })
+    expect(requests.at(-1)!.url).toMatch(/\/values_batch_update$/)
+    expect(requests.at(-1)!.body).toEqual({ valueRanges: [{ range: 'plays!A7:B7', values: [['p1', 'c']] }] })
+    expect(new FeishuSink({ appId: 'app', appSecret: 'secret', spreadsheet: 'book', sheets: { usage: 'u', client_error: 'e', server: 's' } }).sessionsEnabled).toBe(false)
+  })
+
+  it('accepts the page acknowledgement sequence and app heartbeats outside a game', () => {
+    const heartbeat = { ...event, type: 'heartbeat', play_id: 'play-1', game: { kind: 'j2me', file: 'a.jar', name: 'A' }, active_ms: 30000 }
+    expect(parseReports({ ...envelope, events: [{ ...heartbeat, seq: 3 }] })[0].seq).toBe(3)
+    expect(parseReports({ ...envelope, events: [{ ...event, seq: 1 }] })[0].seq).toBe(1)
+    expect(parseReports({ ...envelope, events: [heartbeat] })[0].seq).toBeUndefined()
+    for (const seq of [0, 1.5, '2']) expect(() => parseReports({ ...envelope, events: [{ ...heartbeat, seq }] })).toThrow()
+    const [app] = parseReports({ ...envelope, events: [{ ...event, type: 'heartbeat', seq: 2 }] })
+    expect(app).toMatchObject({ type: 'heartbeat', seq: 2 })
+    expect(app.play_id).toBeUndefined()
+    // Inside a game the play time stays required.
+    expect(() => parseReports({ ...envelope, events: [{ ...heartbeat, active_ms: undefined }] })).toThrow()
+    expect(() => parseReports({ ...envelope, events: [{ ...heartbeat, game: undefined }] })).toThrow()
   })
 
   it('refreshes rejected credentials without exposing the upstream body', async () => {
@@ -83,7 +127,7 @@ describe('Nest report endpoint', () => {
     directory = await mkdtemp(join(tmpdir(), 'bawang-report-http-'))
     vi.stubEnv('LOG_DIR', directory)
     vi.stubEnv('LOG_ENV', 'test')
-    for (const key of ['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_SPREADSHEET_TOKEN', 'FEISHU_USAGE_SHEET_ID', 'FEISHU_ERROR_SHEET_ID', 'FEISHU_SERVER_SHEET_ID']) vi.stubEnv(key, '')
+    for (const key of ['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_SPREADSHEET_TOKEN', 'FEISHU_USAGE_SHEET_ID', 'FEISHU_ERROR_SHEET_ID', 'FEISHU_SERVER_SHEET_ID', 'FEISHU_SESSION_SHEET_ID']) vi.stubEnv(key, '')
     app = await NestFactory.create(AppModule, { logger: false, bodyParser: false })
     await app.listen(0, '127.0.0.1')
     base = `http://127.0.0.1:${app.getHttpServer().address().port}`
@@ -110,6 +154,15 @@ describe('Nest report endpoint', () => {
     expect(preflight.status).toBe(204)
     expect((await fetch(`${base}/collect`)).status).toBe(405)
     expect((await fetch(`${base}/__52java/open`)).status).toBe(200)
+  })
+
+  it('feeds newly accepted acknowledgements to the session table', async () => {
+    const observed = vi.spyOn(app.get(SessionTracker), 'observe')
+    const heartbeat = { ...event, id: 'beat-1', type: 'heartbeat', play_id: 'play-1', game: { kind: 'j2me', file: 'a.jar', name: 'A' }, active_ms: 30000, seq: 1 }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect((await fetch(`${base}/collect`, { method: 'POST', body: JSON.stringify({ ...envelope, events: [heartbeat] }) })).status).toBe(204)
+    }
+    expect(observed.mock.calls.map(([records]) => records.map(record => record.id))).toEqual([['beat-1'], []])
   })
 
   it('rejects malformed and oversized input, and does not acknowledge disk failures', async () => {

@@ -109,13 +109,14 @@ test('in the APK nothing is sent or stored under a page id before the app host g
   assert.equal(env.posts.length, 0)
   assert.equal(env.beacons.length, 0)
   assert.equal(env.storage.has('xiaochao-device-id'), false)
-  assert.equal(JSON.parse(env.storage.get('xiaochao-analytics-queue')).length, 1)
+  // app_open and the leaving heartbeat
+  assert.equal(JSON.parse(env.storage.get('xiaochao-analytics-queue')).length, 2)
 
   env.win.__XIAOCHAO_RN_HOST__ = { deviceId: '3f2b8c1e-0d4a-4b6e-9a7c-1e2d3f4a5b6c', platform: 'android' }
   env.online()
   await settle()
   assert.equal(env.posts[0].body.device_id, '3f2b8c1e-0d4a-4b6e-9a7c-1e2d3f4a5b6c')
-  assert.deepEqual(env.posts[0].body.events.map((event) => event.type), ['app_open'])
+  assert.deepEqual(env.posts[0].body.events.map((event) => event.type), ['app_open', 'heartbeat'])
 })
 
 test('a device clock change does not change the play time', async () => {
@@ -182,6 +183,41 @@ test('play time counts only the time the game is in front', async () => {
   assert.equal(plays.reduce((sum, event) => sum + (event.active_ms || 0), 0), 30_000 + 5_000 + 30_000 + 12_000)
 })
 
+test('the app session acknowledges from the first event, with or without a game, in one growing seq', async () => {
+  const env = fakeWindow()
+  const analytics = start(env)
+  await settle()
+  assert.deepEqual(events(env.posts).map((event) => [event.type, event.seq]), [['app_open', 1]]) // sent at once, no wait
+  env.advance(30_000)
+  env.tick() // in the lobby: a heartbeat without a game
+  const end = analytics.startPlay(GAME)
+  env.advance(30_000)
+  env.tick()
+  env.hide() // leaving the page acknowledges what was played so far
+  env.tick() // hidden: no heartbeat
+  env.show() // coming back acknowledges at once
+  env.show() // already in front: nothing more
+  end()
+  await settle()
+
+  const sent = [...new Map(events(env.posts).concat(env.beacons.flatMap((beacon) => JSON.parse(beacon.blob.text).events)).map((event) => [event.id, event])).values()].sort((a, b) => a.seq - b.seq)
+  assert.deepEqual(sent.map((event) => [event.type, event.seq, event.play_id ? 'play' : 'app']), [
+    ['app_open', 1, 'app'], ['heartbeat', 2, 'app'], ['game_start', 3, 'play'], ['heartbeat', 4, 'play'], ['heartbeat', 5, 'play'], ['heartbeat', 6, 'play'], ['game_end', 7, 'play'],
+  ])
+  assert.equal(new Set(sent.map((event) => event.session_id)).size, 1)
+  assert.equal(sent[1].active_ms, undefined)
+})
+
+test('this page load goes first: app_open is in the first request even behind an offline backlog', async () => {
+  const backlog = Array.from({ length: 80 }, (_, index) => ({ id: `old-${index}`, type: 'heartbeat', ts: 1, session_id: 'earlier-visit', seq: index + 1 }))
+  const env = fakeWindow({ storage: new Map([['xiaochao-analytics-queue', JSON.stringify(backlog)]]) })
+  start(env)
+  await settle()
+  assert.deepEqual([env.posts[0].body.events[0].type, env.posts[0].body.events[0].seq], ['app_open', 1])
+  assert.equal(events(env.posts).length, 81)
+  assert.equal(env.storage.has('xiaochao-analytics-queue'), false)
+})
+
 test('events the endpoint did not take stay queued, survive a reload and are sent later', async () => {
   const env = fakeWindow({ fetchOk: 'throw' })
   const analytics = start(env)
@@ -198,7 +234,9 @@ test('events the endpoint did not take stay queued, survive a reload and are sen
   const later = fakeWindow({ storage: env.storage })
   start(later)
   await settle()
-  assert.deepEqual(events(later.posts).map((event) => event.type), ['app_open', 'game_start', 'game_end', 'app_open', 'app_open'])
+  // This page load's app_open goes first, then the backlog in its original order.
+  assert.deepEqual(events(later.posts).map((event) => event.type), ['app_open', 'app_open', 'game_start', 'game_end', 'app_open'])
+  assert.equal(events(later.posts)[1].id, queued[0].id)
   assert.equal(new Set(events(later.posts).map((event) => event.id)).size, 5)
   assert.equal(env.storage.has('xiaochao-analytics-queue'), false)
 })
@@ -249,7 +287,7 @@ test('beacon acceptance retains the queue until fetch confirms HTTP success', as
   start(refused)
   await settle()
   refused.pagehide()
-  assert.equal(JSON.parse(refused.storage.get('xiaochao-analytics-queue')).length, 1)
+  assert.equal(JSON.parse(refused.storage.get('xiaochao-analytics-queue')).length, 2)
 })
 
 test('without an endpoint nothing is collected', () => {
@@ -281,8 +319,8 @@ test('long multibyte errors drain in ordered byte-budgeted batches after reconne
     analytics.reportError({ kind: 'runtime', message: '中文😀'.repeat(200), stack: '中文😀'.repeat(800) })
   }
   await settle()
-  const queued = JSON.parse(env.storage.get('xiaochao-analytics-queue'))
   env.pagehide()
+  const queued = JSON.parse(env.storage.get('xiaochao-analytics-queue'))
   const beaconBody = env.beacons[0].blob.text
   assert.ok(Buffer.byteLength(beaconBody, 'utf8') <= 48 * 1024)
   assert.ok(JSON.parse(beaconBody).events.length < 50)
@@ -307,7 +345,8 @@ test('oversized corrupt persisted events cannot block valid events', async () =>
   const env = fakeWindow({ storage })
   start(env)
   await settle()
-  assert.deepEqual(events(env.posts).map(event => event.id).slice(0, 1), ['valid'])
+  assert.deepEqual(events(env.posts).map(event => event.type), ['app_open', 'client_error'])
+  assert.equal(events(env.posts)[1].id, 'valid')
   assert.equal(events(env.posts).some(event => event.id === 'corrupt'), false)
   assert.equal(storage.has('xiaochao-analytics-queue'), false)
 })

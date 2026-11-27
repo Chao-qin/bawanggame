@@ -57,7 +57,10 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
   let queue = readQueue(storage)
   let sending = false
   let hostActive = true
+  let inFront = false
   let play = null
+  // Every event of this page load carries the next seq; the server ends a session (and its play) whose events stop.
+  let seq = 0
 
   const visible = () => hostActive && win.document?.visibilityState !== 'hidden'
   const save = () => writeStorage(storage, QUEUE_KEY, queue.length ? JSON.stringify(queue) : null)
@@ -66,7 +69,7 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
   const ready = () => (identity ??= deviceIdentity(win)) !== null
 
   function track(type, fields = {}) {
-    queue.push({ id: randomId(), type, ts: now(), session_id: sessionId, ...fields })
+    queue.push({ id: randomId(), type, ts: now(), session_id: sessionId, seq: ++seq, ...fields })
     if (queue.length > MAX_QUEUE) queue = queue.slice(-MAX_QUEUE)
     save()
   }
@@ -80,7 +83,8 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
   function nextBatch() {
     const batch = []
     const encoder = new TextEncoder()
-    for (const event of queue) {
+    // This page load's events go first, so app_open is not held behind a backlog left by an earlier offline visit.
+    for (const event of [...queue.filter((entry) => entry.session_id === sessionId), ...queue.filter((entry) => entry.session_id !== sessionId)]) {
       if (encoder.encode(envelope([...batch, event])).byteLength > MAX_BATCH_BYTES) {
         if (batch.length) break
         // Corrupt persisted entries must not block every subsequent valid event.
@@ -149,24 +153,40 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
     return { play_id: play.id, game: play.game }
   }
 
+  function playTime() {
+    return { ...playFields(), active_ms: takeActiveMs() }
+  }
+
+  // The app session's acknowledgement, sent whether or not a game is open; inside a game it carries the play time.
+  function heartbeat() {
+    track('heartbeat', play ? playTime() : {})
+  }
+
   function pause() {
-    if (play && play.resumedAt !== null) {
-      play.activeMs += elapsed() - play.resumedAt
-      play.resumedAt = null
-      track('heartbeat', { ...playFields(), active_ms: takeActiveMs() })
+    if (inFront) {
+      inFront = false
+      if (play && play.resumedAt !== null) {
+        play.activeMs += elapsed() - play.resumedAt
+        play.resumedAt = null
+      }
+      heartbeat()
     }
     flushBeacon()
   }
 
   function resume() {
-    if (play && play.resumedAt === null) play.resumedAt = elapsed()
+    if (!inFront) {
+      inFront = true
+      if (play && play.resumedAt === null) play.resumedAt = elapsed()
+      // Coming back acknowledges at once, so a session the server timed out while hidden continues without delay.
+      heartbeat()
+    }
     flush()
   }
 
   function endPlay() {
     if (!play) return
-    win.clearInterval(play.timer)
-    track('game_end', { ...playFields(), active_ms: takeActiveMs() })
+    track('game_end', playTime())
     play = null
     flush()
   }
@@ -178,14 +198,8 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
       game: { kind: game.kind, file: String(game.file).slice(0, 200), name: String(game.name || game.file).slice(0, 200), local: !!game.local },
       activeMs: 0,
       resumedAt: visible() ? elapsed() : null,
-      timer: 0,
     }
     track('game_start', playFields())
-    play.timer = win.setInterval(() => {
-      if (!visible()) return
-      track('heartbeat', { ...playFields(), active_ms: takeActiveMs() })
-      flush()
-    }, heartbeatMs)
     flush()
     return endPlay
   }
@@ -200,8 +214,15 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
       if (visible()) resume()
       else pause()
     })
+    // The first event (seq 1) goes out at once; heartbeats follow every heartbeatMs while the page is in front.
+    inFront = visible()
     track('app_open')
     flush()
+    win.setInterval(() => {
+      if (!visible()) return
+      heartbeat()
+      flush()
+    }, heartbeatMs)
   }
 
   function reportError(error) {

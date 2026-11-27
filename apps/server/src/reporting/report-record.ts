@@ -15,6 +15,7 @@ export type ReportRecord = {
   play_id?: string
   game?: { kind: string; file: string; name: string; local: boolean }
   active_ms?: number
+  seq?: number
   message?: string
   context?: string
   error?: { kind: string; message: string; stack: string; url: string; context: string; line?: number; column?: number }
@@ -78,10 +79,17 @@ export function parseReports(value: unknown): ReportRecord[] {
       if (!['j2me', 'maopao', 'flash', 'local-revival'].includes(kind)) throw new Error('invalid game kind')
       record.game = { kind, file: redact(identifier(game.file, 200), 200), name: redact(game.name ?? game.file, 200), local: game.local === true }
     }
-    if (['game_start', 'heartbeat', 'game_end'].includes(type) && (!record.play_id || !record.game)) throw new Error('missing game')
-    if (type === 'heartbeat' || type === 'game_end') {
+    // A heartbeat outside a game only keeps the app session alive; inside one it also carries the play time.
+    const inPlay = type === 'game_start' || type === 'game_end' || (type === 'heartbeat' && event.play_id !== undefined)
+    if (inPlay && (!record.play_id || !record.game)) throw new Error('missing game')
+    if (type === 'game_end' || (type === 'heartbeat' && inPlay)) {
       if (typeof event.active_ms !== 'number' || !Number.isSafeInteger(event.active_ms) || event.active_ms < 0) throw new Error('invalid duration')
       record.active_ms = event.active_ms
+    }
+    // The page's acknowledgement sequence (1, 2, 3… over the whole app session); older clients do not send it.
+    if (event.seq !== undefined) {
+      if (typeof event.seq !== 'number' || !Number.isSafeInteger(event.seq) || event.seq < 1) throw new Error('invalid sequence')
+      record.seq = event.seq
     }
     if (type === 'client_error') {
       const error = object(event.error)

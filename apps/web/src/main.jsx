@@ -15,7 +15,10 @@ import { installErrorReporting } from './error-reporting.js'
 
 installSelectionGuard()
 const runtimeFrame = isRuntimeFrame()
-const endpoint = import.meta.env.VITE_ANALYTICS_URL ?? (new URLSearchParams(location.search).get('host') === 'rn' ? '' : '/collect')
+// VITE_ANALYTICS_URL: a full URL reports there; 'off' turns reporting off. Unset or empty (a CI variable that was never
+// set) reports to this site's own /collect, except in the APK, which has no server of its own and needs a full URL.
+const configuredEndpoint = import.meta.env.VITE_ANALYTICS_URL || ''
+const endpoint = configuredEndpoint === 'off' ? '' : configuredEndpoint || (new URLSearchParams(location.search).get('host') === 'rn' ? '' : '/collect')
 if (!runtimeFrame) installAnalytics(endpoint)
 installErrorReporting()
 // The J2ME / MRP frame turns itself (its own #root) and reaches the app host through the parent's bridge.
