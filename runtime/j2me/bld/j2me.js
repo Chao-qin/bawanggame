@@ -11116,6 +11116,35 @@ var J2ME;
             while (stream.currentBCI < methodInfo.codeAttribute.code.length) {
                 var op = stream.currentBC();
                 switch (op) {
+                    // A backward branch is a loop. Only a method that can yield gets preemption checks on its back
+                    // edges, so a small loop that calls nothing yielding (a game's `while (!ready) {}` busy-wait) was
+                    // never preempted: it held the main thread forever, and the thread that would end it never ran.
+                    case 153 /* IFEQ */:
+                    case 154 /* IFNE */:
+                    case 155 /* IFLT */:
+                    case 156 /* IFGE */:
+                    case 157 /* IFGT */:
+                    case 158 /* IFLE */:
+                    case 159 /* IF_ICMPEQ */:
+                    case 160 /* IF_ICMPNE */:
+                    case 161 /* IF_ICMPLT */:
+                    case 162 /* IF_ICMPGE */:
+                    case 163 /* IF_ICMPGT */:
+                    case 164 /* IF_ICMPLE */:
+                    case 165 /* IF_ACMPEQ */:
+                    case 166 /* IF_ACMPNE */:
+                    case 167 /* GOTO */:
+                    case 198 /* IFNULL */:
+                    case 199 /* IFNONNULL */:
+                        if (stream.readBranchDest() <= stream.currentBCI) {
+                            result = 7 /* Likely */;
+                        }
+                        break;
+                    case 200 /* GOTO_W */:
+                        if (stream.readFarBranchDest() <= stream.currentBCI) {
+                            result = 7 /* Likely */;
+                        }
+                        break;
                     case 187 /* NEW */:
                         var classInfo = constantPool.resolveClass(stream.readCPI());
                         result = canStaticInitializerYield(classInfo);
@@ -11569,6 +11598,12 @@ var J2ME;
             writer && writer.writeLn("emitBlock: " + block.startBci + " " + this.sp + " " + block.isExceptionEntry);
             release || assert(this.sp !== undefined, "Bad stack height");
             stream.setBCI(block.startBci);
+            // The interpreter checks for preemption on every backward branch, but a method compiled (or entered by
+            // OSR) from a hot loop only checked once on entry, so the loop never gave the main thread back. Check at
+            // each loop header; an unwind there resumes the interpreter at the start of this block.
+            if (this.blockMap.backTargets && this.blockMap.backTargets[block.startBci] && J2ME.canYield(this.methodInfo)) {
+                this.emitPreemptionCheck(this.blockEmitter, String(block.startBci));
+            }
             var lastSourceLocation = null;
             var lastBC;
             while (stream.currentBCI <= block.endBci) {
@@ -11688,9 +11723,10 @@ var J2ME;
             }
             // Insert a preemption check after the OSR code so the pc
             // and state will be stored. We can only do this if the
-            // method has the necessary unwinding code.
+            // method has the necessary unwinding code. It resumes at the runtime pc: 0 on a normal entry, the loop
+            // header an OSR entered at (resuming at 0 would run the code before the loop again with changed locals).
             if (J2ME.canYield(this.methodInfo)) {
-                this.emitPreemptionCheck(this.bodyEmitter);
+                this.emitPreemptionCheck(this.bodyEmitter, "pc");
             }
             if (needsEntryDispatch) {
                 var entryBlock = Relooper.addBlock("// Entry Dispatch Block");
@@ -12319,13 +12355,13 @@ var J2ME;
             this.emitUnwind(emitter, String(nextPC), true);
             emitter.leave("}");
         };
-        BaselineCompiler.prototype.emitPreemptionCheck = function (emitter) {
+        BaselineCompiler.prototype.emitPreemptionCheck = function (emitter, pc) {
             if (!J2ME.emitCheckPreemption || this.methodInfo.implKey in J2ME.noPreemptMap) {
                 return;
             }
             emitter.writeLn("PS++;");
             emitter.writeLn("if((PS&" + preemptionSampleMask + ")===0)PE();");
-            this.emitUnwind(emitter, String(this.pc), true);
+            this.emitUnwind(emitter, pc, true);
         };
         BaselineCompiler.prototype.emitMonitorExit = function (emitter, object) {
             emitter.writeLn("lk=GM(" + object + ");");
