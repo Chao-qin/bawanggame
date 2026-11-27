@@ -158,5 +158,6 @@ public/               generated React PWA output (ignored by Git)
 - Licensed under the Apache License 2.0 (see `LICENSE`)
 - [pluotsorbet](https://github.com/mozilla/pluotsorbet) — Mozilla, Apache License 2.0; the class library is based on phoneME
 - M3G — [J2ME-Loader](https://github.com/nikita36078/J2ME-Loader), see `src/m3g/NOTICE` for details
+- [vmrp](https://github.com/vmrp/vmrp) (MRP runtime) with [unicorn](https://github.com/unicorn-engine/unicorn) — GPL-3.0; the patched build in `runtime/mrp/vmrp/` is GPL-3.0 (see its `LICENSE` and `README.md`)
 - [webaudio-tinysynth](https://github.com/g200kg/webaudio-tinysynth), [BenzAMRRecorder](https://github.com/BenzLeung/benz-amr-recorder), [text-encoding](https://github.com/inexorabletash/text-encoding)
 # 大宋豪侠本地服务器

@@ -1,6 +1,6 @@
 # vmrp 冒泡内核
 
-冒泡播放器（`apps/web/src/runtime/MrpPlayer.jsx`）加载本目录的 `vmrp.js` / `vmrp.wasm`。它们由上游 [vmrp](https://github.com/vmrp/vmrp)（GPL-3.0）在提交 `ffe01e9` 上打 `hle-memcpy.patch` 编译而成；系统文件（`fs/`）和 `midi.js` 仍取自 `maopao-revival/vendor/vmrp.github.io/vmrp_v1.0/`。
+冒泡播放器（`apps/web/src/runtime/MrpPlayer.jsx`）加载本目录的 `vmrp.js` / `vmrp.wasm`。它们由上游 [vmrp](https://github.com/vmrp/vmrp)（GPL-3.0）在提交 `ffe01e9` 上打 `hle-memcpy.patch` 编译而成。本目录（编译产物、补丁、构建脚本）按 GPL-3.0 发布，许可证见 `LICENSE`，对应源码即上游提交加本目录的补丁与 `build.sh`。系统文件（`fs/`）和 `midi.js` 仍取自 `maopao-revival/vendor/vmrp.github.io/vmrp_v1.0/`。
 
 ## 补丁做了什么
 
