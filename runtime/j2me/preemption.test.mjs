@@ -63,7 +63,13 @@ test('a method without a backward branch still cannot yield', () => {
   assert.equal(J2ME.canYield(method('straight')), NONE)
 })
 
-test('compiled code checks for preemption at a loop header, not only on entry', () => {
-  const body = J2ME.baselineCompileMethod(method('spinLater'), 0 /* Runtime */).body
-  assert.equal(body.match(/PE\(\)/g)?.length, 2, body)
+// The bytecode index each preemption check of a compiled method resumes the interpreter at ($.B(method, pc, ...)).
+function resumePoints(name) {
+  const body = J2ME.baselineCompileMethod(method(name), 0 /* Runtime */).body
+  return [...body.matchAll(/PE\(\);\n\s*if\(U\)\{\$\.B\(\$\w+,([^,]+),/g)].map((match) => match[1])
+}
+
+test('compiled code checks for preemption at a loop header and resumes there', () => {
+  // On entry: the runtime pc (0, or the loop header an on-stack replacement entered at); then the loop header (bci 2).
+  assert.deepEqual(resumePoints('spinLater'), ['pc', '2'])
 })

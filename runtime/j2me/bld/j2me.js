@@ -11602,8 +11602,7 @@ var J2ME;
             // OSR) from a hot loop only checked once on entry, so the loop never gave the main thread back. Check at
             // each loop header; an unwind there resumes the interpreter at the start of this block.
             if (this.blockMap.backTargets && this.blockMap.backTargets[block.startBci] && J2ME.canYield(this.methodInfo)) {
-                this.pc = block.startBci;
-                this.emitPreemptionCheck(this.blockEmitter);
+                this.emitPreemptionCheck(this.blockEmitter, String(block.startBci));
             }
             var lastSourceLocation = null;
             var lastBC;
@@ -11724,9 +11723,10 @@ var J2ME;
             }
             // Insert a preemption check after the OSR code so the pc
             // and state will be stored. We can only do this if the
-            // method has the necessary unwinding code.
+            // method has the necessary unwinding code. It resumes at the runtime pc: 0 on a normal entry, the loop
+            // header an OSR entered at (resuming at 0 would run the code before the loop again with changed locals).
             if (J2ME.canYield(this.methodInfo)) {
-                this.emitPreemptionCheck(this.bodyEmitter);
+                this.emitPreemptionCheck(this.bodyEmitter, "pc");
             }
             if (needsEntryDispatch) {
                 var entryBlock = Relooper.addBlock("// Entry Dispatch Block");
@@ -12355,13 +12355,13 @@ var J2ME;
             this.emitUnwind(emitter, String(nextPC), true);
             emitter.leave("}");
         };
-        BaselineCompiler.prototype.emitPreemptionCheck = function (emitter) {
+        BaselineCompiler.prototype.emitPreemptionCheck = function (emitter, pc) {
             if (!J2ME.emitCheckPreemption || this.methodInfo.implKey in J2ME.noPreemptMap) {
                 return;
             }
             emitter.writeLn("PS++;");
             emitter.writeLn("if((PS&" + preemptionSampleMask + ")===0)PE();");
-            this.emitUnwind(emitter, String(this.pc), true);
+            this.emitUnwind(emitter, pc, true);
         };
         BaselineCompiler.prototype.emitMonitorExit = function (emitter, object) {
             emitter.writeLn("lk=GM(" + object + ");");
