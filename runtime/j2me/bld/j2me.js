@@ -2621,9 +2621,14 @@ var J2ME;
             BlockMap.prototype.setSuccessors = function (predBci, successors) {
                 if (!this.hasBackwardBranches) {
                     for (var i = 0; i < successors.length; i++) {
-                        if (successors[i].startBci < predBci) {
+                        if (successors[i].startBci <= predBci) {
                             this.hasBackwardBranches = true;
                         }
+                    }
+                }
+                for (var i = 0; i < successors.length; i++) {
+                    if (successors[i].startBci <= predBci) {
+                        (this.backTargets || (this.backTargets = Object.create(null)))[successors[i].startBci] = true;
                     }
                 }
                 var predecessor = this.blockMap[predBci];
@@ -5253,10 +5258,8 @@ var J2ME;
     
                     if (e && e.constructor && e.constructor.prototype && e.constructor.prototype.classInfo && e.constructor.prototype.classInfo._name) {
                         // At this point the Java exception can still be handled by the MIDlet.
-                        if (/[?&]debug=1(?:&|$)/.test(location.search)) {
-                            var detailMessage = e.detailMessage ? J2ME.fromStringAddr(e.detailMessage) : "";
-                            console.warn("Java exception: " + e.constructor.prototype.classInfo._name + ": " + detailMessage + " at " + mi.implKey + " pc " + opPC);
-                        }
+                        var detailMessage = e.detailMessage ? J2ME.fromStringAddr(e.detailMessage) : "";
+                        console.warn("Java exception: " + e.constructor.prototype.classInfo._name + ": " + detailMessage + " at " + mi.implKey + " pc " + opPC);
                     } else {
                         console.error(e);
                     }
@@ -11145,6 +11148,18 @@ var J2ME;
                             result = 7 /* Likely */;
                         }
                         break;
+                    case 170 /* TABLESWITCH */:
+                    case 171 /* LOOKUPSWITCH */: {
+                        var switchInfo = op === 170 /* TABLESWITCH */ ? stream.readTableSwitch() : stream.readLookupSwitch();
+                        for (var i = 0; i < switchInfo.numberOfCases() + 1; i++) {
+                            var target = i < switchInfo.numberOfCases() ? switchInfo.targetAt(i) : switchInfo.defaultTarget();
+                            if (target <= stream.currentBCI) {
+                                result = 7 /* Likely */;
+                                break;
+                            }
+                        }
+                        break;
+                    }
                     case 187 /* NEW */:
                         var classInfo = constantPool.resolveClass(stream.readCPI());
                         result = canStaticInitializerYield(classInfo);

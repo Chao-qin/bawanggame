@@ -53,5 +53,3 @@ var APP_BASE_DIR = "./";
 
 config.autosize = "1";
 config.logConsole = "web";
-
-if (config.release && !/[?&]debug=1(&|$)/.test(location.search)) console.log = function () {};
