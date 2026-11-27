@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseFlashArchiveGames } from '../src/flashCatalog.js'
+import { parseFlashArchiveGames } from '../src/flash/flashCatalog.js'
 
 describe('Flash archive catalog parser', () => {
   it('extracts title and HTTPS artwork from the approved image host', () => {

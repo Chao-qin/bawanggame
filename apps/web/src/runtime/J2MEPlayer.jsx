@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { reportError } from '../error-reporting.js'
 import { PhoneMarkup } from './PhoneMarkup.jsx'
 import { createRuntimeSession, loadClassicInOrder, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
@@ -103,6 +104,7 @@ export function J2MEPlayer({ game, onExit, onReady }) {
         setLoading(false)
       } catch (e) {
         if (alive && session.active) {
+          reportError(e, { kind: 'runtime', context: 'j2me:startup' })
           session.invalidate()
           cleanupRuntimeArtifacts()
           setLoading(false)

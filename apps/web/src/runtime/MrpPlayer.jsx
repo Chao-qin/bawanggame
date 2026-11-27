@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { reportError } from '../error-reporting.js'
 import { PhoneMarkup } from './PhoneMarkup.jsx'
 import { createRuntimeSession, loadClassicInOrder, loadStyle } from './loadScript.js'
 import { cleanupRuntimeArtifacts } from './cleanup.js'
@@ -36,6 +37,7 @@ export function MrpPlayer({ game, onReady }) {
         callbacks.current.onReady?.()
       } catch (e) {
         if (alive && session.active) {
+          reportError(e, { kind: 'runtime', context: 'maopao:startup' })
           session.invalidate()
           cleanupRuntimeArtifacts()
           setLoading(false)

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { reportError } from '../error-reporting.js'
 import { createRuntimeSession, loadClassic } from './loadScript.js'
 import { RuntimeFailure, RuntimeLoading } from './RuntimeStatus.jsx'
 import { get as getLocalFlash } from '../localFlash.js'
@@ -175,6 +176,7 @@ export function FlashPlayer({ game, onCleanupReady, onExit }) {
         setLoading(false)
       } catch (cause) {
         if (alive && session.active) {
+          reportError(cause, { kind: 'runtime', context: 'flash:startup' })
           setLoading(false)
           setError(cause?.message || String(cause))
           setCanReturn(cause?.code === 'missing_record')

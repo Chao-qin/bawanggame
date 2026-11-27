@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createAnalytics, HOST_ACTIVE_EVENT, installAnalytics, trackPlay } from './analytics.js'
+import { createAnalytics, HOST_ACTIVE_EVENT, installAnalytics, trackPlay, reportError, normalizeError } from './analytics.js'
 
 const ENDPOINT = 'https://stats.example.com/collect'
 const GAME = { kind: 'j2me', file: 'snake.jar', name: '贪吃蛇', local: false }
@@ -79,6 +79,7 @@ test('a web device keeps one random id across launches and reports the app openi
   // A CORS simple request: no preflight before each batch.
   assert.equal(post.init.headers['Content-Type'], 'text/plain;charset=UTF-8')
   assert.equal(post.init.credentials, 'omit')
+  assert.equal(Object.hasOwn(post.init, 'keepalive'), false)
   assert.equal(post.body.v, 1)
   assert.equal(post.body.platform, 'web')
   assert.match(post.body.device_id, /\S{8,}/)
@@ -171,7 +172,7 @@ test('play time counts only the time the game is in front', async () => {
   end()
   await settle()
 
-  const sent = events(env.posts).concat(env.beacons.flatMap((beacon) => JSON.parse(beacon.blob.text).events))
+  const sent = [...new Map(events(env.posts).concat(env.beacons.flatMap((beacon) => JSON.parse(beacon.blob.text).events)).map((event) => [event.id, event])).values()]
   const plays = sent.filter((event) => event.play_id).sort((a, b) => a.ts - b.ts)
   assert.equal(new Set(sent.map((event) => event.id)).size, sent.length)
   assert.equal(new Set(plays.map((event) => event.play_id)).size, 1)
@@ -226,7 +227,7 @@ test('reconnecting sends what was queued offline', async () => {
   assert.equal(env.storage.has('xiaochao-analytics-queue'), false)
 })
 
-test('leaving the page hands the queue to a beacon, keeping it when the browser refuses', async () => {
+test('beacon acceptance retains the queue until fetch confirms HTTP success', async () => {
   const env = fakeWindow({ fetchOk: 'throw' })
   const analytics = start(env)
   analytics.startPlay(GAME)
@@ -238,6 +239,10 @@ test('leaving the page hands the queue to a beacon, keeping it when the browser 
   assert.equal(env.beacons[0].blob.type, 'text/plain;charset=UTF-8')
   assert.deepEqual(beacon.events.map((event) => event.type), ['app_open', 'game_start', 'heartbeat'])
   assert.equal(beacon.events[2].active_ms, 8_000)
+  assert.equal(JSON.parse(env.storage.get('xiaochao-analytics-queue')).length, 3)
+  env.win.fetch = async (url, init) => { env.posts.push({ body: JSON.parse(init.body) }); return { ok: true } }
+  env.online()
+  await settle()
   assert.equal(env.storage.has('xiaochao-analytics-queue'), false)
 
   const refused = fakeWindow({ fetchOk: 'throw', beaconOk: false })
@@ -251,4 +256,66 @@ test('without an endpoint nothing is collected', () => {
   installAnalytics('')
   assert.equal(typeof trackPlay(GAME), 'function')
   assert.equal(trackPlay(GAME)(), undefined)
+  assert.doesNotThrow(() => reportError(new Error('disabled')))
+})
+
+test('client errors share the durable queue, session and current play', async () => {
+  const env = fakeWindow({ fetchOk: false })
+  const analytics = start(env)
+  analytics.startPlay(GAME)
+  analytics.reportError({ kind: 'runtime', message: 'failed' })
+  await settle()
+  const queue = JSON.parse(env.storage.get('xiaochao-analytics-queue'))
+  const error = queue.at(-1)
+  assert.equal(error.type, 'client_error')
+  assert.equal(error.session_id, queue[0].session_id)
+  assert.equal(error.play_id, queue[1].play_id)
+  assert.deepEqual(error.game, GAME)
+  assert.equal(error.error.message, 'failed')
+})
+
+test('long multibyte errors drain in ordered byte-budgeted batches after reconnecting', async () => {
+  const env = fakeWindow({ fetchOk: 'throw' })
+  const analytics = start(env)
+  for (let i = 0; i < 60; i++) {
+    analytics.reportError({ kind: 'runtime', message: '中文😀'.repeat(200), stack: '中文😀'.repeat(800) })
+  }
+  await settle()
+  const queued = JSON.parse(env.storage.get('xiaochao-analytics-queue'))
+  env.pagehide()
+  const beaconBody = env.beacons[0].blob.text
+  assert.ok(Buffer.byteLength(beaconBody, 'utf8') <= 48 * 1024)
+  assert.ok(JSON.parse(beaconBody).events.length < 50)
+  assert.deepEqual(JSON.parse(env.storage.get('xiaochao-analytics-queue')), queued)
+  env.posts.length = 0
+  env.win.fetch = async (url, init) => { env.posts.push({ init, body: JSON.parse(init.body) }); return { ok: true } }
+  env.online()
+  await settle()
+  assert.ok(env.posts.length > 1)
+  for (const post of env.posts) {
+    assert.ok(Buffer.byteLength(post.init.body, 'utf8') <= 48 * 1024)
+    assert.ok(post.body.events.length <= 50)
+  }
+  assert.deepEqual(events(env.posts).map(event => event.id), queued.map(event => event.id))
+  assert.equal(env.storage.has('xiaochao-analytics-queue'), false)
+})
+
+test('oversized corrupt persisted events cannot block valid events', async () => {
+  const corrupt = { id: 'corrupt', error: { message: '😀'.repeat(50_000) } }
+  const valid = { id: 'valid', type: 'client_error', error: { kind: 'runtime', message: 'ok' } }
+  const storage = new Map([['xiaochao-analytics-queue', JSON.stringify([corrupt, valid])]])
+  const env = fakeWindow({ storage })
+  start(env)
+  await settle()
+  assert.deepEqual(events(env.posts).map(event => event.id).slice(0, 1), ['valid'])
+  assert.equal(events(env.posts).some(event => event.id === 'corrupt'), false)
+  assert.equal(storage.has('xiaochao-analytics-queue'), false)
+})
+
+test('credential text redaction covers quoted values and complete cookie headers', () => {
+  const raw = '{"password":"test-private value","access_token":"test-token","client_secret":"test-secret","status":"ready"}\nCookie: theme=dark; session=test-session\nSet-Cookie: session=test-set; Path=/\nstatus=healthy'
+  const result = normalizeError(raw).message
+  for (const secret of ['test-private', 'value', 'test-token', 'test-secret', 'test-session', 'test-set']) assert.equal(result.includes(secret), false)
+  assert.ok(result.includes('"status":"ready"'))
+  assert.ok(result.includes('status=healthy'))
 })

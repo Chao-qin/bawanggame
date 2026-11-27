@@ -1,12 +1,12 @@
 // The installed app has no Node server, so the host answers the page's online requests itself. It serves the same
-// paths and JSON as the desktop proxy (apps/server/src/index.ts) and shares its page parsers. Native requests are
+// paths and JSON as the desktop proxy (apps/server/src/java, apps/server/src/flash) and shares its page parsers. Native requests are
 // not subject to CORS, which is why the page cannot fetch these sites directly. A downloaded game is written into
 // the static web root and the page reads it back from the local server.
-import { parseFlashArchiveDetail, parseFlashArchiveGames } from '../../../server/src/flashCatalog'
+import { parseFlashArchiveDetail, parseFlashArchiveGames } from '../../../server/src/flash/flashCatalog'
 import {
   allowedStoreUrl, isZipHeader, JAVA_DEFAULT_BASE, parseStoreCatalog, parseStoreDetail, storeCatalogQuery,
   storeCatalogUrl, storeDetailUrl, storeHosts, storeJarName, validStoreId,
-} from '../../../server/src/javaCatalog'
+} from '../../../server/src/java/javaCatalog'
 
 export const DOWNLOADS_PATH = '/__downloads'
 const FLASH_HOMES_BASE = 'https://flash.homes'

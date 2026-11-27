@@ -40,7 +40,7 @@ pnpm mobile:verify-web
 
 可用 `base64 <release.keystore`（macOS 可用 `base64 -i release.keystore`）生成 base64 内容。签名密钥只保存在 GitHub Actions secrets 中，不要提交到仓库。工作流从 tag 设置 Android `versionName`，并用 GitHub Actions run number 设置递增的 `versionCode`。
 
-52java 商城与 Flash 商城（Flash 保存计划）在安装包中开箱即用：页面的商城请求由 RN 宿主直接访问 52emu / flash.homes（原生请求不受 CORS 限制，见 `src/host/onlineProxy.ts`），下载的 JAR / SWF 先写入本地静态目录 `__downloads/`，再由页面读入本机库；该目录在每次启动时清空。页面与桌面 Node 代理共用同一套页面解析（`apps/server/src/javaCatalog.ts`、`flashCatalog.ts`）。
+52java 商城与 Flash 商城（Flash 保存计划）在安装包中开箱即用：页面的商城请求由 RN 宿主直接访问 52emu / flash.homes（原生请求不受 CORS 限制，见 `src/host/onlineProxy.ts`），下载的 JAR / SWF 先写入本地静态目录 `__downloads/`，再由页面读入本机库；该目录在每次启动时清空。页面与桌面 Node 代理共用同一套页面解析（`apps/server/src/java/javaCatalog.ts`、`apps/server/src/flash/flashCatalog.ts`）。
 
 如需改用自建的 Node 服务，可在构建时设置（可选）：
 

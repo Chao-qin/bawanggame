@@ -1,7 +1,15 @@
-import { createHashRouter, Navigate, useLocation, useParams } from 'react-router-dom'
+import { useEffect } from 'react'
+import { createHashRouter, Navigate, useLocation, useParams, useRouteError } from 'react-router-dom'
+import { reportError } from './error-reporting.js'
 import App, { RuntimeFramePage } from './App.jsx'
 
 const libraryTabs = new Set(['j2me', 'maopao', 'flash', 'flash-store', 'store'])
+
+function RouteFailure() {
+  const error = useRouteError()
+  useEffect(() => { reportError(error, { kind: 'react', context: 'route' }) }, [error])
+  return <div role="alert">页面加载失败，请刷新后重试。</div>
+}
 
 function UnknownRoute() {
   const location = useLocation()
@@ -14,13 +22,14 @@ function UnknownRoute() {
 export function createApplicationRouter(runtimeFrame) {
   const routes = runtimeFrame
     ? [
-      { path: '/play/:kind/*', element: <RuntimeFramePage /> },
+      { path: '/play/:kind/*', element: <RuntimeFramePage />, errorElement: <RouteFailure /> },
       { path: '*', element: null },
     ]
     : [
       {
         path: '/',
         element: <App />,
+        errorElement: <RouteFailure />,
         children: [
           { path: 'library/:tab?' },
           { path: 'play/:kind/*' },

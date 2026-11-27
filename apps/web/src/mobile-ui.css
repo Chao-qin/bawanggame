@@ -78,6 +78,14 @@ body, :root:root {
   padding-block: calc(14px + var(--safe-area-top, 0px)) 14px;
   border-bottom: 1px solid var(--ui-border);
 }
+.updateNotices {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.updateNotices .adm-notice-bar { border-radius: var(--ui-radius-md); }
+.updateNotices .adm-notice-bar-info { --text-color: #0b3a75; }
+.updateNotices a { color: inherit; font-weight: 600; }
 .brand {
   display: flex;
   align-items: center;

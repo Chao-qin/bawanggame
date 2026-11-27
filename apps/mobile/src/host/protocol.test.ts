@@ -14,6 +14,19 @@ function loadBridge(post?: (raw: string) => void, capabilities: Parameters<typeo
 }
 
 describe('injected bridge requests', () => {
+  it('announces readiness with the WebView user agent for the engine version check', () => {
+    const sent: Array<{ type: string; payload?: unknown }> = []
+    const window: Record<string, unknown> = {
+      location: { href: 'http://127.0.0.1/', hash: '' },
+      navigator: { userAgent: 'Mozilla/5.0 Chrome/120.0.0.0 Mobile Safari/537.36' },
+      dispatchEvent: () => true,
+      ReactNativeWebView: { postMessage: (raw: string) => sent.push(JSON.parse(raw)) },
+    }
+    // eslint-disable-next-line no-new-func
+    new Function('window', 'CustomEvent', injectedBridge([]))(window, class {})
+    expect(sent.find((item) => item.type === 'app.ready')?.payload).toEqual({ url: 'http://127.0.0.1/', userAgent: 'Mozilla/5.0 Chrome/120.0.0.0 Mobile Safari/537.36' })
+  })
+
   it('posts a request with an id and settles it from the host script', async () => {
     const sent: Array<{ id?: string; type: string; payload?: unknown }> = []
     const host = loadBridge((raw) => sent.push(JSON.parse(raw)))

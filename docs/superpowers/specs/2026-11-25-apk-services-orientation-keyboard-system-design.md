@@ -14,7 +14,7 @@
 APK 内没有 Node 服务，商城此前只能在构建时注入 `MOBILE_52JAVA_API_BASE`。现在：
 
 - 页面统一经 `apps/web/src/online.js` 的 `onlineFetch(path)` 请求 `/__52java/*`、`/__flash/*`：浏览器走 Node 代理；设置了 `MOBILE_52JAVA_API_BASE` 的包走该地址；否则由 RN 宿主回答（`online.fetch` 桥接请求，带 id 的请求/应答）。
-- 宿主 `apps/mobile/src/host/onlineProxy.ts` 用原生 `fetch`（不受 CORS 限制）请求 52emu / flash.homes，与 Node 代理共用 `apps/server/src/javaCatalog.ts`、`flashCatalog.ts` 的解析。下载写入静态根目录 `__downloads/`（启动时清空），页面再从本地服务读回；52emu 下载的 https→http 跳转由 fetch 跟随，最终地址仍按 52emu 主机白名单校验，并校验 ZIP / SWF 签名与大小上限（JAR 经 JS 内存转存，限 16 MiB；SWF 由原生下载器落盘，限 64 MiB）。宿主只声明本机能提供的能力（`online.fetch` 仅 Android，`orientation.lock` 仅在原生模块注册时）；桥接请求带超时，超时后挂起项被清理。
+- 宿主 `apps/mobile/src/host/onlineProxy.ts` 用原生 `fetch`（不受 CORS 限制）请求 52emu / flash.homes，与 Node 代理共用 `apps/server/src/java/javaCatalog.ts`、`apps/server/src/flash/flashCatalog.ts` 的解析。下载写入静态根目录 `__downloads/`（启动时清空），页面再从本地服务读回；52emu 下载的 https→http 跳转由 fetch 跟随，最终地址仍按 52emu 主机白名单校验，并校验 ZIP / SWF 签名与大小上限（JAR 经 JS 内存转存，限 16 MiB；SWF 由原生下载器落盘，限 64 MiB）。宿主只声明本机能提供的能力（`online.fetch` 仅 Android，`orientation.lock` 仅在原生模块注册时）；桥接请求带超时，超时后挂起项被清理。
 - 同类问题一并处理：APK 内置 JAR 的图标在打包时导出到 `jar-icons/`；外部链接（如「打开原站」）交给系统浏览器，不再替换应用页面。
 
 ## 2. 冒泡全量目录
