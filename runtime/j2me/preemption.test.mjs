@@ -52,11 +52,17 @@ const loop = new J2ME.ClassInfo(classFile({
   straight: [ILOAD_0, IFEQ, 0x00, 0x04, RETURN, RETURN],
   // The same busy-wait after two instructions, so its loop header is not the method entry.
   spinLater: [ICONST_0, POP, ILOAD_0, IFNE, 0xff, 0xff, RETURN],
+  // A state-machine loop can use a switch as its back edge.
+  spinSwitch: [ICONST_0, 0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, RETURN],
 }))
 const method = (name) => loop.getLocalMethodByNameString(name, '(I)V')
 
 test('a small loop that calls nothing can be preempted', () => {
   assert.equal(J2ME.canYield(method('spin')), LIKELY)
+})
+
+test('a switch loop can be preempted', () => {
+  assert.equal(J2ME.canYield(method('spinSwitch')), LIKELY)
 })
 
 test('a method without a backward branch still cannot yield', () => {
