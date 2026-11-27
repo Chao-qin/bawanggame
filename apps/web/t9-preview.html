@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body { margin: 0; background: #0b0e13; }
+      body { display: grid; place-items: center; min-height: 100vh; }
+      #root { width: 420px; }
+      .wrap { aspect-ratio: 7.4 / 7.95; width: 100%; }
+      .wrap.landscape { aspect-ratio: 7.4 / 3.6; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import { KeyboardCanvas } from '/src/keyboard/KeyboardCanvas.jsx'
+      import { T9_PORTRAIT, T9_LANDSCAPE, getLayout } from '/src/keyboard/layouts.js'
+      const params = new URLSearchParams(location.search)
+      const id = params.get('layout') === 'landscape' ? T9_LANDSCAPE : T9_PORTRAIT
+      const layout = getLayout(id)
+      createRoot(document.getElementById('root')).render(
+        React.createElement('div', { className: 'wrap' + (id === T9_LANDSCAPE ? ' landscape' : '') },
+          React.createElement(KeyboardCanvas, { layout, accessibleLabel: id }))
+      )
+    </script>
+  </body>
+</html>

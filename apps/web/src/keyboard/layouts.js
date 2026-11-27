@@ -156,7 +156,7 @@ const t9Side = {
 // A function key is a corner block: its box reaches towards the wheel, but the inner corner is cut away by an arc
 // concentric with the wheel. That gives the wheel almost the whole navigation area and leaves the four keys the
 // corners. KeyboardCanvas.jsx draws the arc; hit-test.js presses only the part of the box outside it.
-const T9_ARC_GAP = 0.12
+const T9_ARC_GAP = 0.04
 // The four function keys are drawn as icons, not legends: check = left soft key, back = right soft key,
 // end = end/hang-up key, clear = clear key. The label/value remain the runtime action and its accessible name.
 const T9_ICON = { choice: 'check', back: 'back', ret: 'end', clear: 'clear' }
@@ -187,7 +187,8 @@ const PORTRAIT_WHEEL = { x: (PORTRAIT_DESIGN_WIDTH - PORTRAIT_WHEEL_SIZE) / 2, y
 const portraitArc = t9Arc(PORTRAIT_WHEEL.x + PORTRAIT_WHEEL.size / 2,
   PORTRAIT_WHEEL.y + PORTRAIT_WHEEL.size / 2, PORTRAIT_WHEEL.size)
 const PORTRAIT_CORNER_WIDTH = 3.6
-const PORTRAIT_CORNER_HEIGHT = 1.9
+// Tall enough that the upper and lower function keys almost meet: the wide gap between them read as a dead zone.
+const PORTRAIT_CORNER_HEIGHT = 2.1
 const PORTRAIT_CORNER_RIGHT = PORTRAIT_DESIGN_WIDTH - PORTRAIT_CORNER_WIDTH
 const PORTRAIT_CORNER_BOTTOM = PORTRAIT_NAV_HEIGHT - PORTRAIT_CORNER_HEIGHT
 // The digit block: the same key size as before the wheel grew, starting just under the navigation area.
@@ -209,10 +210,10 @@ const landscapeArc = t9Arc(LANDSCAPE_WHEEL.x + LANDSCAPE_WHEEL.size / 2,
   LANDSCAPE_WHEEL.y + LANDSCAPE_WHEEL.size / 2, LANDSCAPE_WHEEL.size)
 const t9Landscape = [
   navWheel(LANDSCAPE_WHEEL.x, LANDSCAPE_WHEEL.y, LANDSCAPE_WHEEL.size),
-  cornerKey('choice', 0, 0, 1.3, 1, 'top-left', landscapeArc),
-  cornerKey('back', 1.5, 0, 1.3, 1, 'top-right', landscapeArc),
-  cornerKey('ret', 0, 1.6, 1.3, 1, 'bottom-left', landscapeArc),
-  cornerKey('clear', 1.5, 1.6, 1.3, 1, 'bottom-right', landscapeArc),
+  cornerKey('choice', 0, 0, 1.3, 1.25, 'top-left', landscapeArc),
+  cornerKey('back', 1.5, 0, 1.3, 1.25, 'top-right', landscapeArc),
+  cornerKey('ret', 0, 1.35, 1.3, 1.25, 'bottom-left', landscapeArc),
+  cornerKey('clear', 1.5, 1.35, 1.3, 1.25, 'bottom-right', landscapeArc),
   ...t9Digits({ x: 5.3, y: 0, width: 1.15, height: 0.9, stepX: 1.25, stepY: 0.98 }),
 ]
 

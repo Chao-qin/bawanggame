@@ -56,8 +56,12 @@ test('T9 halves: navigation above the digits in portrait, left of them with room
   assert.ok(portraitWheel.width / 7.4 > 0.55, 'the wheel spans more than half the keypad width')
   assert.deepEqual(
     ['choice', 'back', 'ret', 'clear'].map((id) => portrait.keys.find((key) => key.id === id).y),
-    [0, 0, 2.4, 2.4], 'end/clear keys sit beside the wheel instead of taking their own row',
+    [0, 0, 2.2, 2.2], 'end/clear keys sit beside the wheel instead of taking their own row',
   )
+  const topKeys = ['choice', 'back'].map((id) => portrait.keys.find((key) => key.id === id))
+  const bottomKeys = ['ret', 'clear'].map((id) => portrait.keys.find((key) => key.id === id))
+  const cornerGap = bottomKeys[0].y - (topKeys[0].y + topKeys[0].height)
+  assert.ok(cornerGap > 0 && cornerGap <= 0.11, 'the upper and lower function keys nearly meet')
   const digits = layoutGroup(portrait, 'numpad').keys
   const digitHeight = extent(digits).bottom - extent(digits).top
   const navBottom = extent(layoutGroup(portrait, 'nav').keys).bottom
