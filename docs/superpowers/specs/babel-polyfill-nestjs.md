@@ -13,9 +13,9 @@ Deliver browser compatibility and a NestJS server refactor together in one pull 
 
 ## Design
 
-Use Vite's legacy plugin, which uses Babel to create modern and legacy output and loads only the required polyfills for the configured browser targets. Polyfills are packaged with the site; no third-party runtime CDN is required. Browserslist will explicitly cover the latest two Chrome, Firefox, Safari, and Edge releases and Android WebView.
+Use Vite's legacy plugin, which uses Babel to create modern and legacy output and loads only the required polyfills for the configured browser targets. Polyfills are packaged with the site; no third-party runtime CDN is required. Browserslist explicitly targets the latest two Chrome, Firefox, Safari, and Edge releases and Chrome for Android for the Chromium-based WebView baseline. Device WebView compatibility still requires separate validation; classic emulator scripts loaded outside Vite are not Babel-transformed by this build.
 
-The NestJS application is divided into focused modules for catalog APIs, game downloads and archive inspection, static/runtime assets, and WebSocket proxy/Bluetooth services. The HTTP adapter and existing path contracts remain stable. WebSocket upgrade handling and TCP proxy sockets are attached through Nest lifecycle hooks and closed during shutdown.
+The NestJS application delegates catalog APIs, game downloads and archive inspection, and static/runtime assets to the existing HTTP handlers. A separate WebSocket runtime owns each application's Bluetooth rooms and proxy connections. The HTTP adapter and existing path contracts remain stable. WebSocket upgrade handling and TCP proxy sockets are attached through Nest lifecycle hooks and closed during shutdown, including process termination signals. An explicit TypeScript source root keeps the compiled entry at `dist/src/main.js` both locally and in the Docker build, where test sources are excluded.
 
 ## Acceptance
 

@@ -57,7 +57,7 @@ export default defineConfig({
         'last 2 Firefox versions',
         'last 2 Safari versions',
         'last 2 Edge versions',
-        'last 2 Android versions',
+        'last 2 ChromeAndroid versions',
       ],
       renderLegacyChunks: true,
       polyfills: true,

@@ -2,7 +2,8 @@ import { All, Controller, Inject, Injectable, Module, Req, Res } from '@nestjs/c
 import { HttpAdapterHost } from '@nestjs/core'
 import { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
-import { handleHttp, handleUpgrade } from './index.js'
+import { handleHttp } from './index.js'
+import { createWebSocketRuntime } from './websocket-runtime.js'
 
 @Controller()
 class HttpController {
@@ -15,7 +16,8 @@ class HttpController {
 @Injectable()
 class WebSocketLifecycle implements OnModuleInit, OnModuleDestroy {
   private server?: Server
-  private readonly upgrade = (req: IncomingMessage, socket: import('node:stream').Duplex, head: Buffer) => handleUpgrade(req, socket, head)
+  private readonly runtime = createWebSocketRuntime()
+  private readonly upgrade = this.runtime.handleUpgrade
 
   constructor(@Inject(HttpAdapterHost) private readonly adapterHost: HttpAdapterHost) {}
 
@@ -27,6 +29,7 @@ class WebSocketLifecycle implements OnModuleInit, OnModuleDestroy {
 
   onModuleDestroy() {
     this.server?.off('upgrade', this.upgrade)
+    return this.runtime.close()
   }
 }
 
