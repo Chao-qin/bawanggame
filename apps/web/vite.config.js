@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import legacy from '@vitejs/plugin-legacy'
 import UnoCSS from 'unocss/vite'
 
 const apiTarget = `http://127.0.0.1:${process.env.PORT || 8080}`
@@ -47,7 +48,22 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
-  plugins: [react(), UnoCSS()],
+  plugins: [
+    react(),
+    UnoCSS(),
+    legacy({
+      targets: [
+        'last 2 Chrome versions',
+        'last 2 Firefox versions',
+        'last 2 Safari versions',
+        'last 2 Edge versions',
+        'last 2 Android versions',
+      ],
+      renderLegacyChunks: true,
+      polyfills: true,
+      modernPolyfills: true,
+    }),
+  ],
   server: {
     port: 5173,
     proxy: {

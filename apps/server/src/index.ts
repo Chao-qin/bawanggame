@@ -1,8 +1,7 @@
 import { createReadStream, promises as fs } from 'node:fs'
-import { createServer, IncomingMessage, ServerResponse } from 'node:http'
+import { IncomingMessage, ServerResponse } from 'node:http'
 import { connect as tcpConnect } from 'node:net'
 import crypto from 'node:crypto'
-import { networkInterfaces } from 'node:os'
 import { connect as tlsConnect } from 'node:tls'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { URL } from 'node:url'
@@ -12,8 +11,7 @@ import yauzl from 'yauzl'
 import { parseFlashArchiveDetail, parseFlashArchiveGames, type FlashArchiveGame } from './flashCatalog.js'
 import { allowedStoreUrl, isZipHeader, JAVA_DEFAULT_BASE, parseStoreCatalog, parseStoreDetail, storeCatalogQuery, storeCatalogUrl, storeDetailUrl, storeHosts, storeJarName, validStoreId, type StoreCatalog, type StoreCatalogQuery, type StoreGame } from './javaCatalog.js'
 
-const PROJECT = resolve(import.meta.dirname, '../../..')
-const PORT = Number(process.env.PORT ?? 8080)
+const PROJECT = resolve(import.meta.dirname, import.meta.dirname.endsWith('/dist/src') ? '../../../..' : '../../..')
 const JAVA_BASE = (process.env['52JAVA_BASE_URL'] ?? JAVA_DEFAULT_BASE).replace(/\/$/, '')
 const JAVA_HOSTS = storeHosts(JAVA_BASE)
 const JAVA_MAX_BYTES = Number(process.env['52JAVA_MAX_BYTES'] ?? 64 * 1024 * 1024)
@@ -30,7 +28,6 @@ const MIME: Record<string, string> = {
   '.png': 'image/png', '.svg': 'image/svg+xml', '.wasm': 'application/wasm',
   '.jar': 'application/java-archive', '.mrp': 'application/octet-stream',
 }
-
 const storeCache = new Map<string, { expires: number; value: StoreCatalog }>()
 const flashArchiveCache = new Map<string, { expires: number; value: FlashArchiveGame[] }>()
 
@@ -277,7 +274,7 @@ async function jars(res: ServerResponse) {
   res.end(JSON.stringify(items))
 }
 
-const server = createServer(async (req, res) => {
+export async function handleHttp(req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
   if (req.method === 'OPTIONS' && url.pathname.startsWith('/__52java/')) {
     res.writeHead(204, {
@@ -368,15 +365,15 @@ const server = createServer(async (req, res) => {
   }
   const target = mappedPath(url.pathname === '/' ? '/index.html' : url.pathname)
   if (!target || !(await sendFile(req, res, target, immutableRequest(url)))) res.writeHead(404).end('Not found')
-})
+}
 
 const wss = new WebSocketServer({ noServer: true })
-server.on('upgrade', (req, socket, head) => {
+export function handleUpgrade(req: IncomingMessage, socket: import('node:stream').Duplex, head: Buffer) {
   const path = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`).pathname
   if (path === '/__proxy' || path === '/__bt') {
     wss.handleUpgrade(req, socket, head, ws => handleSocket(path, req, ws))
   } else socket.destroy()
-})
+}
 
 type Radio = { ws: WebSocket; addr: string; name: string; services: Map<string, string>; links: Set<number>; room: string }
 const rooms = new Map<string, { pass: string; net: string; peers: Map<string, Radio> }>()
@@ -453,11 +450,3 @@ function handleSocket(path: string, req: IncomingMessage, ws: WebSocket) {
   ws.on('message', (data, binary) => { if (binary) tcp.write(data as Buffer); else if (data.toString() === 'shut') tcp.end() })
   ws.on('close', () => tcp.destroy())
 }
-
-const lanAddress = Object.values(networkInterfaces())
-  .flat()
-  .find((item) => item && item.family === 'IPv4' && !item.internal)?.address
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`http://localhost:${PORT}`)
-  if (lanAddress) console.log(`http://${lanAddress}:${PORT}`)
-})

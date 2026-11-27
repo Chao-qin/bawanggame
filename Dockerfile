@@ -51,7 +51,7 @@ COPY --from=production-dependencies /app/node_modules/ node_modules/
 COPY --from=production-dependencies /app/apps/server/node_modules/ apps/server/node_modules/
 COPY --from=build /app/apps/server/package.json apps/server/
 # The server resolves asset paths relative to its entrypoint.
-COPY --from=build /app/apps/server/dist/src/ apps/server/src/
+COPY --from=build /app/apps/server/dist/src/ apps/server/dist/src/
 COPY runtime/ runtime/
 COPY games/jar/.keep games/jar/
 COPY start.sh turnserver.conf ./
@@ -64,4 +64,4 @@ EXPOSE 8080 3478/tcp 3478/udp 49160-49200/udp
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s \
   CMD curl -fsS "http://127.0.0.1:${PORT}/" > /dev/null || exit 1
 ENTRYPOINT ["bash", "start.sh"]
-CMD ["node", "apps/server/src/index.js"]
+CMD ["node", "apps/server/dist/src/main.js"]
