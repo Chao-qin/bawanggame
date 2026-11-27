@@ -27,6 +27,7 @@ body {
 /* 应用界面不是文档：长按不选字、不弹系统菜单；输入控件保留选择和粘贴。JS 兜底见 selection-guard.js。 */
 html,
 body {
+  overscroll-behavior-y: none;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -60,6 +61,7 @@ body, :root:root {
   min-height: 100dvh;
   margin-inline: auto;
   padding: 0 max(16px, var(--safe-area-right, 0px)) 32px max(16px, var(--safe-area-left, 0px));
+  overflow-x: clip;
 }
 .runtimeFrame {
   position: fixed;
@@ -637,6 +639,8 @@ body.runtime-active .runtimeSheet * { touch-action: pan-y !important; }
     padding: 6px max(5px, var(--safe-area-right, 0px)) max(6px, var(--safe-area-bottom, 0px)) max(5px, var(--safe-area-left, 0px));
     border-width: 1px 0 0;
     border-radius: 0;
+    overscroll-behavior: none;
+    touch-action: manipulation;
   }
   .tabs .tab { padding: 7px 0; font-size: 10px; }
   .tabs .tab {
@@ -702,6 +706,12 @@ body.runtime-active .runtimeSheet * { touch-action: pan-y !important; }
 }
 
 @media (max-width: 420px) {
+  .installShortcut {
+    width: var(--ui-control-size);
+    min-width: var(--ui-control-size);
+    padding-inline: 0;
+  }
+  .installShortcut > span { display: none; }
   .storeGrid { grid-template-columns: minmax(0, 1fr); }
   .storeCard .storeCardBody { gap: 10px; }
   .storeCard .downloadButton { min-width: 72px; }
@@ -736,6 +746,12 @@ body.runtime-active .runtimeSheet * { touch-action: pan-y !important; }
 }
 .header .headerAction > span { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
 .header .headerAction[aria-pressed='true'] { background: var(--ui-raised); color: var(--ui-accent); }
+.installShortcutMessage {
+  padding: 20px max(16px, var(--safe-area-right, 0px)) calc(20px + var(--safe-area-bottom, 0px)) max(16px, var(--safe-area-left, 0px));
+  color: var(--ui-text);
+}
+.installShortcutMessage strong { font-size: 18px; }
+.installShortcutMessage p { margin: 10px 0 16px; color: var(--ui-muted); line-height: 1.6; }
 
 /* 「键盘」 page (keyboard/KeyboardSystemPage.jsx). */
 .keyboardSystem { display: grid; gap: var(--ui-space-3); padding-block: var(--ui-space-4); }
