@@ -14,6 +14,7 @@ services:
       FEISHU_USAGE_SHEET_ID: "${FEISHU_USAGE_SHEET_ID:-}"
       FEISHU_ERROR_SHEET_ID: "${FEISHU_ERROR_SHEET_ID:-}"
       FEISHU_SERVER_SHEET_ID: "${FEISHU_SERVER_SHEET_ID:-}"
+      FEISHU_SESSION_SHEET_ID: "${FEISHU_SESSION_SHEET_ID:-}"
     volumes:
       - reporting-logs:/app/.data/reporting
       - type: bind

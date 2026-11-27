@@ -21,6 +21,21 @@ afterEach(async () => {
 })
 
 describe('ReportStore', () => {
+  it('gives heartbeats outside a game a receipt at once: deduplicated, never queued or sent to the event sheet', async () => {
+    const disabled = { enabled: false, append: vi.fn(async () => {}) }
+    const { store, directory } = await setup(disabled)
+    const lobby = { ...record('lobby'), type: 'heartbeat' }
+    const play = { ...record('play'), type: 'heartbeat', play_id: 'play-1' }
+    expect((await store.accept([lobby, play])).map(item => item.id)).toEqual(['lobby', 'play'])
+    expect(await store.accept([lobby])).toEqual([])
+    expect(await readdir(join(directory, 'pending'))).toHaveLength(1)
+    expect(await readdir(join(directory, 'sent'))).toHaveLength(1)
+    const enabled = await setup()
+    await enabled.store.accept([{ ...record('lobby-3'), type: 'heartbeat' }])
+    await enabled.store.flush()
+    expect(enabled.sink.append).not.toHaveBeenCalled()
+  })
+
   it('recovers pending records and keeps sent receipts across restarts', async () => {
     const { store, directory, sink } = await setup()
     expect(await store.accept([record('a'), record('a')])).toHaveLength(1)

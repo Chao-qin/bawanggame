@@ -19,7 +19,7 @@
 
 ## 2. 开启方式
 
-Web 默认上报同源 `/collect`。构建时可用 `VITE_ANALYTICS_URL` 指定其他地址，显式空字符串关闭。APK 未配置时仍不采集，需要配置对应环境的 HTTPS 完整地址。
+Web 默认上报同源 `/collect`。构建时可用 `VITE_ANALYTICS_URL` 指定其他地址，`off` 关闭，空字符串等同未设置。APK 未配置时仍不采集，需要配置对应环境的 HTTPS 完整地址（发版流程默认生产地址）。
 
 | 构建方式 | 设置位置 |
 |---|---|
@@ -52,7 +52,7 @@ Content-Type: text/plain;charset=UTF-8     ← 正文是 JSON 字符串，按 JS
   "device_id": "48315c73-5202-4dd2-8418-b73a43ddde48",
   "platform": "web",
   "events": [
-    { "id": "…", "type": "app_open",   "ts": 1795590372641, "session_id": "…" },
+    { "id": "…", "type": "app_open",   "ts": 1795590372641, "session_id": "…", "seq": 1 },
     { "id": "…", "type": "game_start", "ts": 1795590380000, "session_id": "…", "play_id": "…",
       "game": { "kind": "flash", "file": "sample-game.swf", "name": "Star Catcher", "local": false } },
     { "id": "…", "type": "heartbeat",  "ts": 1795590410000, "session_id": "…", "play_id": "…", "game": { … }, "active_ms": 30000 },
@@ -67,7 +67,8 @@ Content-Type: text/plain;charset=UTF-8     ← 正文是 JSON 字符串，按 JS
 | `device_id` | 设备 ID（第 1 节） |
 | `platform` | `web` / `android` / `ios` |
 | `events[].id` | 事件唯一 ID，用于去重 |
-| `events[].type` | `app_open` 打开应用；`game_start` 进入游戏；`heartbeat` 游玩心跳；`game_end` 退出游戏；`client_error` 前端异常 |
+| `events[].type` | `app_open` 打开应用；`game_start` 进入游戏；`heartbeat` 心跳（页面可见时每 30 秒一次，在大厅时不带游戏字段）；`game_end` 退出游戏；`client_error` 前端异常 |
+| `events[].seq` | 本次打开应用内的序号，从 1 递增，所有事件共用；服务端据此统计丢失的确认（[会话 ack 设计](2026-11-27-usage-session-ack-design.md)） |
 | `events[].ts` | 客户端时间，毫秒时间戳（设备时钟可能不准，可另记服务端收到时间） |
 | `events[].session_id` | 本次打开应用的 ID |
 | `events[].play_id` | 这一局的 ID，`game_start` 到 `game_end` 相同 |
@@ -88,7 +89,7 @@ Content-Type: text/plain;charset=UTF-8     ← 正文是 JSON 字符串，按 JS
 | 每局时长 | 同一 `play_id` 的 `active_ms` 求和 |
 | 每个游戏总时长、人均时长 | 按游戏分组对 `active_ms` 求和，再除以 `device_id` 去重数 |
 
-`game_end` 可能因进程被杀而丢失，此时一局最多少算最后不到 30 秒；不需要 `game_end` 也能算时长。
+`game_end` 可能因进程被杀而丢失，此时一局最多少算最后不到 30 秒；不需要 `game_end` 也能算时长。何时离开由服务端按确认超时判定，见会话 ack 设计。
 
 ## 5. 接入点
 

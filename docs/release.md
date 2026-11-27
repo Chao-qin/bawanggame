@@ -20,9 +20,11 @@ PR 和 `main` 的推送由 `CI` workflow 检查：Web 构建、服务端与 Web 
 | 类型 | 名称 | 说明 |
 |---|---|---|
 | Secret | `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD` | 发版签名；缺任何一项发版都会失败 |
-| Variable | `ANALYTICS_URL` | APK 的上报地址，填完整 HTTPS 接口地址（例如 `https://<域名>/collect`）；不填则 APK 不上报 |
+| Variable | `ANALYTICS_URL` | APK 和同次构建的静态站包的上报地址，填完整 HTTPS 接口地址（例如 `https://<域名>/collect`）；不填时默认 `https://frp-net.com:59352/collect`，填 `off` 关闭上报 |
 
 服务端运行时的环境变量（飞书、日志目录等）见 `.env.example` 和 `docs/reporting.md`，与打包无关。
+
+未设置 `ANALYTICS_URL` 时，每次发版的 APK 与静态站包都向生产地址上报，测试用的发版也会写入生产表格；测试 tag 应先把变量设为测试环境地址或 `off`。客户端会发送不在游戏中的心跳，旧版服务端会拒收这类批次，所以**先部署服务端，再发布客户端**。
 
 ## 版本检测与公告
 

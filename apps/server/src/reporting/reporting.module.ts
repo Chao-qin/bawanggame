@@ -7,6 +7,9 @@ import { FeishuSink, feishuConfig } from './feishu-sink.js'
 import { parseReports, redact, serverRecord } from './report-record.js'
 import type { ReportRecord } from './report-record.js'
 import { ReportStore } from './report-store.js'
+import { SessionTracker } from './sessions.js'
+
+const logDirectory = () => resolve(process.env.LOG_DIR || '.data/reporting')
 
 export function printReport(record: ReportRecord) {
   const stream = ['error', 'fatal', 'warn'].includes(record.level) ? process.stderr : process.stdout
@@ -68,7 +71,7 @@ function readBody(req: IncomingMessage): Promise<unknown> {
 
 @Controller('collect')
 class ReportingController {
-  constructor(@Inject(ReportStore) private readonly store: ReportStore) {}
+  constructor(@Inject(ReportStore) private readonly store: ReportStore, @Inject(SessionTracker) private readonly sessions: SessionTracker) {}
 
   @All()
   async collect(@Req() req: IncomingMessage, @Res() res: ServerResponse) {
@@ -83,7 +86,10 @@ class ReportingController {
       const payload = await readBody(req)
       try { records = parseReports(payload) } catch { throw new HttpException('Invalid report batch', 400) }
       const inserted = await this.store.accept(records)
-      inserted.forEach(printReport)
+      // Heartbeats outside a game only keep the session alive; printing one every 30 s per open page is noise.
+      inserted.filter(record => record.type !== 'heartbeat' || record.play_id).forEach(printReport)
+      // The events are stored: a session-table failure must not refuse them (a retry would be deduplicated anyway).
+      await this.sessions.observe(inserted).catch(() => process.stderr.write('Session tracking failed; events were stored\n'))
       res.writeHead(204).end()
     } catch (error) {
       const status = error instanceof HttpException ? error.getStatus() : 503
@@ -111,14 +117,22 @@ class ReportingExceptionFilter implements ExceptionFilter {
 @Module({
   controllers: [ReportingController],
   providers: [
-    { provide: ReportStore, useFactory: () => new ReportStore(resolve(process.env.LOG_DIR || '.data/reporting'), new FeishuSink(feishuConfig())) },
+    { provide: FeishuSink, useFactory: () => new FeishuSink(feishuConfig()) },
+    { provide: ReportStore, useFactory: (sink: FeishuSink) => new ReportStore(logDirectory(), sink), inject: [FeishuSink] },
+    { provide: SessionTracker, useFactory: (sink: FeishuSink) => new SessionTracker(logDirectory(), sink), inject: [FeishuSink] },
     AppLogger,
     { provide: APP_FILTER, useClass: ReportingExceptionFilter },
   ],
   exports: [ReportStore, AppLogger],
 })
 export class ReportingModule implements OnModuleInit, OnModuleDestroy {
-  constructor(@Inject(ReportStore) private readonly store: ReportStore) {}
-  onModuleInit() { this.store.start() }
-  onModuleDestroy() { return this.store.close() }
+  constructor(@Inject(ReportStore) private readonly store: ReportStore, @Inject(SessionTracker) private readonly sessions: SessionTracker, @Inject(FeishuSink) private readonly sink: FeishuSink) {}
+  onModuleInit() {
+    // Said once at startup: otherwise a missing variable only shows as an empty sheet.
+    if (!this.sink.enabled) process.stderr.write('Feishu sync is off (FEISHU_* not all set); reports stay in the console and LOG_DIR\n')
+    else if (!this.sink.sessionsEnabled) process.stderr.write('Feishu session sheet is off (FEISHU_SESSION_SHEET_ID not set); session state stays in LOG_DIR/sessions.json\n')
+    this.store.start()
+    this.sessions.start()
+  }
+  async onModuleDestroy() { await Promise.all([this.store.close(), this.sessions.close()]) }
 }

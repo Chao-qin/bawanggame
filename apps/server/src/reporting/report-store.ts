@@ -15,7 +15,23 @@ export class ReportQueueFullError extends Error {
 const MAX_BYTES = 50 * 1024 * 1024
 const MAX_RECORDS = 5000
 const RETENTION = 7 * 24 * 60 * 60 * 1000
+// Heartbeats outside a game only acknowledge the app session (the session table); the event sheet does not keep them.
+const sessionOnly = (record: ReportRecord) => record.type === 'heartbeat' && !record.play_id
 const keyOf = (record: ReportRecord) => createHash('sha256').update(JSON.stringify([record.category, record.device_id ?? '', record.id])).digest('hex')
+
+async function syncDirectory(directory: string) {
+  const handle = await open(directory, 'r')
+  try { await handle.sync() } finally { await handle.close() }
+}
+
+/** Writes `name` in `directory` so a crash leaves either the old or the new content, never a torn file. */
+export async function writeAtomic(directory: string, name: string, data: string) {
+  const temporary = join(directory, `${name}.${randomUUID()}.tmp`)
+  const handle = await open(temporary, 'wx', 0o600)
+  try { await handle.writeFile(data); await handle.sync() } finally { await handle.close() }
+  await rename(temporary, join(directory, name))
+  await syncDirectory(directory)
+}
 
 export class ReportStore {
   private readonly pending: string
@@ -39,18 +55,9 @@ export class ReportStore {
     return next
   }
 
-  private async syncDirectory(directory: string) {
-    const handle = await open(directory, 'r')
-    try { await handle.sync() } finally { await handle.close() }
-  }
+  private syncDirectory(directory: string) { return syncDirectory(directory) }
 
-  private async atomic(directory: string, key: string, data: string) {
-    const temporary = join(directory, `${key}.${randomUUID()}.tmp`)
-    const handle = await open(temporary, 'wx', 0o600)
-    try { await handle.writeFile(data); await handle.sync() } finally { await handle.close() }
-    await rename(temporary, join(directory, `${key}.json`))
-    await this.syncDirectory(directory)
-  }
+  private atomic(directory: string, key: string, data: string) { return writeAtomic(directory, `${key}.json`, data) }
 
   private async cleanup() {
     for (const file of await readdir(this.sent)) {
@@ -90,9 +97,12 @@ export class ReportStore {
         } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
         fresh.set(key, { record, data: JSON.stringify(record) })
       }
-      const size = [...fresh.values()].reduce((sum, item) => sum + Buffer.byteLength(item.data), 0)
-      if (fresh.size && (this.entries.size + fresh.size > MAX_RECORDS || this.bytes + size > MAX_BYTES)) throw new ReportQueueFullError()
-      for (const [key, { data }] of fresh) {
+      // Session-only heartbeats get their receipt at once: they deduplicate but never wait in (or fill) the queue.
+      const queued = [...fresh].filter(([, { record }]) => !sessionOnly(record))
+      const size = queued.reduce((sum, [, item]) => sum + Buffer.byteLength(item.data), 0)
+      if (queued.length && (this.entries.size + queued.length > MAX_RECORDS || this.bytes + size > MAX_BYTES)) throw new ReportQueueFullError()
+      for (const [key, { record, data }] of fresh) {
+        if (sessionOnly(record)) { await this.atomic(this.sent, key, ''); continue }
         await this.atomic(this.pending, key, data)
         const length = Buffer.byteLength(data)
         this.entries.set(key, length)

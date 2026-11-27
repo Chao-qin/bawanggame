@@ -18,7 +18,7 @@ RUN pnpm --filter @xiaochao/web --filter @xiaochao/server install --frozen-lockf
 COPY apps/web/ apps/web/
 COPY apps/server/ apps/server/
 COPY games/flash/ games/flash/
-# Browser reports use the same environment's backend; an explicit empty value disables collection.
+# Browser reports use the same environment's backend; `off` disables collection.
 ARG VITE_ANALYTICS_URL=/collect
 RUN pnpm build \
  && pnpm --filter @xiaochao/server build
