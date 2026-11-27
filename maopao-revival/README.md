@@ -4,6 +4,7 @@
 
 - 调研与验证结论：[docs/research.md](docs/research.md)
 - 运行时：`vendor/vmrp.github.io`（vmrp GPL-3.0 网页版，1.8MB WASM + 664 个内置 MRP 游戏，零 CDN 依赖）
+- 播放器内核：`runtime/mrp/vmrp/`（本仓库打补丁重编的 vmrp，原生执行系统层 `memcpy`，见其 README）；vendor 提供 `fs/` 与 `midi.js`
 
 ## 启动
 

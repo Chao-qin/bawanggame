@@ -54,8 +54,10 @@ find games/jar -maxdepth 1 -type f -name '*.jar' -exec cp {} "$DEST/jar/" \;
 # 冒泡运行时与大厅
 mkdir -p "$DEST/maopao/vmrp_v1.0" "$DEST/maopao/hall" "$DEST/maopao/public/mrps"
 cp -R "$VENDOR/vmrp_v1.0/fs" "$DEST/maopao/vmrp_v1.0/fs"
-cp "$VENDOR"/vmrp_v1.0/vmrp.js "$VENDOR"/vmrp_v1.0/vmrp.wasm \
-  "$VENDOR"/vmrp_v1.0/fs.js "$VENDOR"/vmrp_v1.0/midi.js "$DEST/maopao/vmrp_v1.0/"
+cp "$VENDOR"/vmrp_v1.0/fs.js "$VENDOR"/vmrp_v1.0/midi.js "$DEST/maopao/vmrp_v1.0/"
+# The player runs this repository's vmrp build (runtime/mrp/vmrp/README.md), not the vendor checkout's.
+mkdir -p "$DEST/runtime/mrp/vmrp"
+cp runtime/mrp/vmrp/vmrp.js runtime/mrp/vmrp/vmrp.wasm runtime/mrp/vmrp/LICENSE runtime/mrp/vmrp/README.md "$DEST/runtime/mrp/vmrp/"
 
 python3 - "$REPORT" "$VENDOR" "$DEST" <<'PYEOF'
 import json, os, shutil, sys

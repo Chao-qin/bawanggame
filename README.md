@@ -79,7 +79,7 @@ To include the MRP library, first place the vmrp runtime and your local game ass
 docker compose -f compose.yaml -f compose.mrp.yaml up --build -d --wait
 ```
 
-The default image carries the MRP runtime (`vmrp_v1.0`, from the pinned vmrp checkout) and the full tracked catalog; every game is marked `bundled: false` and loads from the public vmrp.github.io mirror when it starts. The optional Compose file mounts the tracked `maopao-revival/hall/` catalog and the vendor checkout’s `vmrp_v1.0/` and `public/mrps/` directories, so every game is served locally. Verify both vendor directories exist before adding the override. The 「大宋豪侠 · 本地复活」 entry requires the separate `dasong-server` service.
+The default image carries the MRP runtime (`vmrp_v1.0` system files from the pinned vmrp checkout, plus this repository's patched vmrp build in `runtime/mrp/vmrp/`) and the full tracked catalog; every game is marked `bundled: false` and loads from the public vmrp.github.io mirror when it starts. The optional Compose file mounts the tracked `maopao-revival/hall/` catalog and the vendor checkout’s `vmrp_v1.0/` and `public/mrps/` directories, so every game is served locally. Verify both vendor directories exist before adding the override. The 「大宋豪侠 · 本地复活」 entry requires the separate `dasong-server` service.
 
 ```bash
 docker compose logs -f web
@@ -158,5 +158,6 @@ public/               generated React PWA output (ignored by Git)
 - Licensed under the Apache License 2.0 (see `LICENSE`)
 - [pluotsorbet](https://github.com/mozilla/pluotsorbet) — Mozilla, Apache License 2.0; the class library is based on phoneME
 - M3G — [J2ME-Loader](https://github.com/nikita36078/J2ME-Loader), see `src/m3g/NOTICE` for details
+- [vmrp](https://github.com/vmrp/vmrp) (MRP runtime) with [unicorn](https://github.com/unicorn-engine/unicorn) — GPL-3.0; the patched build in `runtime/mrp/vmrp/` is GPL-3.0 (see its `LICENSE` and `README.md`)
 - [webaudio-tinysynth](https://github.com/g200kg/webaudio-tinysynth), [BenzAMRRecorder](https://github.com/BenzLeung/benz-amr-recorder), [text-encoding](https://github.com/inexorabletash/text-encoding)
 # 大宋豪侠本地服务器
