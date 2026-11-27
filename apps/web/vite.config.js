@@ -2,6 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import legacy from '@vitejs/plugin-legacy'
 import UnoCSS from 'unocss/vite'
+import { readFileSync } from 'node:fs'
+
+// The version update check (src/updates.js) compares this with the root package.json on the GitHub main branch.
+const appVersion = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version
 
 const apiTarget = `http://127.0.0.1:${process.env.PORT || 8080}`
 
@@ -45,6 +49,7 @@ const proxyTargets = [
 export default defineConfig({
   root: '.',
   base: '/',
+  define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion) },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

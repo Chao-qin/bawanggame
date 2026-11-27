@@ -129,7 +129,7 @@ export const injectedBridge = (capabilities: readonly HostCapability[], identity
     setInsets: setInsets,
     haptic: haptic
   };
-  send('app.ready', { url: window.location.href });
+  send('app.ready', { url: window.location.href, userAgent: window.navigator ? window.navigator.userAgent : '' });
 })();
 true;
 `

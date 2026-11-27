@@ -13,6 +13,7 @@ import { KeypadSettingsPopup } from './runtime/KeypadSettingsPopup.jsx'
 import { GameSettingsSheet } from './runtime/GameSettingsSheet.jsx'
 import { useKeypadPrefs, useRuntimeOrientation, useViewportOrientation } from './runtime/RuntimeKeypad.jsx'
 import { PrimaryNavigation } from './components/PrimaryNavigation.jsx'
+import { UpdateNotices } from './components/UpdateNotices.jsx'
 import { fetchArtwork, validArtwork } from './artwork.js'
 import { GameArtwork, LibraryGameEntry, RecentGameEntry, StoreGameEntry } from './components/GameEntry.jsx'
 import { cleanupRuntimeArtifacts } from './runtime/cleanup.js'
@@ -1373,6 +1374,7 @@ export default function App() {
         </Button>
         <PrimaryNavigation items={TABS} activeId={keyboardSystem ? null : tab} onSelect={switchTab} />
       </header>
+      <UpdateNotices />
       <main className="main">
         {keyboardSystem && <Suspense fallback={<div className="status" role="status"><DotLoading /> 加载中</div>}><KeyboardSystemPage onBack={closeKeyboard} /></Suspense>}
         {!keyboardSystem && TABS.map((t) => (

@@ -11,6 +11,7 @@ import { dispatchHapticMessage } from './src/host/haptics'
 import { handleOnlineRequest, type OnlineResult } from './src/host/onlineProxy'
 import { dispatchOrientationMessage } from './src/host/orientation'
 import { styles } from './src/host/styles'
+import { MIN_WEBVIEW_CHROME, openWebViewUpdate, outdatedWebViewVersion } from './src/host/webviewEngine'
 
 const MAX_START_ATTEMPTS = 2
 const BrowserView = WebView as any
@@ -29,6 +30,9 @@ function AppContent() {
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [bridgeScript, setBridgeScript] = useState(() => injectedBridge(hostCapabilities))
+  const [outdatedWebView, setOutdatedWebView] = useState<number | null>(null)
+  // 「知道了」 holds until the app restarts; every page load announces itself again (app.ready).
+  const webViewWarningDismissed = useRef(false)
 
   const start = useCallback(async () => {
     setError('')
@@ -86,6 +90,10 @@ function AppContent() {
   const handleMessage = (event: WebViewMessageEvent) => {
     const message = parseHostMessage(event.nativeEvent.data)
     if (!message) return
+    if (message.type === 'app.ready') {
+      if (!webViewWarningDismissed.current) setOutdatedWebView(outdatedWebViewVersion((message.payload as { userAgent?: unknown } | undefined)?.userAgent))
+      return
+    }
     if (message.type === 'haptic') {
       dispatchHapticMessage(message, Vibration)
       return
@@ -165,6 +173,21 @@ function AppContent() {
             <View style={styles.center}>
               <Text style={styles.title}>正在启动小潮霸王</Text>
               <Text style={styles.message}>正在准备内置模拟器资源…</Text>
+            </View>
+          )}
+          {outdatedWebView !== null && (
+            <View style={[styles.banner, { top: insets.top + 8 }]}>
+              <Text style={styles.bannerText}>
+                系统 WebView 内核版本过低（Chrome {outdatedWebView}，需要 {MIN_WEBVIEW_CHROME} 或更高），部分页面和游戏可能无法运行。请在应用市场更新「Android System WebView」或系统浏览器。
+              </Text>
+              <View style={styles.bannerActions}>
+                <Pressable style={styles.bannerButton} onPress={() => { openWebViewUpdate(Linking).catch(() => {}) }}>
+                  <Text style={styles.actionText}>去更新</Text>
+                </Pressable>
+                <Pressable style={styles.bannerButton} onPress={() => { webViewWarningDismissed.current = true; setOutdatedWebView(null) }}>
+                  <Text style={styles.actionText}>知道了</Text>
+                </Pressable>
+              </View>
             </View>
           )}
         </View>
