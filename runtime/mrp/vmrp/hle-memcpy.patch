@@ -1,0 +1,84 @@
+diff --git a/vmrp.c b/vmrp.c
+index e3e44c1..ffe0487 100644
+--- a/vmrp.c
++++ b/vmrp.c
+@@ -2,7 +2,9 @@
+ 
+ #include <inttypes.h>
+ #include <stdint.h>
++#include <stdbool.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <string.h>
+ 
+ #include "./header/bridge.h"
+@@ -153,6 +155,61 @@ int32_t loadCode() {
+     return MR_SUCCESS;
+ }
+ 
++
++// cfunction.ext copies memory one byte per loop iteration (its memcpy at 0x94E94: subs/ldrb/subs/strb/bcs),
++// and almost all of a game's emulated instructions are spent there, mostly copying screen buffers. When the
++// loaded cfunction.ext has exactly that code, do the copy natively on entry and leave R2 (the length) at 0, so
++// the original code returns at once through its own `subs r2, r2, #1; bxcc lr`. PC is not written: that would
++// stop the emulation, and unicorn flushes its whole translation cache every time emulation stops.
++#define HLE_MEMCPY_ADDRESS 0x94E94
++static const uint32_t hle_memcpy_code[] = {
++    0xE1A03000, 0xE2522001, 0x312FFF1E, 0xE4D1C001, 0xE2522001, 0xE4C3C001, 0x2AFFFFFB, 0xE12FFF1E,
++};
++static uint8_t *hle_buffer = NULL;
++static uint32_t hle_buffer_size = 0;
++
++static bool hle_in_memory(uint32_t addr, uint32_t len) {
++    return addr >= START_ADDRESS && addr < END_ADDRESS && len <= END_ADDRESS - addr;
++}
++
++static void hle_memcpy(uc_engine *uc, uint64_t address, uint32_t size, void *user_data) {
++    uint32_t dst, src, len, zero = 0;
++    uc_reg_read(uc, UC_ARM_REG_R0, &dst);
++    uc_reg_read(uc, UC_ARM_REG_R1, &src);
++    uc_reg_read(uc, UC_ARM_REG_R2, &len);
++    // Anything unusual (nothing to copy, or memory outside the emulator) runs the original code.
++    if (len == 0 || !hle_in_memory(dst, len) || !hle_in_memory(src, len)) return;
++    if (len > hle_buffer_size) {
++        uint8_t *buffer = realloc(hle_buffer, len);
++        if (buffer == NULL) return;
++        hle_buffer = buffer;
++        hle_buffer_size = len;
++    }
++    uint8_t *from = getMrpMemPtr(src);
++    uint32_t distance = dst - src;
++    if (dst > src && distance < len) {
++        // The original copies forward byte by byte, so a destination overlapping just after the source
++        // repeats its first `distance` bytes.
++        for (uint32_t i = 0; i < len; i++) hle_buffer[i] = i < distance ? from[i] : hle_buffer[i - distance];
++    } else {
++        memcpy(hle_buffer, from, len);
++    }
++    // uc_mem_write (unlike writing the host memory directly) also invalidates translated code in the range.
++    if (uc_mem_write(uc, dst, hle_buffer, len) != UC_ERR_OK) return;
++    uc_reg_write(uc, UC_ARM_REG_R2, &zero);
++}
++
++static void hle_init(uc_engine *uc) {
++    uint32_t code[sizeof(hle_memcpy_code) / sizeof(hle_memcpy_code[0])];
++    uc_hook hook;
++    if (uc_mem_read(uc, HLE_MEMCPY_ADDRESS, code, sizeof(code)) != UC_ERR_OK) return;
++    if (memcmp(code, hle_memcpy_code, sizeof(code)) != 0) {
++        printf("hle: cfunction.ext memcpy not found, copying in emulation\n");
++        return;
++    }
++    uc_hook_add(uc, &hook, UC_HOOK_CODE, hle_memcpy, NULL, HLE_MEMCPY_ADDRESS, HLE_MEMCPY_ADDRESS, 0);
++}
++
+ int startVmrp() {
+     uc = initVmrp();
+     if (uc == NULL) {
+@@ -164,6 +221,7 @@ int startVmrp() {
+         printf("loadCode fail.\n");
+         return MR_FAILED;
+     }
++    hle_init(uc);
+     bridge_ext_init(uc);
+ 
+     if (bridge_dsm_init(uc) == MR_SUCCESS) {

@@ -79,7 +79,7 @@ To include the MRP library, first place the vmrp runtime and your local game ass
 docker compose -f compose.yaml -f compose.mrp.yaml up --build -d --wait
 ```
 
-The default image carries the MRP runtime (`vmrp_v1.0`, from the pinned vmrp checkout) and the full tracked catalog; every game is marked `bundled: false` and loads from the public vmrp.github.io mirror when it starts. The optional Compose file mounts the tracked `maopao-revival/hall/` catalog and the vendor checkout’s `vmrp_v1.0/` and `public/mrps/` directories, so every game is served locally. Verify both vendor directories exist before adding the override. The 「大宋豪侠 · 本地复活」 entry requires the separate `dasong-server` service.
+The default image carries the MRP runtime (`vmrp_v1.0` system files from the pinned vmrp checkout, plus this repository's patched vmrp build in `runtime/mrp/vmrp/`) and the full tracked catalog; every game is marked `bundled: false` and loads from the public vmrp.github.io mirror when it starts. The optional Compose file mounts the tracked `maopao-revival/hall/` catalog and the vendor checkout’s `vmrp_v1.0/` and `public/mrps/` directories, so every game is served locally. Verify both vendor directories exist before adding the override. The 「大宋豪侠 · 本地复活」 entry requires the separate `dasong-server` service.
 
 ```bash
 docker compose logs -f web

@@ -31,7 +31,7 @@ export function MrpPlayer({ game, onReady }) {
         if (!alive || !session.active) return
         window.__XIAOCHAO_RUNTIME_MRP_URL = fileUrl
         await Promise.all(styles.map((src) => loadStyle(src, session)))
-        await loadClassicInOrder(['/config/i18n.js', '/config/settings.js', '/runtime/j2me/touch-layout.js', '/ui-feedback.js', '/keypad-canvas.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/maopao/vmrp_v1.0/vmrp.js'], session)
+        await loadClassicInOrder(['/config/i18n.js', '/config/settings.js', '/runtime/j2me/touch-layout.js', '/ui-feedback.js', '/keypad-canvas.js', '/runtime/j2me/input-mapping.js', '/touchpad.js', '/maopao/vmrp_v1.0/midi.js', '/mrp-runtime.js', '/runtime/mrp/vmrp/vmrp.js'], session)
         if (!alive || !session.active) return
         setLoading(false)
         callbacks.current.onReady?.()
