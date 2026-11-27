@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { reportError } from '../error-reporting.js'
 
 const API = '/dasong/v1/command'
 const noop = () => {}
@@ -45,6 +46,7 @@ export function LocalRevivalPlayer({ onExit, onCleanupReady }) {
         const world = await command(token, 'world.get')
         if (alive && !stoppedRef.current) setState({loading: false, error: '', token, world, character, message: '方向键移动角色'})
       } catch (error) {
+        if (alive && !stoppedRef.current) reportError(error, { kind: 'runtime', context: 'local-revival:startup' })
         if (alive && !stoppedRef.current) setState((current) => ({...current, loading: false, error: error.message || String(error), message: '本地服务未启动'}))
       }
     })()
@@ -74,6 +76,7 @@ export function LocalRevivalPlayer({ onExit, onCleanupReady }) {
       const world = await command(state.token, 'world.get')
       if (!stoppedRef.current) setState((current) => ({...current, world, character: {...current.character, x: result.x, y: result.y}, message: `已移动到 (${result.x}, ${result.y})`}))
     } catch (error) {
+      if (!stoppedRef.current) reportError(error, { kind: 'runtime', context: 'local-revival:network' })
       if (!stoppedRef.current) setState((current) => ({...current, message: error.message || String(error)}))
     }
   }

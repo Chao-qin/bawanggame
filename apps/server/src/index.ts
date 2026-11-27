@@ -1,4 +1,5 @@
 import { createReadStream, promises as fs } from 'node:fs'
+import { Logger } from '@nestjs/common'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { extname, join, normalize, resolve, sep } from 'node:path'
 import { URL } from 'node:url'
@@ -26,8 +27,10 @@ const MIME: Record<string, string> = {
 }
 const storeCache = new Map<string, { expires: number; value: StoreCatalog }>()
 const flashArchiveCache = new Map<string, { expires: number; value: FlashArchiveGame[] }>()
+const logger = new Logger('Http')
 
-function json(res: ServerResponse, status: number, value: unknown) {
+function json(res: ServerResponse, status: number, value: unknown, cause?: unknown) {
+  if (status >= 500) logger.error(cause ?? value)
   res.writeHead(status, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -84,7 +87,7 @@ async function storeDownload(res: ServerResponse, id: string) {
       return await streamStoreResponse(res, game, redirected)
     }
     return await streamStoreResponse(res, game, response)
-  } catch (error) { return json(res, 502, { error: String(error instanceof Error ? error.message : error) }) }
+  } catch (error) { return json(res, 502, { error: String(error instanceof Error ? error.message : error) }, error) }
 }
 
 async function streamStoreResponse(res: ServerResponse, game: StoreGame, response: Response) {
@@ -297,8 +300,7 @@ export async function handleHttp(req: IncomingMessage, res: ServerResponse) {
       const catalog = await storeCatalog(storeCatalogQuery(url.searchParams))
       return json(res, 200, { source: JAVA_BASE, siteUrl: JAVA_BASE, ...catalog })
     } catch (error) {
-      console.error('52emu catalog error:', error)
-      return json(res, 502, { error: 'catalog_unavailable', siteUrl: JAVA_BASE })
+      return json(res, 502, { error: 'catalog_unavailable', siteUrl: JAVA_BASE }, error)
     }
   }
   if (url.pathname === '/__52java/download') {
@@ -312,8 +314,7 @@ export async function handleHttp(req: IncomingMessage, res: ServerResponse) {
       const query = (url.searchParams.get('query') || '').trim().slice(0, 120)
       return json(res, 200, { source: FLASH_HOMES_BASE, games: await flashArchiveCatalog(query) })
     } catch (error) {
-      console.error('flash.homes catalog error:', error)
-      return json(res, 502, { error: 'flash_catalog_unavailable' })
+      return json(res, 502, { error: 'flash_catalog_unavailable' }, error)
     }
   }
   const flashDetail = url.pathname.match(/^\/__flash\/detail\/([A-Z0-9-]+)$/i)
@@ -323,7 +324,7 @@ export async function handleHttp(req: IncomingMessage, res: ServerResponse) {
       const detail = await flashHomesPage(`/flash/${code}`)
       return json(res, 200, { source: FLASH_HOMES_BASE, game: parseFlashArchiveDetail(detail, code) })
     } catch (error) {
-      return json(res, 502, { error: String(error instanceof Error ? error.message : error) })
+      return json(res, 502, { error: String(error instanceof Error ? error.message : error) }, error)
     }
   }
   const flashDownload = url.pathname.match(/^\/__flash\/download\/([A-Z0-9-]+)$/i)
@@ -356,7 +357,7 @@ export async function handleHttp(req: IncomingMessage, res: ServerResponse) {
       }
       return res.end()
     } catch (error) {
-      return json(res, 502, { error: String(error instanceof Error ? error.message : error) })
+      return json(res, 502, { error: String(error instanceof Error ? error.message : error) }, error)
     }
   }
   const target = mappedPath(url.pathname === '/' ? '/index.html' : url.pathname)

@@ -4,6 +4,7 @@ import { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { handleHttp } from './index.js'
 import { createWebSocketRuntime } from './websocket-runtime.js'
+import { ReportingModule } from './reporting.module.js'
 
 @Controller()
 class HttpController {
@@ -34,4 +35,7 @@ class WebSocketLifecycle implements OnModuleInit, OnModuleDestroy {
 }
 
 @Module({ controllers: [HttpController], providers: [WebSocketLifecycle] })
+class RuntimeModule {}
+
+@Module({ imports: [ReportingModule, RuntimeModule] })
 export class AppModule {}

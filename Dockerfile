@@ -18,8 +18,8 @@ RUN pnpm --filter @xiaochao/web --filter @xiaochao/server install --frozen-lockf
 COPY apps/web/ apps/web/
 COPY apps/server/ apps/server/
 COPY games/flash/ games/flash/
-# Usage statistics endpoint (docs/superpowers/specs/2026-11-24-usage-analytics-design.md); unset leaves them off.
-ARG VITE_ANALYTICS_URL=
+# Browser reports use the same environment's backend; an explicit empty value disables collection.
+ARG VITE_ANALYTICS_URL=/collect
 RUN pnpm build \
  && pnpm --filter @xiaochao/server build
 
@@ -44,7 +44,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-ENV NODE_ENV=production PORT=8080 TURN_STATE_DIR=/app/turn
+ENV NODE_ENV=production PORT=8080 TURN_STATE_DIR=/app/turn LOG_DIR=/app/.data/reporting
 
 COPY --from=build /app/public/ public/
 COPY --from=production-dependencies /app/node_modules/ node_modules/
@@ -57,7 +57,7 @@ COPY games/jar/.keep games/jar/
 COPY start.sh turnserver.conf ./
 COPY --from=mrp-runtime /vmrp/vmrp_v1.0/ maopao-revival/vendor/vmrp.github.io/vmrp_v1.0/
 COPY --from=mrp-runtime /catalog/manifest.json maopao-revival/vendor/vmrp.github.io/hall/manifest.json
-RUN install -d -o node -g node "$TURN_STATE_DIR"
+RUN install -d -o node -g node "$TURN_STATE_DIR" "$LOG_DIR"
 
 USER node
 EXPOSE 8080 3478/tcp 3478/udp 49160-49200/udp

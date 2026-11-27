@@ -3,12 +3,14 @@ import { NestFactory } from '@nestjs/core'
 import { Logger } from '@nestjs/common'
 import { networkInterfaces } from 'node:os'
 import { AppModule } from './app.module.js'
+import { AppLogger } from './reporting.module.js'
 
 const PORT = Number(process.env.PORT ?? 8080)
 const logger = new Logger('Bootstrap')
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bodyParser: false })
+  const app = await NestFactory.create(AppModule, { bodyParser: false, bufferLogs: true })
+  app.useLogger(app.get(AppLogger))
   app.enableShutdownHooks()
   await app.listen(PORT, '0.0.0.0')
 

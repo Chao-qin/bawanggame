@@ -11,6 +11,7 @@ const DEVICE_KEY = 'xiaochao-device-id'
 const QUEUE_KEY = 'xiaochao-analytics-queue'
 const MAX_QUEUE = 500
 const MAX_BATCH = 50
+const MAX_BATCH_BYTES = 48 * 1024
 const HEARTBEAT_MS = 30_000
 const FETCH_TIMEOUT_MS = 15_000
 
@@ -76,10 +77,28 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
     save()
   }
 
+  function nextBatch() {
+    const batch = []
+    const encoder = new TextEncoder()
+    for (const event of queue) {
+      if (encoder.encode(envelope([...batch, event])).byteLength > MAX_BATCH_BYTES) {
+        if (batch.length) break
+        // Corrupt persisted entries must not block every subsequent valid event.
+        queue = queue.filter((entry) => entry !== event)
+        save()
+        continue
+      }
+      batch.push(event)
+      if (batch.length === MAX_BATCH) break
+    }
+    return batch
+  }
+
   async function flush() {
     if (sending || !queue.length || !ready()) return
+    const batch = nextBatch()
+    if (!batch.length) return
     sending = true
-    const batch = queue.slice(0, MAX_BATCH)
     // A request that never settles (captive portal, half-open connection) must not hold up every later flush.
     const controller = typeof win.AbortController === 'function' ? new win.AbortController() : null
     const timer = controller ? win.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS) : 0
@@ -90,7 +109,6 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: envelope(batch),
         credentials: 'omit',
-        keepalive: true,
         signal: controller?.signal,
       })
       if (response.ok) drop(batch)
@@ -106,12 +124,13 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
     flush()
   }
 
-  // The page may be gone before a fetch settles; a beacon the browser accepted is taken as sent.
+  // Beacon cannot confirm HTTP acceptance; keep IDs queued until fetch confirms (the server deduplicates).
   function flushBeacon() {
-    const batch = queue.slice(0, MAX_BATCH)
-    if (!batch.length || typeof win.navigator?.sendBeacon !== 'function' || !ready()) return
+    if (typeof win.navigator?.sendBeacon !== 'function' || !ready()) return
+    const batch = nextBatch()
+    if (!batch.length) return
     try {
-      if (win.navigator.sendBeacon(endpoint, new win.Blob([envelope(batch)], { type: 'text/plain;charset=UTF-8' }))) drop(batch)
+      win.navigator.sendBeacon(endpoint, new win.Blob([envelope(batch)], { type: 'text/plain;charset=UTF-8' }))
     } catch (_) {}
   }
 
@@ -185,7 +204,12 @@ export function createAnalytics({ endpoint, win = window, now = Date.now, elapse
     flush()
   }
 
-  return { start, startPlay, flush }
+  function reportError(error) {
+    track('client_error', { ...(play ? playFields() : {}), error })
+    flush()
+  }
+
+  return { start, startPlay, flush, reportError }
 }
 
 let installed = null
@@ -200,4 +224,29 @@ export function installAnalytics(endpoint) {
 /** Marks `game` as being played until the returned function is called. */
 export function trackPlay(game) {
   return installed ? installed.startPlay(game) : () => {}
+}
+
+export function reportError(error, context) {
+  try { installed?.reportError(normalizeError(error, context)) } catch (_) {}
+}
+
+function text(value, limit) {
+  try {
+    return String(value ?? '').replace(/https?:\/\/[^\s)]+/g, (url) => url.split(/[?#]/)[0])
+      .replace(/\b((?:set-)?cookie)\s*:\s*[^\r\n]*/gi, '$1: [redacted]')
+      .replace(/(\b[\w-]*(?:authorization|cookie|password|token|secret|api[_-]?key)["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:Bearer\s+)?[^\s,;"'}]+)/gi, '$1[redacted]')
+      .replace(/\bBearer\s+[^\s,;"']+/gi, 'Bearer [redacted]').slice(0, limit)
+  } catch (_) { return '[unreadable]' }
+}
+
+export function normalizeError(error, context = {}) {
+  try {
+    const result = { kind: text(context.kind || 'runtime', 80), message: text(error?.message ?? error, 1000) }
+    if (error?.stack) result.stack = text(error.stack, 4000)
+    if (context.url) result.url = text(context.url, 500).split(/[?#]/)[0]
+    if (Number.isFinite(context.line)) result.line = context.line
+    if (Number.isFinite(context.column)) result.column = context.column
+    if (context.context) result.context = text(context.context, 500)
+    return result
+  } catch (_) { return { kind: 'runtime', message: '[unreadable]' } }
 }
